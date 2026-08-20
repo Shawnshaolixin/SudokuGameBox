@@ -50,15 +50,15 @@ sysinfo.txt
 # Crashlytics 生成文件
 crashlytics-build.properties
 
-# 打包的 Addressables 数据
-/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+# 打包的 Addressables 数据（任意层级）
+**/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
 
-# 临时自动生成的 Android 资源
-/[Aa]ssets/[Ss]treaming[Aa]ssets/aa.meta
-/[Aa]ssets/[Ss]treaming[Aa]ssets/aa/*
+# 临时自动生成的 Android 资源（任意层级）
+**/[Aa]ssets/[Ss]treaming[Aa]ssets/aa.meta
+**/[Aa]ssets/[Ss]treaming[Aa]ssets/aa/*
 
 # Unity AI Assistant 本地设置（可能含个人配置）
-ProjectSettings/Packages/com.unity.ai.assistant/
+com.unity.ai.assistant/
 
 # 本地 MCP 服务器配置（含本机绝对路径，个人环境使用）
 .mcp.json
