@@ -1,0 +1,1834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku - UI 原型设计稿</title>
+<style>
+  /* ===== 全局样式 ===== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 40px;
+  }
+
+  .page-title {
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 32px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .page-subtitle {
+    text-align: center;
+    color: #888;
+    margin-bottom: 40px;
+    font-size: 16px;
+    letter-spacing: 2px;
+  }
+  .page-subtitle span { color: #667eea; -webkit-text-fill-color: #667eea; }
+
+  /* ===== 布局 ===== */
+  .design-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 40px;
+  }
+
+  /* ===== 手机模型 ===== */
+  .phone-mockup {
+    width: 375px;
+    background: #0f0f1a;
+    border-radius: 44px;
+    padding: 16px;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.08),
+      0 20px 60px rgba(0,0,0,0.6),
+      0 0 120px rgba(102,126,234,0.06);
+    position: relative;
+    transition: transform 0.3s ease;
+  }
+  .phone-mockup:hover { transform: translateY(-6px); }
+
+  .phone-notch {
+    width: 150px; height: 30px;
+    background: #0f0f1a;
+    border-radius: 0 0 18px 18px;
+    margin: -16px auto 8px;
+    position: relative;
+    z-index: 10;
+  }
+  .phone-notch::after {
+    content: '';
+    width: 10px; height: 10px;
+    background: #1e1e32;
+    border-radius: 50%;
+    position: absolute;
+    top: 10px; left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .phone-screen {
+    background: #16162a;
+    border-radius: 32px;
+    overflow: hidden;
+    min-height: 700px;
+    position: relative;
+  }
+
+  /* ===== 屏幕标签 ===== */
+  .screen-label {
+    text-align: center;
+    padding: 12px 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #888;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  /* ===== 状态栏 ===== */
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 20px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #aaa;
+  }
+
+  /* ===== 主菜单 ===== */
+  .main-menu-content {
+    padding: 20px;
+    text-align: center;
+  }
+
+  .app-icon {
+    width: 72px; height: 72px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 20px;
+    margin: 10px auto 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    font-weight: 800;
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(102,126,234,0.3);
+  }
+
+  .app-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .app-subtitle {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 28px;
+    letter-spacing: 3px;
+  }
+
+  /* ===== 每日挑战入口 ===== */
+  .daily-challenge-card {
+    background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15));
+    border: 1px solid rgba(102,126,234,0.2);
+    border-radius: 16px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    cursor: pointer;
+  }
+  .daily-challenge-card:hover { background: linear-gradient(135deg, rgba(102,126,234,0.25), rgba(118,75,162,0.25)); }
+
+  .daily-left { text-align: left; }
+  .daily-label {
+    font-size: 11px;
+    color: #667eea;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .daily-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .daily-badge {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    text-transform: uppercase;
+  }
+
+  /* ===== 难度菜单 ===== */
+  .difficulty-section {
+    text-align: left;
+    margin-bottom: 8px;
+  }
+  .difficulty-section .section-label {
+    font-size: 11px;
+    color: #666;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .diff-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .diff-btn:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(102,126,234,0.3);
+  }
+
+  .diff-info { text-align: left; }
+  .diff-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .diff-desc {
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+  }
+  .diff-stats {
+    text-align: right;
+    font-size: 12px;
+    color: #555;
+  }
+  .diff-stats .pb {
+    color: #667eea;
+    font-weight: 600;
+  }
+
+  .diff-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    margin-right: 12px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .diff-icon.easy { background: #4CAF50; }
+  .diff-icon.medium { background: #FF9800; }
+  .diff-icon.hard { background: #f44336; }
+
+  .diff-row {
+    display: flex;
+    align-items: center;
+    flex: 1;
+  }
+
+  /* ===== 底部菜单 ===== */
+  .bottom-menu {
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    margin-top: 12px;
+  }
+  .bottom-menu-item {
+    text-align: center;
+    color: #555;
+    font-size: 10px;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .bottom-menu-item:hover,
+  .bottom-menu-item.active { color: #667eea; }
+  .bottom-menu-item .icon {
+    font-size: 22px;
+    margin-bottom: 2px;
+  }
+
+  /* ===== 游戏盘面 ===== */
+  .game-content { padding: 12px 16px; }
+
+  .game-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .game-timer {
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 1px;
+  }
+  .game-timer .label {
+    font-size: 11px;
+    color: #666;
+    font-weight: 400;
+    margin-right: 4px;
+  }
+
+  .game-difficulty-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: rgba(255,152,0,0.15);
+    color: #FF9800;
+  }
+
+  .game-hint-coins {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #FFD700;
+  }
+  .game-hint-coins .coin-icon { font-size: 16px; }
+
+  /* ===== 数独网格 ===== */
+  .sudoku-grid {
+    width: 100%;
+    aspect-ratio: 1;
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    gap: 1px;
+    background: #2a2a4a;
+    border: 3px solid #667eea;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .sudoku-cell {
+    background: #1a1a30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s;
+    aspect-ratio: 1;
+  }
+  .sudoku-cell:hover { background: #222244; }
+
+  /* 粗边框 —— 3x3 宫分隔 */
+  .sudoku-cell.br { border-right: 2px solid #667eea; }
+  .sudoku-cell.bb { border-bottom: 2px solid #667eea; }
+  .sudoku-cell.bl { border-left: 2px solid #667eea; }
+  .sudoku-cell.bt { border-top: 2px solid #667eea; }
+
+  .sudoku-cell.given { color: #8899cc; font-weight: 700; }
+  .sudoku-cell.player { color: #fff; font-weight: 500; }
+  .sudoku-cell.selected { background: #2a3a6a; }
+  .sudoku-cell.highlighted { background: #1e2a4a; }
+  .sudoku-cell.same-number { background: #2a2a4a; }
+  .sudoku-cell.error { color: #f44336; }
+  .sudoku-cell .pencil-mark {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    width: 100%; height: 100%;
+    padding: 2px;
+  }
+  .sudoku-cell .pencil-mark span {
+    font-size: 8px;
+    color: #667;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sudoku-cell .pencil-mark span.active { color: #889; font-weight: 600; }
+
+  /* ===== 数字盘 ===== */
+  .numpad {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .numpad-btn {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: #ccc;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .numpad-btn:hover { background: rgba(102,126,234,0.2); border-color: rgba(102,126,234,0.3); }
+  .numpad-btn:active { transform: scale(0.92); }
+  .numpad-btn.completed { color: #4CAF50; background: rgba(76,175,80,0.08); }
+
+  /* ===== 底部工具栏 ===== */
+  .game-toolbar {
+    display: flex;
+    justify-content: space-around;
+    padding: 4px 0;
+  }
+  .tool-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 10px;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: all 0.15s;
+  }
+  .tool-btn:hover { color: #ccc; background: rgba(255,255,255,0.04); }
+  .tool-btn.active { color: #667eea; }
+  .tool-btn .icon { font-size: 22px; }
+  .tool-btn .badge {
+    font-size: 10px;
+    font-weight: 700;
+    color: #FFD700;
+  }
+
+  /* ===== 暂停弹窗 ===== */
+  .overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    border-radius: 32px;
+  }
+
+  .modal {
+    background: #1a1a30;
+    border-radius: 20px;
+    padding: 32px 28px;
+    width: 280px;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  }
+
+  .modal h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 20px;
+  }
+
+  .modal-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: all 0.15s;
+  }
+  .modal-btn:active { transform: scale(0.97); }
+  .modal-btn.primary {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: #fff;
+  }
+  .modal-btn.primary:hover { opacity: 0.9; }
+  .modal-btn.secondary {
+    background: rgba(255,255,255,0.06);
+    color: #ccc;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .modal-btn.secondary:hover { background: rgba(255,255,255,0.1); }
+  .modal-btn.danger {
+    background: rgba(244,67,54,0.1);
+    color: #f44336;
+    border: 1px solid rgba(244,67,54,0.2);
+  }
+  .modal-btn.danger:hover { background: rgba(244,67,54,0.2); }
+
+  /* ===== 结算弹窗 ===== */
+  .result-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .result-stat:last-child { border-bottom: none; }
+  .result-stat .label { color: #888; font-size: 13px; }
+  .result-stat .value { color: #fff; font-weight: 600; font-size: 15px; }
+  .result-stat .value.pb { color: #4CAF50; }
+  .result-stat .value.new-record { color: #FFD700; }
+
+  .result-header {
+    margin-bottom: 16px;
+  }
+  .result-header .emoji {
+    font-size: 40px;
+    margin-bottom: 8px;
+  }
+  .result-header h2 {
+    font-size: 20px;
+    color: #fff;
+  }
+  .result-header p {
+    font-size: 13px;
+    color: #888;
+    margin-top: 4px;
+  }
+
+  .reward-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(255,215,0,0.08);
+    border: 1px solid rgba(255,215,0,0.15);
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin: 12px 0;
+    cursor: pointer;
+    font-size: 13px;
+    color: #FFD700;
+    font-weight: 600;
+  }
+  .reward-row:hover { background: rgba(255,215,0,0.14); }
+
+  /* ===== 统计页面 ===== */
+  .stats-content { padding: 16px 20px; }
+
+  .stats-header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .stats-header h2 {
+    font-size: 22px;
+    color: #fff;
+    font-weight: 700;
+  }
+  .stats-header p {
+    font-size: 12px;
+    color: #666;
+  }
+
+  .stats-overview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 16px 8px;
+    text-align: center;
+  }
+  .stat-card .number {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .stat-card .label {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  .stats-detail-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .stats-detail-item:last-child { border-bottom: none; }
+  .stats-detail-item .left { text-align: left; }
+  .stats-detail-item .left .name { color: #ccc; font-size: 14px; }
+  .stats-detail-item .left .sub { color: #666; font-size: 11px; }
+  .stats-detail-item .right { text-align: right; }
+  .stats-detail-item .right .val { color: #fff; font-weight: 600; font-size: 14px; }
+  .stats-detail-item .right .sub { color: #666; font-size: 11px; }
+
+  /* ===== 设置页面 ===== */
+  .settings-content { padding: 16px 20px; }
+
+  .settings-header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .settings-header h2 {
+    font-size: 22px;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .settings-group {
+    margin-bottom: 20px;
+  }
+  .settings-group-title {
+    font-size: 11px;
+    color: #667eea;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .settings-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .settings-item:last-child { border-bottom: none; }
+  .settings-item .info { text-align: left; }
+  .settings-item .info .name { color: #ccc; font-size: 14px; }
+  .settings-item .info .desc { color: #666; font-size: 11px; margin-top: 2px; }
+
+  /* Toggle Switch */
+  .toggle {
+    width: 48px; height: 28px;
+    background: #333;
+    border-radius: 14px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle.on { background: linear-gradient(135deg, #667eea, #764ba2); }
+  .toggle::after {
+    content: '';
+    width: 24px; height: 24px;
+    background: #fff;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px; left: 2px;
+    transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  .toggle.on::after { transform: translateX(20px); }
+
+  /* ===== 笔记模式 - 网格预览 ===== */
+  .note-grid .sudoku-cell .pencil-mark span { font-size: 8px; }
+  .note-grid-example {
+    width: 100%;
+    aspect-ratio: 1;
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    gap: 1px;
+    background: #2a2a4a;
+    border: 3px solid #FF9800;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  /* ===== 颜色主题预览 ===== */
+  .theme-preview {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .theme-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .theme-dot:hover { transform: scale(1.1); }
+  .theme-dot.active { border-color: #667eea; }
+  .theme-dot.dark { background: #16162a; }
+  .theme-dot.light { background: #f0f0f0; }
+  .theme-dot.blue { background: #1a2a4a; }
+  .theme-dot.green { background: #1a2a1a; }
+  .theme-dot.purple { background: #2a1a3a; }
+
+  /* ===== 说明标注 ===== */
+  .annotation {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #667eea;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .phone-mockup:hover .annotation { opacity: 1; }
+
+  /* ===== 交互提示 ===== */
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: #444;
+    margin: 0 -10px;
+  }
+  .flow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0;
+  }
+
+  /* ===== 界面流标注 ===== */
+  .flow-section {
+    text-align: center;
+    margin: 60px 0 30px;
+    padding: 20px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  .flow-section h3 {
+    font-size: 18px;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .flow-section p {
+    font-size: 13px;
+    color: #666;
+  }
+
+  /* ===== 响应式 ===== */
+  @media (max-width: 860px) {
+    body { padding: 20px; }
+    .phone-mockup { width: 340px; }
+  }
+  @media (max-width: 400px) {
+    .phone-mockup { width: 100%; }
+  }
+
+  /* ===== 散景装饰 ===== */
+  .bg-glow {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(100px);
+    opacity: 0.08;
+    pointer-events: none;
+    z-index: -1;
+  }
+  .bg-glow.g1 { width: 400px; height: 400px; background: #667eea; top: -100px; left: -100px; }
+  .bg-glow.g2 { width: 500px; height: 500px; background: #764ba2; bottom: -200px; right: -200px; }
+
+  /* 新建游戏 / 选择难度弹窗 */
+  .difficulty-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .diff-select-btn {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+  }
+  .diff-select-btn:hover { background: rgba(255,255,255,0.06); border-color: rgba(102,126,234,0.3); }
+  .diff-select-btn .info { flex: 1; }
+  .diff-select-btn .info .name { color: #fff; font-size: 16px; font-weight: 600; }
+  .diff-select-btn .info .desc { color: #666; font-size: 12px; margin-top: 2px; }
+  .diff-select-btn .check { color: #667eea; font-size: 20px; }
+
+  /* 成就卡片 */
+  .achievement-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .achievement-item:last-child { border-bottom: none; }
+  .achievement-item .ach-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .achievement-item .ach-icon.unlocked { background: rgba(255,215,0,0.1); }
+  .achievement-item .ach-info { flex: 1; }
+  .achievement-item .ach-info .name { color: #ccc; font-size: 14px; font-weight: 500; }
+  .achievement-item .ach-info .desc { color: #666; font-size: 11px; }
+  .achievement-item .ach-status { color: #666; font-size: 12px; }
+
+  .progress-bar {
+    height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  .progress-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  /* 引导页 */
+  .tutorial-step {
+    padding: 24px 20px;
+    text-align: center;
+  }
+  .tutorial-step .illustration {
+    width: 160px; height: 160px;
+    margin: 0 auto 20px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 64px;
+  }
+  .tutorial-step h3 {
+    font-size: 20px;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .tutorial-step p {
+    font-size: 14px;
+    color: #888;
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .tutorial-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+  .tutorial-dots span {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #333;
+  }
+  .tutorial-dots span.active { background: #667eea; width: 24px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="bg-glow g1"></div>
+<div class="bg-glow g2"></div>
+
+<h1 class="page-title">Sudoku · UI 原型设计稿</h1>
+<p class="page-subtitle">基于 GDD 与 PRD · <span>Figma / 蓝湖</span> 风格设计预览</p>
+
+<!-- ===== 界面流程说明 ===== -->
+<div class="flow-section">
+  <h3>📱 界面流程图 (User Flow)</h3>
+  <p>主菜单 → 选择难度 → 游戏盘面 → 胜利结算 → 返回主菜单 / 下一局</p>
+  <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:16px;font-size:12px;color:#888;">
+    <span style="padding:4px 12px;background:rgba(102,126,234,0.1);border-radius:6px;border:1px solid rgba(102,126,234,0.15);">🏠 主菜单</span>
+    <span style="color:#555;">→</span>
+    <span style="padding:4px 12px;background:rgba(255,152,0,0.1);border-radius:6px;border:1px solid rgba(255,152,0,0.15);">🎯 难度选择</span>
+    <span style="color:#555;">→</span>
+    <span style="padding:4px 12px;background:rgba(76,175,80,0.1);border-radius:6px;border:1px solid rgba(76,175,80,0.15);">🧩 游戏盘面</span>
+    <span style="color:#555;">→</span>
+    <span style="padding:4px 12px;background:rgba(255,215,0,0.1);border-radius:6px;border:1px solid rgba(255,215,0,0.15);">🏆 结算弹窗</span>
+  </div>
+</div>
+
+<!-- ===== 设计稿网格 ===== -->
+<div class="design-grid">
+
+  <!-- ======== 界面 1: 主菜单 ======== -->
+  <div class="phone-mockup">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-label">🏠 主菜单 · Main Menu</div>
+      <div class="main-menu-content">
+        <div class="app-icon">S</div>
+        <div class="app-title">Sudoku</div>
+        <div class="app-subtitle">CLASSIC PUZZLE</div>
+
+        <!-- 每日挑战 -->
+        <div class="daily-challenge-card">
+          <div class="daily-left">
+            <div class="daily-label">🔥 每日挑战</div>
+            <div class="daily-title">今天你数独了吗？</div>
+          </div>
+          <div class="daily-badge">PLAY</div>
+        </div>
+
+        <!-- 难度菜单 -->
+        <div class="difficulty-section">
+          <div class="section-label">选择难度</div>
+
+          <div class="diff-btn">
+            <div class="diff-row">
+              <div class="diff-icon easy">E</div>
+              <div class="diff-info">
+                <div class="diff-name">Easy</div>
+                <div class="diff-desc">入门 · 适合初学者</div>
+              </div>
+            </div>
+            <div class="diff-stats">PB <span class="pb">3:42</span></div>
+          </div>
+
+          <div class="diff-btn">
+            <div class="diff-row">
+              <div class="diff-icon medium">M</div>
+              <div class="diff-info">
+                <div class="diff-name">Medium</div>
+                <div class="diff-desc">中等 · 需要一些技巧</div>
+              </div>
+            </div>
+            <div class="diff-stats">PB <span class="pb">7:18</span></div>
+          </div>
+
+          <div class="diff-btn">
+            <div class="diff-row">
+              <div class="diff-icon hard">H</div>
+              <div class="diff-info">
+                <div class="diff-name">Hard</div>
+                <div class="diff-desc">困难 · 挑战你的逻辑</div>
+              </div>
+            </div>
+            <div class="diff-stats">PB <span class="pb">—</span></div>
+          </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="bottom-menu">
+          <div class="bottom-menu-item active">
+            <div class="icon">🏠</div>
+            <div>主页</div>
+          </div>
+          <div class="bottom-menu-item">
+            <div class="icon">📊</div>
+            <div>统计</div>
+          </div>
+          <div class="bottom-menu-item">
+            <div class="icon">🏆</div>
+            <div>成就</div>
+          </div>
+          <div class="bottom-menu-item">
+            <div class="icon">⚙️</div>
+            <div>设置</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 界面 2: 游戏盘面 ======== -->
+  <div class="phone-mockup">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-label">🧩 游戏盘面 · Game Board</div>
+      <div class="game-content">
+        <!-- 顶栏 -->
+        <div class="game-top-bar">
+          <div class="game-timer">
+            <span class="label">⏱</span> 05:23
+          </div>
+          <div class="game-difficulty-tag">Medium</div>
+          <div class="game-hint-coins">
+            <span class="coin-icon">💡</span> ×3
+          </div>
+        </div>
+
+        <!-- 数独网格 -->
+        <div class="sudoku-grid">
+          <!-- 第1行 -->
+          <div class="sudoku-cell given br bb selected">5</div>
+          <div class="sudoku-cell given br bb">3</div>
+          <div class="sudoku-cell given bb br">7</div>
+          <div class="sudoku-cell given bb">6</div>
+          <div class="sudoku-cell highlighted bb"> </div>
+          <div class="sudoku-cell player bb">9</div>
+          <div class="sudoku-cell given bb br">8</div>
+          <div class="sudoku-cell highlighted bb"> </div>
+          <div class="sudoku-cell given bb">2</div>
+          <!-- 第2行 -->
+          <div class="sudoku-cell given br">6</div>
+          <div class="sudoku-cell given br">7</div>
+          <div class="sudoku-cell bb br"> </div>
+          <div class="sudoku-cell given">1</div>
+          <div class="sudoku-cell given">9</div>
+          <div class="sudoku-cell given bb">5</div>
+          <div class="sudoku-cell given br">3</div>
+          <div class="sudoku-cell given">4</div>
+          <div class="sudoku-cell given bb">8</div>
+          <!-- 第3行 -->
+          <div class="sudoku-cell br bb">1</div>
+          <div class="sudoku-cell br bb">9</div>
+          <div class="sudoku-cell br bb">8</div>
+          <div class="sudoku-cell bb">3</div>
+          <div class="sudoku-cell bb">4</div>
+          <div class="sudoku-cell player bb">2</div>
+          <div class="sudoku-cell br bb">5</div>
+          <div class="sudoku-cell bb">6</div>
+          <div class="sudoku-cell given bb">7</div>
+          <!-- 第4行 -->
+          <div class="sudoku-cell given br">8</div>
+          <div class="sudoku-cell br">5</div>
+          <div class="sudoku-cell given br">9</div>
+          <div class="sudoku-cell">7</div>
+          <div class="sudoku-cell">6</div>
+          <div class="sudoku-cell">1</div>
+          <div class="sudoku-cell br">4</div>
+          <div class="sudoku-cell">2</div>
+          <div class="sudoku-cell">3</div>
+          <!-- 第5行 -->
+          <div class="sudoku-cell given br">4</div>
+          <div class="sudoku-cell br">2</div>
+          <div class="sudoku-cell given br">6</div>
+          <div class="sudoku-cell">8</div>
+          <div class="sudoku-cell">5</div>
+          <div class="sudoku-cell">3</div>
+          <div class="sudoku-cell br">7</div>
+          <div class="sudoku-cell same-number">9</div>
+          <div class="sudoku-cell">1</div>
+          <!-- 第6行 -->
+          <div class="sudoku-cell given br">7</div>
+          <div class="sudoku-cell br">1</div>
+          <div class="sudoku-cell given br">3</div>
+          <div class="sudoku-cell">9</div>
+          <div class="sudoku-cell">2</div>
+          <div class="sudoku-cell">4</div>
+          <div class="sudoku-cell br">8</div>
+          <div class="sudoku-cell">5</div>
+          <div class="sudoku-cell">6</div>
+          <!-- 第7行 -->
+          <div class="sudoku-cell br bb">9</div>
+          <div class="sudoku-cell br bb">6</div>
+          <div class="sudoku-cell br bb">1</div>
+          <div class="sudoku-cell bb">5</div>
+          <div class="sudoku-cell bb">3</div>
+          <div class="sudoku-cell player bb error">7</div>
+          <div class="sudoku-cell br">2</div>
+          <div class="sudoku-cell bb">8</div>
+          <div class="sudoku-cell bb">4</div>
+          <!-- 第8行 -->
+          <div class="sudoku-cell br">2</div>
+          <div class="sudoku-cell br">8</div>
+          <div class="sudoku-cell bb br">7</div>
+          <div class="sudoku-cell">4</div>
+          <div class="sudoku-cell">1</div>
+          <div class="sudoku-cell bb">9</div>
+          <div class="sudoku-cell br">6</div>
+          <div class="sudoku-cell">3</div>
+          <div class="sudoku-cell bb">5</div>
+          <!-- 第9行 -->
+          <div class="sudoku-cell given br">3</div>
+          <div class="sudoku-cell br">4</div>
+          <div class="sudoku-cell bb br">5</div>
+          <div class="sudoku-cell">2</div>
+          <div class="sudoku-cell">8</div>
+          <div class="sudoku-cell bb">6</div>
+          <div class="sudoku-cell br">1</div>
+          <div class="sudoku-cell">7</div>
+          <div class="sudoku-cell bb">9</div>
+        </div>
+
+        <!-- 数字盘 -->
+        <div class="numpad">
+          <div class="numpad-btn">1</div>
+          <div class="numpad-btn">2</div>
+          <div class="numpad-btn completed">3</div>
+          <div class="numpad-btn">4</div>
+          <div class="numpad-btn completed">5</div>
+          <div class="numpad-btn">6</div>
+          <div class="numpad-btn">7</div>
+          <div class="numpad-btn completed">8</div>
+          <div class="numpad-btn">9</div>
+        </div>
+
+        <!-- 底部工具栏 -->
+        <div class="game-toolbar">
+          <button class="tool-btn">
+            <span class="icon">✏️</span>
+            <span>笔记</span>
+          </button>
+          <button class="tool-btn">
+            <span class="icon">↩️</span>
+            <span>撤销</span>
+          </button>
+          <button class="tool-btn">
+            <span class="icon">↪️</span>
+            <span>重做</span>
+          </button>
+          <button class="tool-btn">
+            <span class="icon">🧹</span>
+            <span>擦除</span>
+          </button>
+          <button class="tool-btn active">
+            <span class="icon">💡</span>
+            <span>提示</span>
+            <span class="badge">×3</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 界面 3: 笔记模式 ======== -->
+  <div class="phone-mockup">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-label">✏️ 笔记模式 · Pencil Marks</div>
+      <div class="game-content">
+        <div class="game-top-bar">
+          <div class="game-timer"><span class="label">⏱</span> 08:15</div>
+          <div class="game-difficulty-tag">Hard</div>
+          <div class="game-hint-coins"><span class="coin-icon">💡</span> ×2</div>
+        </div>
+
+        <div class="note-grid-example">
+          <!-- 第1行 -->
+          <div class="sudoku-cell given br bb">2</div>
+          <div class="sudoku-cell br bb"><div class="pencil-mark"><span></span><span></span><span></span><span class="active">4</span><span></span><span></span><span></span><span></span><span></span></div></div>
+          <div class="sudoku-cell given br bb">8</div>
+          <div class="sudoku-cell br bb">3</div>
+          <div class="sudoku-cell highlighted bb"><div class="pencil-mark"><span class="active">1</span><span></span><span class="active">3</span><span></span><span class="active">5</span><span></span><span class="active">7</span><span></span><span class="active">9</span></div></div>
+          <div class="sudoku-cell given bb">6</div>
+          <div class="sudoku-cell given br bb">4</div>
+          <div class="sudoku-cell bb">7</div>
+          <div class="sudoku-cell bb">9</div>
+          <!-- 第2行 -->
+          <div class="sudoku-cell br">5</div>
+          <div class="sudoku-cell given br"><div class="pencil-mark"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+          <div class="sudoku-cell bb br">1</div>
+          <div class="sudoku-cell given">2</div>
+          <div class="sudoku-cell">4</div>
+          <div class="sudoku-cell highlighted bb"><div class="pencil-mark"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+          <div class="sudoku-cell br">6</div>
+          <div class="sudoku-cell">3</div>
+          <div class="sudoku-cell given bb">8</div>
+          <!-- 第3行 -->
+          <div class="sudoku-cell br bb">7</div>
+          <div class="sudoku-cell br bb">4</div>
+          <div class="sudoku-cell br bb">3</div>
+          <div class="sudoku-cell bb">6</div>
+          <div class="sudoku-cell given bb"><div class="pencil-mark"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+          <div class="sudoku-cell bb">5</div>
+          <div class="sudoku-cell br bb">8</div>
+          <div class="sudoku-cell given bb">1</div>
+          <div class="sudoku-cell bb">2</div>
+          <!-- 剩余行占位 -->
+          <div class="sudoku-cell br">4</div>
+          <div class="sudoku-cell br">2</div>
+          <div class="sudoku-cell br">6</div>
+          <div class="sudoku-cell">8</div>
+          <div class="sudoku-cell">1</div>
+          <div class="sudoku-cell">3</div>
+          <div class="sudoku-cell br">7</div>
+          <div class="sudoku-cell">9</div>
+          <div class="sudoku-cell">5</div>
+          <div class="sudoku-cell br">8</div>
+          <div class="sudoku-cell br">1</div>
+          <div class="sudoku-cell br">9</div>
+          <div class="sudoku-cell">7</div>
+          <div class="sudoku-cell">2</div>
+          <div class="sudoku-cell">4</div>
+          <div class="sudoku-cell br">3</div>
+          <div class="sudoku-cell">6</div>
+          <div class="sudoku-cell">1</div>
+          <div class="sudoku-cell br bb">3</div>
+          <div class="sudoku-cell br bb">6</div>
+          <div class="sudoku-cell br bb">7</div>
+          <div class="sudoku-cell bb">1</div>
+          <div class="sudoku-cell bb">9</div>
+          <div class="sudoku-cell bb">8</div>
+          <div class="sudoku-cell br">2</div>
+          <div class="sudoku-cell bb">4</div>
+          <div class="sudoku-cell bb">5</div>
+          <div class="sudoku-cell br">9</div>
+          <div class="sudoku-cell br">5</div>
+          <div class="sudoku-cell bb br">2</div>
+          <div class="sudoku-cell">4</div>
+          <div class="sudoku-cell">3</div>
+          <div class="sudoku-cell bb">7</div>
+          <div class="sudoku-cell br">1</div>
+          <div class="sudoku-cell">8</div>
+          <div class="sudoku-cell bb">6</div>
+          <div class="sudoku-cell br">1</div>
+          <div class="sudoku-cell br">8</div>
+          <div class="sudoku-cell bb br">4</div>
+          <div class="sudoku-cell">5</div>
+          <div class="sudoku-cell">6</div>
+          <div class="sudoku-cell bb">9</div>
+          <div class="sudoku-cell br">2</div>
+          <div class="sudoku-cell">3</div>
+          <div class="sudoku-cell bb">7</div>
+        </div>
+
+        <div class="numpad">
+          <div class="numpad-btn">1</div>
+          <div class="numpad-btn">2</div>
+          <div class="numpad-btn">3</div>
+          <div class="numpad-btn">4</div>
+          <div class="numpad-btn">5</div>
+          <div class="numpad-btn">6</div>
+          <div class="numpad-btn">7</div>
+          <div class="numpad-btn">8</div>
+          <div class="numpad-btn">9</div>
+        </div>
+
+        <div class="game-toolbar">
+          <button class="tool-btn active" style="color:#FF9800;">
+            <span class="icon">✏️</span>
+            <span>笔记</span>
+          </button>
+          <button class="tool-btn"><span class="icon">↩️</span><span>撤销</span></button>
+          <button class="tool-btn"><span class="icon">🧹</span><span>擦除</span></button>
+          <button class="tool-btn"><span class="icon">💡</span><span>提示</span><span class="badge">×2</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 界面 4: 暂停弹窗 ======== -->
+  <div class="phone-mockup">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-label">⏸️ 暂停 · Pause</div>
+      <div class="game-content" style="position:relative;min-height:700px;">
+        <div class="game-top-bar">
+          <div class="game-timer"><span class="label">⏱</span> 12:47</div>
+          <div class="game-difficulty-tag">Hard</div>
+          <div class="game-hint-coins"><span class="coin-icon">💡</span> ×1</div>
+        </div>
+
+        <!-- 模糊背景网格 -->
+        <div class="sudoku-grid" style="opacity:0.3;filter:blur(4px);pointer-events:none;margin-bottom:12px;">
+          <div class="sudoku-cell given br bb" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given br bb" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given bb br" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given bb" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given bb" style="font-size:12px;"> </div>
+          <div class="sudoku-cell given bb" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given bb br" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given bb" style="font-size:12px;"> </div>
+          <div class="sudoku-cell given bb" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given br" style="font-size:12px;"> </div>
+          <div class="sudoku-cell given" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given" style="font-size:12px;">4</div>
+        </div>
+
+        <!-- 暂停遮罩 -->
+        <div class="overlay">
+          <div class="modal">
+            <h2>⏸️ 游戏暂停</h2>
+            <button class="modal-btn primary">▶️ 继续游戏</button>
+            <button class="modal-btn secondary">🔄 重新开始</button>
+            <button class="modal-btn danger">🏠 返回主页</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 界面 5: 结算弹窗 ======== -->
+  <div class="phone-mockup">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-label">🏆 胜利结算 · Result</div>
+      <div class="game-content" style="position:relative;min-height:700px;">
+        <!-- 模糊背景 -->
+        <div class="sudoku-grid" style="opacity:0.15;filter:blur(6px);pointer-events:none;margin-bottom:12px;">
+          <div class="sudoku-cell given br bb" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given br bb" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given bb br" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given bb" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given bb" style="font-size:12px;"> </div>
+          <div class="sudoku-cell given bb" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given bb br" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given bb" style="font-size:12px;"> </div>
+          <div class="sudoku-cell given bb" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given br" style="font-size:12px;"> </div>
+          <div class="sudoku-cell given" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given" style="font-size:12px;">4</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">9</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">6</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">1</div>
+          <div class="sudoku-cell given" style="font-size:12px;">5</div>
+          <div class="sudoku-cell given" style="font-size:12px;">3</div>
+          <div class="sudoku-cell given" style="font-size:12px;">7</div>
+          <div class="sudoku-cell given br" style="font-size:12px;">2</div>
+          <div class="sudoku-cell given" style="font-size:12px;">8</div>
+          <div class="sudoku-cell given" style="font-size:12px;">4</div>
+        </div>
+
+        <!-- 结算弹窗 -->
+        <div class="overlay">
+          <div class="modal">
+            <div class="result-header">
+              <div class="emoji">🎉</div>
+              <h2>恭喜完成！</h2>
+              <p>难度：Medium · 无错误</p>
+            </div>
+            <div class="result-stat">
+              <span class="label">⏱ 用时</span>
+              <span class="value">05:23</span>
+            </div>
+            <div class="result-stat">
+              <span class="label">📊 个人最佳</span>
+              <span class="value pb">04:58</span>
+            </div>
+            <div class="result-stat">
+              <span class="label">🔥 连击</span>
+              <span class="value">7 天</span>
+            </div>
+            <div class="result-stat">
+              <span class="label">💡 提示使用</span>
+              <span class="value">2 次</span>
+            </div>
+            <div class="result-stat">
+              <span class="label">⭐ 获得奖励</span>
+              <span class="value">+3 💎</span>
+            </div>
+            <div class="reward-row">📺 观看视频 · 奖励翻倍 → +3 💎</div>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+              <button class="modal-btn primary" style="flex:1;">▶️ 下一局</button>
+              <button class="modal-btn secondary" style="flex:0;padding:14px 18px;">🏠</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 界面 6: 统计页面 ======== -->
+  <div class="phone-mockup">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-label">📊 统计 · Statistics</div>
+      <div class="stats-content">
+        <div class="stats-header">
+          <h2>📊 游戏统计</h2>
+          <p>你的数独之旅</p>
+        </div>
+
+        <div class="stats-overview">
+          <div class="stat-card">
+            <div class="number">47</div>
+            <div class="label">总对局</div>
+          </div>
+          <div class="stat-card">
+            <div class="number">92%</div>
+            <div class="label">完成率</div>
+          </div>
+          <div class="stat-card">
+            <div class="number">7🔥</div>
+            <div class="label">最长连击</div>
+          </div>
+        </div>
+
+        <div class="settings-group-title">📈 各难度详情</div>
+        <div class="stats-detail-item">
+          <div class="left">
+            <div class="name">🟢 Easy</div>
+            <div class="sub">18 局完成</div>
+          </div>
+          <div class="right">
+            <div class="val">3:42</div>
+            <div class="sub">最佳</div>
+          </div>
+        </div>
+        <div class="stats-detail-item">
+          <div class="left">
+            <div class="name">🟠 Medium</div>
+            <div class="sub">22 局完成</div>
+          </div>
+          <div class="right">
+            <div class="val">7:18</div>
+            <div class="sub">最佳</div>
+          </div>
+        </div>
+        <div class="stats-detail-item">
+          <div class="left">
+            <div class="name">🔴 Hard</div>
+            <div class="sub">7 局完成</div>
+          </div>
+          <div class="right">
+            <div class="val">16:05</div>
+            <div class="sub">最佳</div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;">
+          <div class="settings-group-title">🏆 成就</div>
+          <div class="achievement-item">
+            <div class="ach-icon unlocked">🏅</div>
+            <div class="ach-info">
+              <div class="name">初出茅庐</div>
+              <div class="desc">完成第 1 局数独</div>
+            </div>
+            <div class="ach-status">✅</div>
+          </div>
+          <div class="achievement-item">
+            <div class="ach-icon unlocked">🔥</div>
+            <div class="ach-info">
+              <div class="name">渐入佳境</div>
+              <div class="desc">连续 7 天完成每日挑战</div>
+            </div>
+            <div class="ach-status">✅</div>
+          </div>
+          <div class="achievement-item">
+            <div class="ach-icon">💎</div>
+            <div class="ach-info">
+              <div class="name">速度之星</div>
+              <div class="desc">Hard 难度 10 分钟内完成</div>
+              <div class="progress-bar"><div class="fill" style="width:65%;"></div></div>
+            </div>
+            <div class="ach-status">65%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 界面 7: 设置页面 ======== -->
+  <div class="phone-mockup">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-label">⚙️ 设置 · Settings</div>
+      <div class="settings-content">
+        <div class="settings-header">
+          <h2>⚙️ 设置</h2>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">🎮 游戏</div>
+          <div class="settings-item">
+            <div class="info">
+              <div class="name">自动检测错误</div>
+              <div class="desc">填入错误数字时立即标红</div>
+            </div>
+            <div class="toggle on"></div>
+          </div>
+          <div class="settings-item">
+            <div class="info">
+              <div class="name">自动清除候选数</div>
+              <div class="desc">填入数字后自动清除同行/列/宫的候选数</div>
+            </div>
+            <div class="toggle on"></div>
+          </div>
+          <div class="settings-item">
+            <div class="info">
+              <div class="name">确认删除</div>
+              <div class="desc">删除数字时显示确认提示</div>
+            </div>
+            <div class="toggle"></div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">🎨 外观</div>
+          <div class="settings-item">
+            <div class="info">
+              <div class="name">深色模式</div>
+              <div class="desc">使用深色主题</div>
+            </div>
+            <div class="toggle on"></div>
+          </div>
+          <div class="settings-item" style="flex-wrap:wrap;">
+            <div class="info" style="width:100%;margin-bottom:8px;">
+              <div class="name">主题颜色</div>
+            </div>
+            <div class="theme-preview">
+              <div class="theme-dot dark active"></div>
+              <div class="theme-dot light"></div>
+              <div class="theme-dot blue"></div>
+              <div class="theme-dot green"></div>
+              <div class="theme-dot purple"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">🔊 声音</div>
+          <div class="settings-item">
+            <div class="info">
+              <div class="name">音效</div>
+              <div class="desc">填数、点击、完成等音效</div>
+            </div>
+            <div class="toggle on"></div>
+          </div>
+          <div class="settings-item">
+            <div class="info">
+              <div class="name">振动反馈</div>
+              <div class="desc">点击和操作时振动</div>
+            </div>
+            <div class="toggle"></div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">📋 其他</div>
+          <div class="settings-item" style="cursor:pointer;">
+            <div class="info">
+              <div class="name">重置所有数据</div>
+              <div class="desc">清除本地进度和统计</div>
+            </div>
+            <span style="color:#f44336;font-size:14px;">→</span>
+          </div>
+          <div class="settings-item" style="cursor:pointer;">
+            <div class="info">
+              <div class="name">隐私政策</div>
+            </div>
+            <span style="color:#888;font-size:14px;">→</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 界面 8: 新手引导 ======== -->
+  <div class="phone-mockup">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-label">👋 新手引导 · Tutorial</div>
+      <div class="tutorial-step">
+        <div class="illustration">👆</div>
+        <h3>点击格子</h3>
+        <p>点击任意空白格选中它，<br>然后从底部数字盘选择数字填入。</p>
+        <div class="tutorial-dots">
+          <span class="active"></span>
+          <span></span>
+          <span></span>
+        </div>
+        <button class="modal-btn primary" style="width:auto;padding:14px 40px;">下一步 →</button>
+        <div style="margin-top:12px;">
+          <span style="font-size:13px;color:#666;cursor:pointer;">跳过引导</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 界面 9: 提示动画演示 ======== -->
+  <div class="phone-mockup">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+      <div class="screen-label">💡 提示系统 · Hint System</div>
+      <div class="game-content" style="position:relative;">
+        <div class="game-top-bar">
+          <div class="game-timer"><span class="label">⏱</span> 03:45</div>
+          <div class="game-difficulty-tag">Easy</div>
+          <div class="game-hint-coins"><span class="coin-icon">💡</span> ×2</div>
+        </div>
+
+        <!-- 高亮提示的网格 -->
+        <div class="sudoku-grid" style="margin-bottom:8px;">
+          <div class="sudoku-cell given br bb">5</div>
+          <div class="sudoku-cell given br bb same-number">3</div>
+          <div class="sudoku-cell given bb br">7</div>
+          <div class="sudoku-cell given bb"> </div>
+          <div class="sudoku-cell given bb"> </div>
+          <div class="sudoku-cell given bb">9</div>
+          <div class="sudoku-cell given bb br">8</div>
+          <div class="sudoku-cell given bb"> </div>
+          <div class="sudoku-cell given bb">2</div>
+          <div class="sudoku-cell given br same-number">6</div>
+          <div class="sudoku-cell given br">7</div>
+          <div class="sudoku-cell bb br"> </div>
+          <div class="sudoku-cell given">1</div>
+          <div class="sudoku-cell given">9</div>
+          <div class="sudoku-cell given bb">5</div>
+          <div class="sudoku-cell given br">3</div>
+          <div class="sudoku-cell given">4</div>
+          <div class="sudoku-cell given bb">8</div>
+          <div class="sudoku-cell br bb">1</div>
+          <div class="sudoku-cell br bb">9</div>
+          <div class="sudoku-cell br bb">8</div>
+          <div class="sudoku-cell bb">3</div>
+          <div class="sudoku-cell bb">4</div>
+          <div class="sudoku-cell player bb">2</div>
+          <div class="sudoku-cell br bb">5</div>
+          <div class="sudoku-cell bb">6</div>
+          <div class="sudoku-cell given bb">7</div>
+          <div class="sudoku-cell given br">8</div>
+          <div class="sudoku-cell br">5</div>
+          <div class="sudoku-cell given br">9</div>
+          <div class="sudoku-cell">7</div>
+          <div class="sudoku-cell">6</div>
+          <div class="sudoku-cell">1</div>
+          <div class="sudoku-cell br">4</div>
+          <div class="sudoku-cell">2</div>
+          <div class="sudoku-cell">3</div>
+          <div class="sudoku-cell given br">4</div>
+          <div class="sudoku-cell br">2</div>
+          <div class="sudoku-cell given br">6</div>
+          <div class="sudoku-cell">8</div>
+          <div class="sudoku-cell">5</div>
+          <div class="sudoku-cell">3</div>
+          <div class="sudoku-cell br">7</div>
+          <div class="sudoku-cell">9</div>
+          <div class="sudoku-cell">1</div>
+          <div class="sudoku-cell given br">7</div>
+          <div class="sudoku-cell br">1</div>
+          <div class="sudoku-cell given br">3</div>
+          <div class="sudoku-cell">9</div>
+          <div class="sudoku-cell">2</div>
+          <div class="sudoku-cell">4</div>
+          <div class="sudoku-cell br">8</div>
+          <div class="sudoku-cell">5</div>
+          <div class="sudoku-cell">6</div>
+          <div class="sudoku-cell br bb">9</div>
+          <div class="sudoku-cell br bb">6</div>
+          <div class="sudoku-cell br bb">1</div>
+          <div class="sudoku-cell bb">5</div>
+          <div class="sudoku-cell bb">3</div>
+          <div class="sudoku-cell player bb">7</div>
+          <div class="sudoku-cell br">2</div>
+          <div class="sudoku-cell bb">8</div>
+          <div class="sudoku-cell bb">4</div>
+          <div class="sudoku-cell br">2</div>
+          <div class="sudoku-cell br">8</div>
+          <div class="sudoku-cell bb br">7</div>
+          <div class="sudoku-cell">4</div>
+          <div class="sudoku-cell">1</div>
+          <div class="sudoku-cell bb">9</div>
+          <div class="sudoku-cell br">6</div>
+          <div class="sudoku-cell">3</div>
+          <div class="sudoku-cell bb">5</div>
+          <div class="sudoku-cell given br">3</div>
+          <div class="sudoku-cell br">4</div>
+          <div class="sudoku-cell bb br">5</div>
+          <div class="sudoku-cell">2</div>
+          <div class="sudoku-cell">8</div>
+          <div class="sudoku-cell bb">6</div>
+          <div class="sudoku-cell br">1</div>
+          <div class="sudoku-cell">7</div>
+          <div class="sudoku-cell bb">9</div>
+        </div>
+
+        <!-- 提示气泡 -->
+        <div style="background:rgba(102,126,234,0.12);border:1px solid rgba(102,126,234,0.2);border-radius:12px;padding:12px;margin-bottom:8px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="font-size:18px;">💡</span>
+            <span style="font-size:13px;font-weight:600;color:#667eea;">提示建议</span>
+          </div>
+          <p style="font-size:13px;color:#ccc;line-height:1.5;">
+            <strong>Naked Single（唯余法）</strong>：<br>
+            第 1 行第 2 列的格子，同行/列/宫已有 
+            <span style="color:#ff9800;">1,2,4,5,6,7,8,9</span>，<br>
+            唯一可填 <strong style="color:#4CAF50;font-size:16px;">3</strong>
+          </p>
+        </div>
+
+        <div class="numpad" style="margin-bottom:4px;">
+          <div class="numpad-btn">1</div>
+          <div class="numpad-btn">2</div>
+          <div class="numpad-btn completed">3</div>
+          <div class="numpad-btn">4</div>
+          <div class="numpad-btn">5</div>
+          <div class="numpad-btn">6</div>
+          <div class="numpad-btn">7</div>
+          <div class="numpad-btn">8</div>
+          <div class="numpad-btn">9</div>
+        </div>
+
+        <div class="game-toolbar">
+          <button class="tool-btn"><span class="icon">✏️</span><span>笔记</span></button>
+          <button class="tool-btn"><span class="icon">↩️</span><span>撤销</span></button>
+          <button class="tool-btn"><span class="icon">🧹</span><span>擦除</span></button>
+          <button class="tool-btn active"><span class="icon">💡</span><span>提示</span><span class="badge">×2</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== 设计规范摘要 ===== -->
+<div class="flow-section" style="margin-top:60px;">
+  <h3>🎨 设计语言摘要</h3>
+  <p>基于 PRD 中 Emma(P1)/David(P2)/Lena(P3) 三种用户画像的 UI 决策</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:20px;text-align:left;">
+    <div style="background:rgba(255,255,255,0.02);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.04);">
+      <div style="font-size:11px;color:#667eea;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">🎯 色彩体系</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <span style="width:24px;height:24px;border-radius:6px;background:#667eea;"></span>
+        <span style="width:24px;height:24px;border-radius:6px;background:#764ba2;"></span>
+        <span style="width:24px;height:24px;border-radius:6px;background:#16162a;"></span>
+        <span style="width:24px;height:24px;border-radius:6px;background:#4CAF50;"></span>
+        <span style="width:24px;height:24px;border-radius:6px;background:#FF9800;"></span>
+        <span style="width:24px;height:24px;border-radius:6px;background:#f44336;"></span>
+        <span style="width:24px;height:24px;border-radius:6px;background:#FFD700;"></span>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:#888;">
+        <div>主色调: <span style="color:#667eea;">#667EEA</span> → <span style="color:#764ba2;">#764BA2</span></div>
+        <div>背景: <span style="color:#888;">#0F0F1A / #16162A</span></div>
+        <div>难度绿/橙/红 | 金币金色</div>
+      </div>
+    </div>
+    <div style="background:rgba(255,255,255,0.02);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.04);">
+      <div style="font-size:11px;color:#667eea;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">🔤 字体层级</div>
+      <div style="font-size:24px;font-weight:700;color:#fff;">H1 28px</div>
+      <div style="font-size:20px;font-weight:700;color:#ddd;">H2 20px</div>
+      <div style="font-size:16px;font-weight:600;color:#ccc;">H3 16px</div>
+      <div style="font-size:14px;color:#aaa;">Body 14px</div>
+      <div style="font-size:12px;color:#666;">Caption 12px</div>
+      <div style="font-size:10px;color:#555;">Label 10px</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.02);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,0.04);">
+      <div style="font-size:11px;color:#667eea;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">📐 间距 & 圆角</div>
+      <div style="font-size:13px;color:#ccc;line-height:2;">
+        <div>圆角: 12px(卡片) / 8px(按钮) / 20px(弹窗)</div>
+        <div>网格: 1px(缝隙) / 3px(宫边框) / 2px(粗边框)</div>
+        <div>热区: ≥ 44dp(数字盘)</div>
+        <div>手机模型: 375px 宽度</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 页尾 ===== -->
+<div style="text-align:center;padding:40px 0 20px;color:#444;font-size:13px;">
+  Sudoku UI 原型设计稿 · 基于 GDD v1.0 / PRD v1.1 · 2026-08
+</div>
+
+</body>
+</html>

@@ -1,0 +1,87 @@
+# =========================================================
+# Unity 项目忽略规则（SudokuGameBox / GameBox）
+# 忽略所有层级下的 Unity 生成目录，以兼容项目放在子目录的情况
+# =========================================================
+
+# Unity 自动生成的目录（Library/Temp/Obj/Logs 等体积大且可重建）
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Uu]ser[Ss]ettings/
+[Ll]ogs/
+[Bb]uild/
+[Bb]uilds/
+[Mm]emory[Cc]aptures/
+[Rr]ecordings/
+[Gg]radle/
+[Ee]xported[Oo]bj/
+
+# Unity 自动生成的解决方案 / 工程文件（.slnx 是 Unity 2022.2+ 的新格式）
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity3D 生成的 meta 对应文件（pdb/mdb 等的 meta）
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Unity 崩溃报告
+sysinfo.txt
+
+# 构建产物
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Crashlytics 生成文件
+crashlytics-build.properties
+
+# 打包的 Addressables 数据
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+
+# 临时自动生成的 Android 资源
+/[Aa]ssets/[Ss]treaming[Aa]ssets/aa.meta
+/[Aa]ssets/[Ss]treaming[Aa]ssets/aa/*
+
+# Unity AI Assistant 本地设置（可能含个人配置）
+ProjectSettings/Packages/com.unity.ai.assistant/
+
+# 本地 MCP 服务器配置（含本机绝对路径，个人环境使用）
+.mcp.json
+
+# =========================================================
+# IDE / 编辑器
+# =========================================================
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================================================
+# 操作系统文件
+# =========================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================================================
+# 其他临时文件
+# =========================================================
+*.log
+*.tmp
+*.bak
