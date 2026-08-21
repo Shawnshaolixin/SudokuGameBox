@@ -92,3 +92,6 @@ desktop.ini
 *.log
 *.tmp
 *.bak
+
+# CLI 测试输出（EditMode/PlayMode 结果 xml 与日志，不入库）
+[Tt]est[Rr]esults/
