@@ -1,0 +1,16 @@
+{
+    "name": "Box.UI",
+    "rootNamespace": "Box.UI",
+    "references": [
+        "Box.Services.Abstractions"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

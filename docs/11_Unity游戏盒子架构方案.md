@@ -37,7 +37,7 @@
 | **D-10** | 本文是否入库 | **✅ 已决:v2.0 脱敏后入库**(`.gitignore` 已移除 `docs/11_…`、`docs/07_…`) | 架构演进必须有 diff 与评审留痕;原始调研材料与历史备份继续只放 `_private/` |
 | **D-11** | 是否引入第三方 UI/游戏框架(GameFramework 一类) | **✅ 已决:不引入全家桶框架,自研薄层 `UIKit`(全 AOT),见 §3.5** | 本方案已经定了 Addressables(资源)+ VContainer(DI)+ ModuleFramework(模块)+ HybridCLR(代码),GameFramework 这类框架自带资源/流程/实体/UI/配置全套,重叠冲突大于收益;真正缺的只是"界面栈 + 弹窗互斥 + 生命周期",600~900 行可控代码即可,且基类留 AOT 才能与热更边界对齐 |
 | **D-12** | 引擎版本 | **✅ 已决:Unity `6000.3.20f1`(国际版)**,2026-08-20 定版;旧基线 `2022.3.50f1c1`(中国版 c1)在验收通过前保留。迁移必须在**工程副本**上做,详见 §4.9 | 出海项目用国际版(插件/文档/政策一致,已核实工程无中国版专属依赖);2022 LTS 已过支持窗口,而 Play 的 targetSdk 每年上调。工程现在只有 4 个 asmdef / 2 个场景,**这是迁移成本最低的时刻**。HybridCLR 支持范围为 `6000.x.y`,但**以 Installer 实证为准**(§4.9 Gate 1) |
-| **D-13** | minSdk | **✅ 已决:统一为 24**(Android 7.0),消除"03 文档写 24 / 工程实配 23"的分裂 | 覆盖率损失可忽略,且多数广告/分析 SDK 的下限在上移;**若 Unity 6 的下拉最低值高于 24,以引擎下限为准并回写 03**(§4.9 checklist 第 8 步) |
+| **D-13** | minSdk | **✅ 已决:定版为 25**(Android 7.1)。2026-08-21 Phase 1 实测触发"以引擎为准"条款:Unity 6000.3 最低支持 API = 25,设 24 已 obsolete(CS0618,构建强制回写 25,下个 release 变 error);已回写 03/10/本文 | 覆盖率损失可忽略,且多数广告/分析 SDK 的下限在上移;设置脚本 `ProjectSetup.cs` 直接写 25 |
 
 ---
 
@@ -84,7 +84,7 @@
 | **ARM64** | 未提 | **仅 ARMv7**(`AndroidTargetArchitectures: 1`)→ **Play 上架硬阻塞** | 同上 |
 | **AAB** | §9.1 当作已满足 | 构建脚本产出 `Build/Sudoku.apk`,未设 `buildAppBundle` | `Assets/Features/Gameplay/Editor/BuildScript.cs` |
 | targetSdk / stripping | 未提 | `AndroidTargetSdkVersion: 0`(Automatic)、`managedStrippingLevel` 空 | `ProjectSettings.asset` |
-| minSdk | 03 文档写 24 | 实际 **23** → **D-13 已统一为 24**(P-1 一并改) | 同上 |
+| minSdk | 03 文档写 24 | 实际 **23** → **D-13 定版 25**(P-1 已落:Unity 6000.3 引擎下限 25) | 同上 |
 | 场景 | "MainMenu 演化为大厅" | `App/Scenes/Menu.unity`、`App/Scenes/Gameplay.unity`(+ 模板 `SampleScene`) | 工程扫描 |
 | 资源加载 | 假定可直接切 Addressables | 现走 `Resources/`(`Resources/Art`、`Resources/Audio`) | 工程扫描 |
 | 存档 | "现项目存档为单一数独进度(加密 JSON)" | 实际 **PlayerPrefs + `JsonUtility`**,无加密、无 `ISaveService` | `GameStatistics.cs`、`SettingsService.cs` |
@@ -414,9 +414,9 @@ Editor 菜单 `Box/New Module...` 一键生成:
 5. **删掉 `Assets/Plugins/Android` 下的 2022 时代 Gradle 模板**(`baseProjectTemplate.gradle` / `mainTemplate.gradle` / `settingsTemplate.gradle` / `gradleTemplate.properties`)→ 新版本重新生成 → **EDM4U 重新 Resolve**(现装 1.2.188,较新)→ 再把 AdMob 需要的 manifest/metadata 改动重打一遍。Unity 6 走 AGP 8 / JDK 17,旧模板必然冲突
 6. 核 SDK:Firebase Unity 13.15、**GoogleMobileAds 8.7.0**(最可能需要升)、Unity IAP 是否声明支持 Unity 6.x;不兼容就升插件,别改引擎
 7. 保留 `scriptingDefineSymbols`(`SUDOKU_ADMOB;SUDOKU_FIREBASE`,接 IAP 后加 `SUDOKU_IAP`)
-8. 重配 Player Settings:**IL2CPP + ARM64 + targetSdk + managedStrippingLevel + minSdk 24**(§1.4 的债务一次性清掉;打开后确认 Unity 6 的 minSdk 下拉最低可选值,若高于 24 则以引擎下限为准并回写 03 文档)
+8. 重配 Player Settings:**IL2CPP + ARM64 + targetSdk 35 + managedStrippingLevel(Medium)+ minSdk 25**(§1.4 的债务一次性清掉;✅ 2026-08-21 已落地:Unity 6 最低支持 API = 25,minSdk 定版 25,03 文档已回写)
 9. `BuildScript.cs` 拆成两个入口:`BuildAndroidApk`(本地测试)与 `BuildAndroidAab`(上架,`EditorUserBuildSettings.buildAppBundle = true`)
-10. 精简包:确认不用则移除 `com.unity.visualscripting`、`com.unity.collab-proxy`
+10. 精简包:确认不用则移除 `com.unity.visualscripting`、`com.unity.collab-proxy`;**`com.unity.ai.assistant` / `com.unity.ai.inference` 已拍板保留(2026-08-21),不精简**
 11. **验收(全过才切主工程)**:EditMode 测试全绿 + IL2CPP+ARM64 真机包跑通"启动→单局→激励广告→返回" + **字体/UI 显示正常** + §11 五项基线重测
 12. 验收通过后:副本转正(或把主工程按同样步骤升一次),回填本节"待确认"两项,同步 03 / 07 / README 的引擎表述
 
@@ -755,7 +755,7 @@ Assets/
 
 | Phase | 内容 | 验收标准 | 工期 |
 |---|---|---|---|
-| **P-1 前置(硬门槛)** | **引擎迁移到 Unity `6000.3.20f1` 国际版(D-12,§4.9:先做 Gate 1 实证 → 副本迁移 → TMP/Gradle 模板/EDM4U 重做)**;工程债务清理:**ARM64 + IL2CPP + AAB + targetSdk + managedStrippingLevel + minSdk 24(D-13)** 一次配齐;`BuildScript` 拆 APK/AAB 双入口;开局生成移出主线程;Canvas 静/动分层;Profiler 基线与工作流 | 空工程里 HybridCLR Installer + `Generate/All` 通过;副本在 6000.3.20f1 下 EditMode 全绿、IL2CPP+ARM64 真机包跑通"启动→单局→激励广告→返回"、**字体/UI 无异常**;§11 五项基线有数;§4.9 待确认两项已回填 | 2~2.5 周 |
+| **P-1 前置(硬门槛)** | **引擎迁移到 Unity `6000.3.20f1` 国际版(D-12,§4.9:先做 Gate 1 实证 → 副本迁移 → TMP/Gradle 模板/EDM4U 重做)**;工程债务清理:**ARM64 + IL2CPP + AAB + targetSdk 35 + managedStrippingLevel + minSdk 25(D-13,2026-08-21 已实测定版)** 一次配齐;`BuildScript` 拆 APK/AAB 双入口;开局生成移出主线程;Canvas 静/动分层;Profiler 基线与工作流 | 空工程里 HybridCLR Installer + `Generate/All` 通过;副本在 6000.3.20f1 下 EditMode 全绿、IL2CPP+ARM64 真机包跑通"启动→单局→激励广告→返回"、**字体/UI 无异常**;§11 五项基线有数;§4.9 待确认两项已回填 | 2~2.5 周 |
 | **P0-a 基础设施** | 装 Addressables / UniTask /(VContainer)/(Unity IAP 启用 `SUDOKU_IAP`);拆 `Box.Services.Abstractions` + `Box.Services`;`Resources → Addressables` 迁移;建 PlayMode 测试程序集;新存档层 + v0→v1 迁移器 | 真机包功能零回归;旧存档可无损升级;PlayMode 测试可跑 | 1.5 周 |
 | **P0-b 盒子骨架** | ModuleFramework(AOT)+ 清单三级兜底 + BootScene/HomeScene;**`UIKit` 薄层(§3.5,含弹窗互斥仲裁)**;数独迁入 `HotUpdate.Sudoku` 并改为 `IGameModule`;HybridCLR 安装 + **纯 AOT 出包模式**打通;解释执行模式本地验证(不上线) | 数独可从大厅进出,内存回落达标;插屏与弹窗不叠加(用例覆盖);纯 AOT 包无回归;解释执行包本地可跑 | 2.5~3 周 |
 | **P1 Trait 最小运行时** | AOT 侧 `ITraitService`/`TraitRegistry` + RC/CDN 拉取 + 四级优先链 + 容灾;**≤10 个 Trait**:`ads.interstitial_protect`、`difficulty.new_user`、`retention.daily_sign` | 改远程 JSON 下次启动生效;拉取失败走缓存不阻断;四级优先链有单测 | 1.5 周 |
@@ -797,7 +797,7 @@ Assets/
 6. **SSV**:P4 接受"本地校验 + 频控"过渡(推荐)还是直接搭接收端?
 7. **R3**:是否引入(建议 P2 之后再评估;P0 只用 UniTask + DI)
 
-已拍板(见 §0):D-1 下发通道、D-2 v1.0 纯 AOT、D-3 Trait 分层、D-5 单货币、D-6 配置四分管、D-7 存档、D-10 本文入库、D-11 不引入全家桶框架自研 `UIKit`、**D-12 引擎 `6000.3.20f1` 国际版**、**D-13 minSdk 24**。
+已拍板(见 §0):D-1 下发通道、D-2 v1.0 纯 AOT、D-3 Trait 分层、D-5 单货币、D-6 配置四分管、D-7 存档、D-10 本文入库、D-11 不引入全家桶框架自研 `UIKit`、**D-12 引擎 `6000.3.20f1` 国际版**、**D-13 minSdk 25(2026-08-21 实测定版,原 24 为引擎下限所替代)**。
 
 §4.9 待回填(不阻塞开工):① `6000.3` 的 LTS 标记;② 该版本可选的 targetSdk 是否满足 Play 当前强制值。
 
@@ -858,7 +858,7 @@ Assets/
 | 决策冲突 | ✅ 已完成 | `docs/README.md` 决策摘要"首期不使用 HybridCLR" → 改为 v1.0 纯 AOT + 程序集拆分口径,并加"盒子化受数据门控约束"一行 |
 | 优先级冲突 | ✅ 已完成 | 03 升 v1.2:Addressables 升为盒子路线 P0、补 HybridCLR 行、构建行加 **ARM64(必须)** |
 | 07 对齐 | ✅ 已完成 | 07 升 v1.2:"不采用 HybridCLR" → "不启用解释执行/远程下发,但程序集提前拆好" |
-| 参数冲突 | ✅ 已决(待落地) | **D-13:minSdk 统一为 24** → P-1 同时改工程与 03 文档;若 Unity 6 引擎下限高于 24 则以引擎为准并回写 |
+| 参数冲突 | ✅ 已决(已落地) | **D-13:minSdk 定版 25**(2026-08-21 实测:引擎下限 25,24 已 obsolete)→ 工程 `ProjectSettings.asset` + 03/10/本文全部回写完成 |
 | 引擎表述 | ✅ 已完成 | D-12 定版 `6000.3.20f1` 后,03 / 07 / README 的引擎基线表述已同步;**07 文件名仍含"Unity2022"** —— 抬头已注明"仅为历史标题",迁移验收通过后可考虑改名 |
 | 备份 | ✅ | v1.4 原文存 `_private/11_Unity游戏盒子架构方案_v1.4_backup.md` |
 | 版本纪律 | — | 本文每次结构性演进升次版本号并在抬头写变更摘要;§4.9 定版后必须回填结论与查验日期 |

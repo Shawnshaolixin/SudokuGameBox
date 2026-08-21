@@ -1,0 +1,16 @@
+{
+    "name": "Box.Gameplay",
+    "rootNamespace": "Box.Gameplay",
+    "references": [
+        "Box.Services.Abstractions"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
