@@ -55,6 +55,6 @@
         "com.unity.modules.wind": "1.0.0",
         "com.unity.modules.xr": "1.0.0",
         "com.unity.pipeline": "0.5.0-exp.1",
-        "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask"
+        "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask#ceac8d6946b1125fe782cd171fbcb245b567dbf9"
     }
 }
