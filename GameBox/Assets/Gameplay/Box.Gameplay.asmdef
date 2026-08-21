@@ -2,7 +2,9 @@
     "name": "Box.Gameplay",
     "rootNamespace": "Box.Gameplay",
     "references": [
-        "Box.Services.Abstractions"
+        "Box.Services.Abstractions",
+        "Box.UI",
+        "UniTask"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

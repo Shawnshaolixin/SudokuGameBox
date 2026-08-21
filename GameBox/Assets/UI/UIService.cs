@@ -1,3 +1,4 @@
+using Box.Services;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -18,9 +19,9 @@ namespace Box.UI
 
         BackKeyRunner _backRunner;
 
-        public UIService(IViewLoader loader)
+        public UIService(IViewLoader loader, IAnalyticsService analytics = null)
         {
-            Router = new UIRouter(loader);
+            Router = new UIRouter(loader) { Analytics = analytics };
             Popup = new PopupArbiter(Router);
             EnsureEventSystem();
             _backRunner = new GameObject("BoxUI_BackKey").AddComponent<BackKeyRunner>();

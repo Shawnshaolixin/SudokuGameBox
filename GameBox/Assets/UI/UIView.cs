@@ -21,12 +21,11 @@ namespace Box.UI
 
         public bool IsShown { get; private set; }
 
-        RectTransform _rect;
-
         protected virtual void Awake()
         {
-            _rect = GetComponent<RectTransform>();
-            ApplySafeArea();
+            // 安全区由 SafeAreaFitter 托管:横竖屏/键盘变化时动态刷新(§3.5 第 8 条 / 11 文档 §10.1)
+            if (GetComponent<SafeAreaFitter>() == null)
+                gameObject.AddComponent<SafeAreaFitter>();
         }
 
         // ---- 生命周期(由 UIRouter 调用,子类覆写) ----
@@ -40,20 +39,12 @@ namespace Box.UI
         internal async UniTask CreateAsync() => await OnCreate();
         internal async UniTask ShowAsync(object args) { IsShown = true; gameObject.SetActive(true); await OnShow(args); }
         internal async UniTask HideAsync() { IsShown = false; await OnHide(); gameObject.SetActive(false); }
-        internal async UniTask DestroyAsync() { await OnDestroy(); Destroy(gameObject); }
-        internal async UniTask RefreshAsync() => await OnRefresh();
-
-        /// <summary>统一安全区适配:刘海/挖孔下自动缩边。</summary>
-        void ApplySafeArea()
+        internal async UniTask DestroyAsync()
         {
-            if (_rect == null) return;
-            var safe = Screen.safeArea;
-            var screen = new Rect(0, 0, Screen.width, Screen.height);
-            var inset = new Vector2(
-                (safe.xMin - screen.xMin) / screen.width,
-                (safe.yMin - screen.yMin) / screen.height);
-            _rect.anchorMin = new Vector2(inset.x, inset.y);
-            _rect.anchorMax = new Vector2(1f - (screen.xMax - safe.xMax) / screen.width, 1f - (screen.yMax - safe.yMax) / screen.height);
+            await OnDestroy();
+            if (Application.isPlaying) Destroy(gameObject);
+            else DestroyImmediate(gameObject); // EditMode 测试/预览安全
         }
+        internal async UniTask RefreshAsync() => await OnRefresh();
     }
 }

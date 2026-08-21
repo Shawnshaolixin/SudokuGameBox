@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Box.Services;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
@@ -13,6 +14,12 @@ namespace Box.UI
     public sealed class UIRouter
     {
         public event Action<UIView> ViewPopped;
+
+        /// <summary>UI 埋点(§3.5 第 7 条):OnShow 自动上报 {id}.ui_show;null 则跳过。</summary>
+        public IAnalyticsService Analytics { get; set; }
+
+        /// <summary>当前栈内(Window/Popup)视图数,仅供测试与调试。</summary>
+        public int StackCount => _stack.Count;
 
         readonly UILayerManager _layers = new();
         readonly IViewLoader _loader;
@@ -47,15 +54,18 @@ namespace Box.UI
                         return null;
                     }
                     view.Id = key;
-                    go.transform.SetParent(_layers.GetCanvas(view.Layer).transform, false);
+                    var canvas = _layers.GetCanvas(view.Layer);
+                    if (canvas != null) go.transform.SetParent(canvas.transform, false);
                     await view.CreateAsync();
                 }
 
-                if (IsStacked(view.Layer) && _stack.Count > 0)
-                    await _stack.Peek().HideAsync();
-
-                _stack.Push(view);
-                await view.ShowAsync(args);
+                if (IsStacked(view.Layer))
+                {
+                    if (_stack.Count > 0) await _stack.Peek().HideAsync();
+                    _stack.Push(view);
+                }
+                await view.ShowAsync(args); // 非栈层(HUD/Toast)只显示不入栈
+                Analytics?.LogEvent($"{view.Id}.ui_show"); // UI 埋点自动化(§3.5 第 7 条)
                 return (TView)view;
             }
             finally
@@ -82,19 +92,16 @@ namespace Box.UI
                 await PopAsync();
         }
 
-        /// <summary>替换栈顶(同层替换,常用于 确认→结算 流程)。</summary>
-        public async UniTask ReplaceAsync(string key, object args = null)
+        /// <summary>替换栈顶(同层替换,常用于 确认→结算 流程);返回替换后的视图。</summary>
+        public async UniTask<TView> ReplaceAsync<TView>(string key, object args = null) where TView : UIView
         {
             if (_stack.Count == 0)
-            {
-                await PushAsync<UIView>(key, args);
-                return;
-            }
+                return await PushAsync<TView>(key, args);
             var top = _stack.Pop();
             await top.HideAsync();
             ViewPopped?.Invoke(top);
             CacheOrDestroy(top);
-            await PushAsync<UIView>(key, args);
+            return await PushAsync<TView>(key, args);
         }
 
         /// <summary>Android 返回键入口(由 UIService 的 BackKeyRunner 逐帧调用)。</summary>

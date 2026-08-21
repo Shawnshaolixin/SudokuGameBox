@@ -2,7 +2,12 @@
     "name": "Box.Editor",
     "rootNamespace": "Box.Editor",
     "references": [
-        "Box.Services.Abstractions"
+        "Box.Services.Abstractions",
+        "Box.UI",
+        "Box.Gameplay",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [
         "Editor"

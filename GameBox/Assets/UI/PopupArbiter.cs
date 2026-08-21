@@ -49,7 +49,9 @@ namespace Box.UI
                 var view = await _router.PushAsync<UIView>(item.Key, item.Args);
                 if (view == null)
                 {
+                    // 资源缺失/超时:必须放行排队者,否则调用方 await 永久挂起(评审发现)
                     Debug.LogWarning($"[UIKit] 弹窗资源缺失: {item.Key}");
+                    item.Done.TrySetResult();
                     return;
                 }
 
@@ -62,6 +64,12 @@ namespace Box.UI
                 }
                 _router.ViewPopped += OnPopped;
                 await tcs.Task;
+                item.Done.TrySetResult();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[UIKit] 弹窗流程异常 {item.Key}: {e.Message}");
+                item.Done.TrySetResult();
             }
             finally
             {
