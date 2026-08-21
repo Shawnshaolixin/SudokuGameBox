@@ -1,3 +1,4 @@
+using System;
 using Box.Services;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -13,6 +14,21 @@ namespace Box.UI
     /// </summary>
     public sealed class UIService
     {
+        /// <summary>
+        /// 应用级唯一实例,由启动引导(AppBootstrap)经 Register 注册。
+        /// EditMode 测试不触发 RuntimeInitializeOnLoadMethod,不受影响。
+        /// </summary>
+        public static UIService Instance { get; private set; }
+
+        /// <summary>注册应用级唯一实例(启动引导调用);重复注册告警并覆盖。</summary>
+        public static void Register(UIService service)
+        {
+            if (service == null) throw new ArgumentNullException(nameof(service));
+            if (Instance != null)
+                Debug.LogWarning("[UIKit] UIService 重复注册,旧实例将被覆盖");
+            Instance = service;
+        }
+
         public UIRouter Router { get; }
         public PopupArbiter Popup { get; }
         public UILayerManager Layers { get; } = new();
@@ -35,7 +51,7 @@ namespace Box.UI
         /// </summary>
         static void EnsureEventSystem()
         {
-            if (Object.FindFirstObjectByType<EventSystem>() != null) return;
+            if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null) return;
             new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         }
 
