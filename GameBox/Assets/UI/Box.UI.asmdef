@@ -2,7 +2,10 @@
     "name": "Box.UI",
     "rootNamespace": "Box.UI",
     "references": [
-        "Box.Services.Abstractions"
+        "Box.Services.Abstractions",
+        "UniTask",
+        "UnityEngine.UI",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

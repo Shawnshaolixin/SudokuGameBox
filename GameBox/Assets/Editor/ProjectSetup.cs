@@ -30,7 +30,10 @@ public static class ProjectSetup
         // .NET Standard 2.1(HybridCLR 前置项;Unity 6 枚举名为 NET_Standard)
         PlayerSettings.SetApiCompatibilityLevel(NamedBuildTarget.Android, ApiCompatibilityLevel.NET_Standard);
 
+        // 输入模式保持模板 New-only 不动(6000.3 无公开 API 且 6000.2+ Android 不支持 Both;
+        // UIKit 已按新输入系统实现:返回键 Keyboard.current + InputSystemUIInputModule)
+
         AssetDatabase.SaveAssets();
-        Debug.Log("[ProjectSetup] applied: IL2CPP / ARM64 / minSdk24 / targetSdk35 / Stripping-Medium / NET_Standard_2_1");
+        Debug.Log("[ProjectSetup] applied: IL2CPP / ARM64 / minSdk25 / targetSdk35 / Stripping-Medium / NET_Standard_2_1");
     }
 }
