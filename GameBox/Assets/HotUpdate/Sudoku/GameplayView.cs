@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Box.ModuleFramework;
 using Box.UI;
 using Cysharp.Threading.Tasks;
 using Sudoku.Core;
@@ -140,7 +141,7 @@ namespace Box.HotUpdate.Sudoku
             }
             else
             {
-                await SceneManager.LoadSceneAsync("MainMenu");
+                await ExitToMainMenuAsync();
             }
         }
 
@@ -171,11 +172,24 @@ namespace Box.HotUpdate.Sudoku
             dialog.SetTitle("退出对局");
             dialog.SetMessage("当前进度将丢失,确定退出?");
             dialog.OnCancel(() => _svc.Router.PopAsync().Forget()); // 取消:只关弹窗
-            dialog.OnConfirm(async () => // 确认:先关弹窗再切场景,防竞态(同 DifficultySelect)
+            dialog.OnConfirm(async () => // 确认:先关弹窗再退模块(复位状态),防竞态(同 DifficultySelect)
             {
                 await _svc.Router.PopAsync();
-                await SceneManager.LoadSceneAsync("MainMenu");
+                await ExitToMainMenuAsync();
             });
+        }
+
+        // ---- 统一回大厅出口(复位模块状态,防二次进入被拒) ----
+        // 必须走 ModuleLoader.ExitAsync:直接切场景会让 _states[sudoku] 永久卡 Active,
+        // EnterAsync 的防重入守卫(GetState != Idle)会拒绝第二次进入。SceneManager 归 OnExit 管。
+
+        async UniTask ExitToMainMenuAsync()
+        {
+            var loader = ModuleLoader.Instance;
+            if (loader != null)
+                await loader.ExitAsync("sudoku"); // SudokuModule.OnExit 内部 LoadSceneAsync("MainMenu")
+            else
+                await SceneManager.LoadSceneAsync("MainMenu"); // 兜底(无启动引导时)
         }
 
         void OnMode()
@@ -227,7 +241,11 @@ namespace Box.HotUpdate.Sudoku
 
                 for (int k = 0; k < 9; k++)
                 {
-                    int index = box * 9 + k;
+                    // 索引换算:视觉(宫优先 box/k) → 数据(行优先 row*9+col)。
+                    // box=(vR/3)*3+(vC/3), k=(vR%3)*3+(vC%3) → vR*9+vC。
+                    // 旧实现 box*9+k 与 SudokuBoard 行优先索引错位,
+                    // 会把第(r+1)行数据渲染进第 r 行 → 视觉同列重复(数据合法,显示错位)。
+                    int index = ((box / 3) * 3 + k / 3) * SudokuBoard.Size + ((box % 3) * 3 + k % 3);
                     // 父格:背景+点击(TMP 与 Image 同为 Graphic 互斥,不能同 GameObject)
                     var go = new GameObject("C" + index, typeof(RectTransform), typeof(Image), typeof(Button), typeof(BoxButton));
                     go.transform.SetParent(boxGo.transform, false);

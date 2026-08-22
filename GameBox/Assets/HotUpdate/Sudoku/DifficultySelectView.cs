@@ -1,3 +1,4 @@
+using Box.ModuleFramework;
 using Box.UI;
 using Cysharp.Threading.Tasks;
 using Sudoku.Core;
@@ -13,6 +14,9 @@ namespace Box.HotUpdate.Sudoku
     public sealed class DifficultySelectView : UIView
     {
         UIService _svc;
+
+        /// <summary>已选难度(Choose 置 true):OnHide 据此区分「取消进入」与「完成进入」。</summary>
+        bool _chosen;
 
         protected override void Awake()
         {
@@ -34,6 +38,17 @@ namespace Box.HotUpdate.Sudoku
             await BoxTween.ScalePulse(transform, 0.8f, 1f, 0.22f); // 弹入(D-15)
         }
 
+        // 弹窗被关闭(返回键/取消)= 取消本次进入:复位模块状态(Idle),
+        // 否则 _states[sudoku] 卡 Active,再次点开始被 EnterAsync 拒绝。
+        // Choose 路径已置 _chosen,此钩子不触发,不会误退(完成进入保持 Active)。
+        protected override async UniTask OnHide()
+        {
+            if (_chosen) return;
+            if (_svc == null || _svc.Router.StackCount != 0) return; // 被上层压栈(hide)而非关闭,不处理
+            var loader = ModuleLoader.Instance;
+            if (loader != null) await loader.ExitAsync("sudoku");
+        }
+
         void Bind(string path, Difficulty difficulty)
         {
             var btn = transform.Find(path)?.GetComponent<BoxButton>();
@@ -42,6 +57,7 @@ namespace Box.HotUpdate.Sudoku
 
         async void Choose(Difficulty difficulty)
         {
+            _chosen = true; // 先标记,再关弹窗:OnHide 不会误退模块(完成进入,保持 Active)
             GameContext.SetNormalGame(difficulty);
             if (_svc == null) return;
             await _svc.Router.PopAsync(); // 先关弹窗再切场景,防竞态
