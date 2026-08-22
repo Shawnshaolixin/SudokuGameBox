@@ -1,6 +1,6 @@
 using Sudoku.Core;
 
-namespace Box.Gameplay
+namespace Box.HotUpdate.Sudoku
 {
     /// <summary>结算后用户去向(弹窗 Action 回写,由 GameplayView 消费)。</summary>
     public enum SettlementAction

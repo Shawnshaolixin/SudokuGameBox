@@ -1,7 +1,7 @@
 using NUnit.Framework;
 using Sudoku.Core;
 
-namespace Box.Gameplay.Tests
+namespace Box.HotUpdate.Sudoku.Tests
 {
     /// <summary>
     /// GameSession 对局核心单测(Phase 4 4-2):

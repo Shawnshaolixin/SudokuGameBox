@@ -150,7 +150,7 @@
     {
       "id": "sudoku",
       "displayNameKey": "module.sudoku.name",   // 走本地化 key,不写死文案
-      "entryType": "Sudoku.HotUpdate.SudokuModule",  // 热更程序集内的入口类型全名
+      "entryType": "Box.HotUpdate.Sudoku.SudokuModule",  // 热更程序集内的入口类型全名(Phase 4.5 落地命名空间)
       "entryAsset": "Modules/Sudoku/SudokuEntry",    // Addressables key
       "icon": "Modules/Sudoku/icon",
       "codeVersion":    "1.3.0",   // 热更 dll 版本
@@ -166,7 +166,7 @@
     {
       "id": "tictactoe",
       "displayNameKey": "module.tictactoe.name",
-      "entryType": "TicTacToe.HotUpdate.TicTacToeModule",
+      "entryType": "Box.HotUpdate.TicTacToe.TicTacToeModule",
       "entryAsset": "Modules/TicTacToe/TicTacToeEntry",
       "icon": "Modules/TicTacToe/icon",
       "codeVersion": "1.0.0", "contentVersion": "1.0.0", "configVersion": "1",
@@ -332,7 +332,9 @@ Editor 菜单 `Box/New Module...` 一键生成:
 | `SudokuCore`(纯算法,性能敏感,永久留 AOT) | |
 
 - **一玩法一 dll**:改数独只下发数独 dll
-- **引用规则(v1.4 措辞矛盾,已修正)**:玩法 dll **之间**禁止互相引用;**允许且只允许**引用 `HotUpdate.Core` 与 AOT 侧的接口程序集;禁止引用 AOT 具体实现类
+- **引用规则(v1.4 措辞矛盾,已修正;Phase 4.5 澄清)**:玩法 dll **之间**禁止互相引用;**允许且只允许**引用 `HotUpdate.Core` 与 AOT 侧的接口程序集;禁止引用 AOT 具体实现类
+  - **框架例外(Phase 4.5 澄清)**:玩法引用 `Box.UI`(UIView/UIService 等)与 `Box.ModuleFramework`(IGameModule/ModuleContext)属于玩法开发的公共 API 面,与引用引擎 API 同权,不受"禁止引用具体实现"限制 —— 禁令针对大厅/服务/玩法之间的应用层耦合;`IGameModule` 接口在 AOT 框架程序集,热更入口类型实现它,依赖方向永远 AOT → 玩法
+  - **Editor 例外**:资产生成工具(如 Phase4SceneSetup)可引用玩法程序集,编辑器无 IL2CPP 裁剪与热更边界,不约束
 - 构建流程:`HybridCLR → Generate/All`(编译热更 dll + `AotGenericReferences` + 补充 metadata)→ 产物按 D-1 进 Addressables 远程组
 - **大厅与所有 Services 留 AOT** —— 无网也能进大厅、玩已缓存玩法
 
@@ -760,6 +762,8 @@ Assets/
 | **P-1 前置(硬门槛)** | **引擎迁移到 Unity `6000.3.20f1` 国际版(D-12,§4.9:先做 Gate 1 实证 → 副本迁移 → TMP/Gradle 模板/EDM4U 重做)**;工程债务清理:**ARM64 + IL2CPP + AAB + targetSdk 35 + managedStrippingLevel + minSdk 25(D-13,2026-08-21 已实测定版)** 一次配齐;`BuildScript` 拆 APK/AAB 双入口;开局生成移出主线程;Canvas 静/动分层;Profiler 基线与工作流 | 空工程里 HybridCLR Installer + `Generate/All` 通过;副本在 6000.3.20f1 下 EditMode 全绿、IL2CPP+ARM64 真机包跑通"启动→单局→激励广告→返回"、**字体/UI 无异常**;§11 五项基线有数;§4.9 待确认两项已回填 | 2~2.5 周 |
 | **P0-a 基础设施** | 装 Addressables / UniTask /(VContainer)/(Unity IAP 启用 `SUDOKU_IAP`);拆 `Box.Services.Abstractions` + `Box.Services`;`Resources → Addressables` 迁移;建 PlayMode 测试程序集;新存档层 + v0→v1 迁移器 | 真机包功能零回归;旧存档可无损升级;PlayMode 测试可跑 | 1.5 周 |
 | **P0-b 盒子骨架** | ModuleFramework(AOT)+ 清单三级兜底 + BootScene/HomeScene;**`UIKit` 薄层(§3.5,含弹窗互斥仲裁)**;数独迁入 `HotUpdate.Sudoku` 并改为 `IGameModule`;HybridCLR 安装 + **纯 AOT 出包模式**打通;解释执行模式本地验证(不上线) | 数独可从大厅进出,内存回落达标;插屏与弹窗不叠加(用例覆盖);纯 AOT 包无回归;解释执行包本地可跑 | 2.5~3 周 |
+
+> **进度注记(2026-08-22)**:执行拆入 10 文档 —— Phase 4.5(ModuleFramework AOT + 数独迁入 `HotUpdate.Sudoku` + `IGameModule` + 入口反射,完成)、Phase 6(Addressables 单场景收敛 + 清单三级兜底,待做)、Phase 9(HybridCLR + 纯 AOT 出包,待做)。
 | **P1 Trait 最小运行时** | AOT 侧 `ITraitService`/`TraitRegistry` + RC/CDN 拉取 + 四级优先链 + 容灾;**≤10 个 Trait**:`ads.interstitial_protect`、`difficulty.new_user`、`retention.daily_sign` | 改远程 JSON 下次启动生效;拉取失败走缓存不阻断;四级优先链有单测 | 1.5 周 |
 | **P2 第二玩法** | 井字棋(走 §3.3 规范 + §3.4 脚手架)+ 交叉导量入口 + `IEconomyService`/`box.coins` 打通 | 双玩法可互跳;金币跨玩法可赚可花;切换 20 次无 OOM | 1.5 周 |
 | **▶ v1.0 上架** | **自包含纯 AOT 盒子**:无网可完整玩;远程管线代码就位但不参与出包 | Play 上架通过(首版零远程代码风险);§11 全部达标 | 1.5~2 周 |

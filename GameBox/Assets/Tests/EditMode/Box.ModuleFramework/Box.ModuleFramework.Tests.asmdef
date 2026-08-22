@@ -1,10 +1,10 @@
 {
-    "name": "Box.Gameplay.Tests",
-    "rootNamespace": "Box.Gameplay.Tests",
+    "name": "Box.ModuleFramework.Tests",
+    "rootNamespace": "Box.ModuleFramework.Tests",
     "references": [
-        "Box.Gameplay",
+        "Box.ModuleFramework",
+        "Box.UI",
         "Box.Services.Abstractions",
-        "Sudoku.Core",
         "UniTask",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"

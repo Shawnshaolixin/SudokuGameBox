@@ -4,7 +4,7 @@ using Sudoku.Core;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace Box.Gameplay
+namespace Box.HotUpdate.Sudoku
 {
     /// <summary>
     /// 难度选择弹窗(Phase 4 4-1):用户主动弹窗,走 Router.Push(不进 PopupArbiter 被动队列)。

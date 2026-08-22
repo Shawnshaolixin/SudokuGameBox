@@ -1,6 +1,6 @@
 using Sudoku.Core;
 
-namespace Box.Gameplay
+namespace Box.HotUpdate.Sudoku
 {
     /// <summary>
     /// 场景间传参(静态):主菜单选难度/每日挑战 → Gameplay 场景读取。

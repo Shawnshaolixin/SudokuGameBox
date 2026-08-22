@@ -1,13 +1,15 @@
-using System;
+using Box.ModuleFramework;
 using Box.UI;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace Box.Gameplay
 {
     /// <summary>
-    /// 主菜单(Phase 4 4-1):开始游戏→难度弹窗;每日挑战→日期种子直接开局;设置→Phase 5 占位。
+    /// 主菜单/大厅雏形(Phase 4 4-1 + Phase 4.5):
+    /// 入口按钮 → IModuleLoader.EnterAsync(中间态:玩法模块内部开弹窗/切场景,决策 B);
+    /// 设置 → Phase 5 占位。不再静态引用玩法类型 —— Box.Gameplay(AOT) 不依赖 HotUpdate.Sudoku,
+    /// v1.1 热更下发后大厅零改动接入新玩法(读 ModuleCatalog 渲染入口,网格化留给第二玩法)。
     /// </summary>
     public sealed class MainMenuView : UIView
     {
@@ -19,18 +21,13 @@ namespace Box.Gameplay
 
         protected override UniTask OnCreate()
         {
-            var svc = UIService.Instance;
             var start = transform.Find("StartButton")?.GetComponent<BoxButton>();
-            if (start != null && svc != null)
-                start.OnClick(() => svc.Router.PushAsync<DifficultySelectView>("UI/Popups/DifficultySelect").Forget());
+            if (start != null)
+                start.OnClick(() => ModuleLoader.Instance?.EnterAsync("sudoku").Forget());
 
             var daily = transform.Find("DailyChallengeButton")?.GetComponent<BoxButton>();
             if (daily != null)
-                daily.OnClick(() =>
-                {
-                    GameContext.SetDaily(DailyChallengeStore.SeedFor(DateTime.UtcNow));
-                    SceneManager.LoadSceneAsync("Gameplay");
-                });
+                daily.OnClick(() => ModuleLoader.Instance?.EnterAsync("sudoku", "daily").Forget());
 
             var settings = transform.Find("SettingsButton")?.GetComponent<BoxButton>();
             if (settings != null)

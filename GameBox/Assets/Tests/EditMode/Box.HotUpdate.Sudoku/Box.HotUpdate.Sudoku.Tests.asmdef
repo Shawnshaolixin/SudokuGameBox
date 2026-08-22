@@ -1,18 +1,17 @@
 {
-    "name": "Box.Gameplay.SmokeTests",
-    "rootNamespace": "Box.Gameplay.Tests",
+    "name": "Box.HotUpdate.Sudoku.Tests",
+    "rootNamespace": "Box.HotUpdate.Sudoku.Tests",
     "references": [
-        "Box.Gameplay",
         "Box.HotUpdate.Sudoku",
-        "Box.ModuleFramework",
-        "Box.UI",
         "Box.Services.Abstractions",
         "Sudoku.Core",
         "UniTask",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "autoReferenced": false,
     "allowUnsafeCode": false,

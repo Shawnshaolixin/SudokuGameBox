@@ -1,6 +1,6 @@
 using Sudoku.Core;
 
-namespace Box.Gameplay
+namespace Box.HotUpdate.Sudoku
 {
     /// <summary>谜题工厂:普通难度生成 + 每日挑战(日期种子确定性)。</summary>
     public static class PuzzleFactory

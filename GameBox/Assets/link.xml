@@ -1,0 +1,9 @@
+<linker>
+    <!--
+        Phase 4.5:模块入口类型保留,防 IL2CPP 裁剪(ModuleLoader 按 entryType 字符串反射,
+        无静态引用 → 默认 stripping 会删掉,Type.GetType 返回 null,模块永远进不去)。
+        热更程序集整体保留:v1.0 随包 AOT 编译,体积小,保全部最稳;
+        v1.1 解释执行模式下 HybridCLR 另有热更侧链接规则,本文件只管 AOT 入口。
+    -->
+    <assembly fullname="Box.HotUpdate.Sudoku" preserve="all" />
+</linker>

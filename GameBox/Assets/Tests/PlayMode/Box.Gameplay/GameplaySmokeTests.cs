@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Reflection;
 using Box.Gameplay;
+using Box.HotUpdate.Sudoku;
 using Box.UI;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Sudoku.Core;
 
-namespace Box.Gameplay
+namespace Box.HotUpdate.Sudoku
 {
     /// <summary>
     /// 对局会话(纯 C#,非 MonoBehaviour,Phase 4 4-2 核心):

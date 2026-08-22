@@ -8,7 +8,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-namespace Box.Gameplay
+namespace Box.HotUpdate.Sudoku
 {
     /// <summary>
     /// 对局视图(Phase 4 4-2):代码生成 81 格棋盘(3x3 宫嵌套 GridLayoutGroup)、
@@ -91,7 +91,7 @@ namespace Box.Gameplay
             bool daily = GameContext.IsDaily;
             if (_titleText != null) _titleText.Text = daily ? "每日挑战" : "数独 - " + DifficultyName(GameContext.Difficulty);
             RefreshBoard();
-            _svc?.Router.Analytics?.LogEvent("level_start");
+            _svc?.Router.Analytics?.LogEvent("sudoku.level_start"); // §8.4 {module_id}.{action}
 
             _timerCts?.Cancel();
             _timerCts = new CancellationTokenSource();
@@ -101,7 +101,7 @@ namespace Box.Gameplay
         void OnGameFinished()
         {
             RefreshBoard();
-            _svc?.Router.Analytics?.LogEvent("level_complete");
+            _svc?.Router.Analytics?.LogEvent("sudoku.level_complete");
 
             var result = new SettlementResult
             {
@@ -188,7 +188,7 @@ namespace Box.Gameplay
         void OnHint()
         {
             if (_session != null && _session.TryUseHint())
-                _svc?.Router.Analytics?.LogEvent("hint_used");
+                _svc?.Router.Analytics?.LogEvent("sudoku.hint_used");
         }
 
         void OnHintExhausted()

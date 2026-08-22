@@ -1,4 +1,5 @@
 using Box.Gameplay;
+using Box.HotUpdate.Sudoku;
 using Box.UI;
 using TMPro;
 using UnityEditor;

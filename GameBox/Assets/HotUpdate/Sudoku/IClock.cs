@@ -1,4 +1,4 @@
-namespace Box.Gameplay
+namespace Box.HotUpdate.Sudoku
 {
     /// <summary>对局计时时钟抽象:测试注入 FakeClock 走纯逻辑,运行时用 UnityClock。</summary>
     public interface IClock

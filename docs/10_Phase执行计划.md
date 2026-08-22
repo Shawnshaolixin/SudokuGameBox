@@ -162,16 +162,32 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 **验收**：任意难度可生成、可解、可完成；生成 < 200ms。
 
-## 10. Phase 5 — 存档系统 + 设置
+## 10. Phase 4.5 — 盒子骨架（ModuleFramework + 热更程序集拆分）
+
+> **背景（2026-08-22 拍板）**：11 文档 P0-b（盒子骨架）在 10 文档无对应执行阶段，补齐。
+> 中间态（决策 B）：ModuleLoader 按 entryType 反射实例化 + 模块内部场景切换，单场景收敛推迟到 Phase 6。
+> v1.0 纯 AOT：热更程序集随包 IL2CPP 编译（D-2），本 Phase 只做程序集边界与入口骨架，不启用解释执行。
 
 | 任务 | 内容 |
 |---|---|
-| 5-1 | AES-GCM 单文件分区存档（D-7）+ v0→v1 迁移器 |
+| 4.5-1 | ModuleFramework 薄骨架（IGameModule/IModuleLoader/ModuleContext/ModuleCatalog + ModuleLoader 静态注册，全 AOT；Resources 兜底清单 Assets/Resources/Config/ModuleCatalog.asset） |
+| 4.5-2 | 程序集拆分 HotUpdate.Sudoku（玩法迁入热更程序集，命名空间 Box.HotUpdate.Sudoku；大厅 Box.Gameplay 不再静态引用玩法类型，依赖方向 AOT → 玩法 单向） |
+| 4.5-3 | 数独迁入 IGameModule（SudokuModule 参数化入口：args="daily" 直开每日挑战，否则难度弹窗；GameContext 收敛，大厅不再持有玩法状态） |
+| 4.5-4 | 埋点契约对齐（§8.4 {module_id}.{action}：sudoku.level_start / sudoku.level_complete / sudoku.hint_used） |
+| 4.5-5 | link.xml 入口类型保留（Assembly 级 preserve，防 IL2CPP 裁剪导致 Type.GetType 返回 null） |
+
+**验收**：EditMode/PlayMode 全绿；纯 AOT AAB 构建通过；大厅进出数独无回归；v1.0 无热更依赖。
+
+## 11. Phase 5 — 存档系统 + 设置
+
+| 任务 | 内容 |
+|---|---|
+| 5-1 | AES-GCM 单文件分区存档（D-7）+ v0→v1 迁移器；schema 结构按 §8.1 固化：`box.coins` / `box.signin` / `installedAt` / `lastModuleId` + `modules.<id>` 分区，模块只读写自己的 `modules.<id>`，`box.*` 仅 Shell/Economy 可写（D-5：P0 定死，第 2 玩法上线前禁止改格式） |
 | 5-2 | 设置（音效/主题/语言基础） |
 
 **验收**：存档加密落盘、迁移器可升版本、异常存档可恢复。
 
-## 11. Phase 6 — Addressables 资源管线 + 首包瘦身
+## 12. Phase 6 — Addressables 资源管线 + 首包瘦身
 
 | 任务 | 内容 |
 |---|---|
@@ -181,7 +197,7 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 **验收**：全新安装首包 ≤60MB，资源加载无长帧。
 
-## 12. Phase 7 — 商业化 + 合规（v1.0 发布前置）
+## 13. Phase 7 — 商业化 + 合规（v1.0 发布前置）
 
 | 任务 | 内容 |
 |---|---|
@@ -191,7 +207,7 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 **验收**：商店合规清单全部通过。
 
-## 13. Phase 8 — v1.0 发布
+## 14. Phase 8 — v1.0 发布
 
 | 任务 | 内容 |
 |---|---|
@@ -201,7 +217,7 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 **验收**：AAB 过 Play 预检，internal track 可安装运行。
 
-## 14. Phase 9 — v1.1 HybridCLR 热更接入（正式工程落地）
+## 15. Phase 9 — v1.1 HybridCLR 热更接入（正式工程落地）
 
 | 任务 | 内容 |
 |---|---|
@@ -212,7 +228,7 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 **验收**：AOT 构建 + 热更 dll 加载运行闭环；首包体积增量符合预算。
 
-## 15. Phase 10 — 热更内容管线
+## 16. Phase 10 — 热更内容管线
 
 | 任务 | 内容 |
 |---|---|
@@ -222,7 +238,7 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 **验收**：新玩法 ≤8MB 增量下发，客户端可热更运行。
 
-## 16. Phase 11 — 运营期
+## 17. Phase 11 — 运营期
 
 | 任务 | 内容 |
 |---|---|

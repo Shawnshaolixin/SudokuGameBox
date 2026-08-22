@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace Box.Gameplay
+namespace Box.HotUpdate.Sudoku
 {
     /// <summary>
     /// 每日挑战进度存储(Phase 4 完整版:临时 PlayerPrefs)。

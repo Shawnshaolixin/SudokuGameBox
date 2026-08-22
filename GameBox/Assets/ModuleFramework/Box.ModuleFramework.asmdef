@@ -1,12 +1,9 @@
 {
-    "name": "Box.Gameplay",
-    "rootNamespace": "Box.Gameplay",
+    "name": "Box.ModuleFramework",
+    "rootNamespace": "Box.ModuleFramework",
     "references": [
-        "Box.ModuleFramework",
-        "Box.Services.Abstractions",
         "Box.UI",
-        "UniTask",
-        "Unity.TextMeshPro"
+        "UniTask"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

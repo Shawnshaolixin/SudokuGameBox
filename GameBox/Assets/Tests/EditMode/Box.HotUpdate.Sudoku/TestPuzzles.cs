@@ -1,7 +1,7 @@
-using Box.Gameplay;
+using Box.HotUpdate.Sudoku;
 using Sudoku.Core;
 
-namespace Box.Gameplay.Tests
+namespace Box.HotUpdate.Sudoku.Tests
 {
     /// <summary>测试用固定谜题:手写合法终盘(每行/列/宫均为 1-9 轮换),按需挖洞。</summary>
     public static class TestPuzzles

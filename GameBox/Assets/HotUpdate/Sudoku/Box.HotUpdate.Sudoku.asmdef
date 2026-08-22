@@ -1,19 +1,15 @@
 {
-    "name": "Box.Editor",
-    "rootNamespace": "Box.Editor",
+    "name": "Box.HotUpdate.Sudoku",
+    "rootNamespace": "Box.HotUpdate.Sudoku",
     "references": [
+        "Box.ModuleFramework",
         "Box.Services.Abstractions",
         "Box.UI",
-        "Box.Gameplay",
-        "Box.ModuleFramework",
-        "Box.HotUpdate.Sudoku",
-        "UnityEngine.UI",
-        "Unity.TextMeshPro",
-        "Unity.InputSystem"
+        "Sudoku.Core",
+        "UniTask",
+        "Unity.TextMeshPro"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

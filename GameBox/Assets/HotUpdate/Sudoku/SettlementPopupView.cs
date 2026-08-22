@@ -2,7 +2,7 @@ using Box.UI;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 
-namespace Box.Gameplay
+namespace Box.HotUpdate.Sudoku
 {
     /// <summary>
     /// 结算弹窗(Phase 4 4-3):展示星级/用时/错误/提示。

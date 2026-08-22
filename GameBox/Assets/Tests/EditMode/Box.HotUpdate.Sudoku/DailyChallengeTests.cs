@@ -4,7 +4,7 @@ using NUnit.Framework;
 using Sudoku.Core;
 using UnityEngine;
 
-namespace Box.Gameplay.Tests
+namespace Box.HotUpdate.Sudoku.Tests
 {
     /// <summary>
     /// 每日挑战(Phase 4 4-4 完整版):日期种子确定性/完成标记/最佳成绩。
