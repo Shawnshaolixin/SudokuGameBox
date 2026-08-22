@@ -24,6 +24,7 @@ namespace Box.Gameplay
             var save = new SaveService();
             var settings = new SettingsService();
             ServiceLocator.Register(save, settings);
+            L10n.Init(settings.Language); // 启动同步语言偏好 → 首屏即按偏好语言渲染(FR-17)
 
             // 模块清单:Resources 兜底路径(Phase 6 迁 Addressables)。
             // 缺失时注册空清单,大厅入口静默不渲染(Editor 脚本 Phase45ModuleSetup 保证资产存在并入库)。

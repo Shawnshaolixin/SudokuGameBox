@@ -1,3 +1,4 @@
+using Box.Services;
 using Box.UI;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -8,6 +9,7 @@ namespace Box.HotUpdate.Sudoku
     /// 结算弹窗(Phase 4 4-3):展示星级/用时/错误/提示。
     /// Confirm=Next(同难度重开),Cancel=Home(回主菜单);返回键关闭不导航(Action=None)。
     /// 由 PopupArbiter 展示(被动弹窗),args 为 SettlementResult,关闭后回写 Action。
+    /// 文案走 L10n(FR-17):标题/消息按当前语言渲染。
     /// </summary>
     public sealed class SettlementPopupView : BoxDialogView
     {
@@ -27,10 +29,10 @@ namespace Box.HotUpdate.Sudoku
             _result = args as SettlementResult;
             if (_result != null)
             {
-                SetTitle(_result.IsDaily ? "每日挑战完成" : "对局完成");
+                SetTitle(L10n.Get(_result.IsDaily ? "settlement.title.daily" : "settlement.title.normal"));
                 string time = GameplayView.FormatTime(_result.TimeSec);
-                string hints = _result.HintsUsed > 0 ? $"  提示 {_result.HintsUsed}" : "";
-                SetMessage($"星级 {_result.StarRating}/3   用时 {time}   错误 {_result.MistakeCount}{hints}");
+                string hints = _result.HintsUsed > 0 ? L10n.Format("settlement.hints", _result.HintsUsed) : "";
+                SetMessage(L10n.Format("settlement.message", _result.StarRating, time, _result.MistakeCount, hints));
             }
             return UniTask.CompletedTask;
         }

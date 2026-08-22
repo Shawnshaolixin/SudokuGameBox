@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Box.ModuleFramework;
+using Box.Services;
 using Box.UI;
 using Cysharp.Threading.Tasks;
 using Sudoku.Core;
@@ -66,7 +67,9 @@ namespace Box.HotUpdate.Sudoku
                 ? PuzzleFactory.CreateDaily(GameContext.DailySeed)
                 : PuzzleFactory.Create(GameContext.Difficulty));
             _svc?.RegisterBackHandler(OnBackKey);
-            // 淡入(D-15):绑定 _timerCts,OnDestroy 取消防场景切换后协程访问已销毁对象
+            L10n.LanguageChanged += OnLanguageChanged; // 语言切换刷新对局内文案(FR-17)
+            ApplyLanguage(); // 打开即按当前语言刷新(prefab 初始英文文案)
+            // 淡入(D-15):绑定 _timerCts,OnDestroy 取消防场景后协程访问已销毁对象
             await BoxTween.FadeTo(gameObject, 0f, 1f, 0.2f, _timerCts.Token);
         }
 
@@ -75,8 +78,44 @@ namespace Box.HotUpdate.Sudoku
         // sealed 类用 private new 避免 CS0628。
         private new void OnDestroy()
         {
+            L10n.LanguageChanged -= OnLanguageChanged; // 退订,防泄漏
             _timerCts?.Cancel();
             if (_svc != null) _svc.ClearBackHandler();
+        }
+
+        void OnLanguageChanged() => ApplyLanguage();
+
+        /// <summary>按当前语言刷新对局内所有静态文案(标题/工具条/模式/按钮)。</summary>
+        void ApplyLanguage()
+        {
+            RefreshTitle();
+            SetButtonLabel("ModeButton", null); // 模式标签由 RefreshBoard 按输入模式定,这里只刷固定按钮
+            SetButtonLabel("UndoButton", L10n.Get("game.undo"));
+            SetButtonLabel("RedoButton", L10n.Get("game.redo"));
+            SetButtonLabel("EraseButton", L10n.Get("game.erase"));
+            SetButtonLabel("HintButton", L10n.Get("game.hint"));
+            SetButtonLabel("BackButton", L10n.Get("game.back"));
+            RefreshHintText();
+        }
+
+        void SetButtonLabel(string path, string text)
+        {
+            var t = transform.Find(path + "/Label")?.GetComponent<TextMeshProUGUI>();
+            if (t != null && text != null) t.text = text;
+        }
+
+        void RefreshTitle()
+        {
+            if (_titleText == null) return;
+            _titleText.Text = GameContext.IsDaily
+                ? L10n.Get("game.title.daily")
+                : L10n.Format("game.title.normal", DifficultyName(GameContext.Difficulty));
+        }
+
+        void RefreshHintText()
+        {
+            if (_hintText != null && _session != null)
+                _hintText.Text = L10n.Format("game.hintcount", _session.HintsUsed, _session.HintCount);
         }
 
         // ---- 对局 ----
@@ -89,8 +128,7 @@ namespace Box.HotUpdate.Sudoku
             _session.GameFinished += OnGameFinished;
             _session.HintExhausted += OnHintExhausted;
 
-            bool daily = GameContext.IsDaily;
-            if (_titleText != null) _titleText.Text = daily ? "每日挑战" : "数独 - " + DifficultyName(GameContext.Difficulty);
+            RefreshTitle(); // 标题走 L10n(每日挑战/数独-难度)
             RefreshBoard();
             _svc?.Router.Analytics?.LogEvent("sudoku.level_start"); // §8.4 {module_id}.{action}
 
@@ -169,8 +207,8 @@ namespace Box.HotUpdate.Sudoku
             if (_svc != null && _svc.Router.StackCount > 0) return;
             var dialog = await _svc.Router.PushAsync<BoxDialogView>("UI/Popups/ExitConfirm");
             if (dialog == null) return; // 资源缺失:放弃
-            dialog.SetTitle("退出对局");
-            dialog.SetMessage("当前进度将丢失,确定退出?");
+            dialog.SetTitle(L10n.Get("game.exit.title"));
+            dialog.SetMessage(L10n.Get("game.exit.message"));
             dialog.OnCancel(() => _svc.Router.PopAsync().Forget()); // 取消:只关弹窗
             dialog.OnConfirm(async () => // 确认:先关弹窗再退模块(复位状态),防竞态(同 DifficultySelect)
             {
@@ -315,10 +353,10 @@ namespace Box.HotUpdate.Sudoku
             if (_undoBtn != null) _undoBtn.SetInteractable(_session.CanUndo);
             if (_redoBtn != null) _redoBtn.SetInteractable(_session.CanRedo);
             if (_hintBtn != null) _hintBtn.SetInteractable(_session.CanUseHint);
-            if (_hintText != null) _hintText.Text = $"提示 {_session.HintsUsed}/{_session.HintCount}";
+            RefreshHintText(); // L10n:提示 x/y
             var modeLabel = _modeBtn != null ? _modeBtn.transform.Find("Label")?.GetComponent<BoxText>() : null;
             if (modeLabel != null)
-                modeLabel.Text = _session.Mode == GameSession.InputMode.Note ? "数字" : "笔记";
+                modeLabel.Text = L10n.Get(_session.Mode == GameSession.InputMode.Note ? "game.mode.note" : "game.mode.input");
         }
 
         // ---- 计时 ----
@@ -331,7 +369,7 @@ namespace Box.HotUpdate.Sudoku
                 while (true)
                 {
                     ct.ThrowIfCancellationRequested();
-                    if (_timeText != null) _timeText.Text = "用时 " + FormatTime(_session.ElapsedSeconds);
+                    if (_timeText != null) _timeText.Text = L10n.Format("game.time", FormatTime(_session.ElapsedSeconds));
                     await UniTask.Yield(ct);
                 }
             }
@@ -356,9 +394,9 @@ namespace Box.HotUpdate.Sudoku
 
         static string DifficultyName(Difficulty d) => d switch
         {
-            Difficulty.Easy => "简单",
-            Difficulty.Medium => "中等",
-            Difficulty.Hard => "困难",
+            Difficulty.Easy => L10n.Get("game.diff.easy"),
+            Difficulty.Medium => L10n.Get("game.diff.medium"),
+            Difficulty.Hard => L10n.Get("game.diff.hard"),
             _ => d.ToString(),
         };
 

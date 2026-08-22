@@ -1,0 +1,160 @@
+using System;
+using System.Collections.Generic;
+
+namespace Box.Services
+{
+    /// <summary>
+    /// 轻量本地化表(FR-17 首期 zh/en;不引第三方库,红线 2)。
+    /// 用法:视图在 OnCreate/OnShow 订阅 L10n.LanguageChanged 刷新文案,OnHide/OnDestroy 退订。
+    /// SetLanguage:同时写 ISettingsService.Language(PlayerPrefs 持久化)并广播事件 → 全局 UI 即时切换。
+    /// 缺键回退:en 缺 → zh → 原始 key(测试/新键不炸)。
+    /// 文本含 {0}/{1} 占位符,用 Format(key, args) 取。
+    /// 热更侧(Box.HotUpdate.Sudoku)可引本类(纯 C#,无 UnityEngine 依赖)。
+    /// </summary>
+    public static class L10n
+    {
+        /// <summary>当前语言代码(zh/en)。</summary>
+        public static string Current { get; private set; } = "zh";
+
+        /// <summary>语言切换事件(所有打开的视图订阅后即时刷新)。</summary>
+        public static event Action LanguageChanged;
+
+        /// <summary>启动同步(静默设置,不广播;AppBootstrap 在视图创建前调用)。</summary>
+        public static void Init(string language)
+        {
+            Current = string.IsNullOrEmpty(language) ? "zh" : language;
+        }
+
+        /// <summary>
+        /// 切换语言:写入偏好(PlayerPrefs 持久化)+ 广播事件。
+        /// 设置弹窗/任何代码调用本方法后,所有订阅视图立即刷新。
+        /// </summary>
+        public static void SetLanguage(string language)
+        {
+            var code = string.IsNullOrEmpty(language) ? "zh" : language;
+            if (code == Current) return; // 无变化不广播
+            Current = code;
+            if (ServiceLocator.Settings != null) ServiceLocator.Settings.Language = code; // 持久化
+            LanguageChanged?.Invoke();
+        }
+
+        /// <summary>按当前语言取文案;缺键回退 zh,再缺回退 key 本身。</summary>
+        public static string Get(string key)
+        {
+            if (Current == "en" && _en.TryGetValue(key, out var en)) return en;
+            if (_zh.TryGetValue(key, out var zh)) return zh;
+            return key;
+        }
+
+        /// <summary>取文案并格式化占位符(如 "数独 - {0}")。</summary>
+        public static string Format(string key, params object[] args)
+        {
+            var t = Get(key);
+            return args == null || args.Length == 0 ? t : string.Format(t, args);
+        }
+
+        // ---- 文本表 ---- //
+
+        static readonly Dictionary<string, string> _zh = new Dictionary<string, string>
+        {
+            // 主菜单
+            { "menu.title", "数独游戏盒" },
+            { "menu.start", "开始游戏" },
+            { "menu.daily", "每日挑战" },
+            { "menu.settings", "设置" },
+
+            // 设置弹窗
+            { "settings.title", "设置" },
+            { "settings.soundOn", "音效:开" },
+            { "settings.soundOff", "音效:关" },
+            { "settings.musicOn", "音乐:开" },
+            { "settings.musicOff", "音乐:关" },
+            { "settings.themeLight", "主题:浅色" },
+            { "settings.themeDark", "主题:深色" },
+            { "settings.langZh", "语言:中文" },
+            { "settings.langEn", "语言:English" },
+            { "settings.done", "完成" },
+
+            // 难度选择
+            { "diff.title", "选择难度" },
+            { "diff.easy", "简单" },
+            { "diff.medium", "中等" },
+            { "diff.hard", "困难" },
+
+            // 对局视图
+            { "game.title.daily", "每日挑战" },
+            { "game.title.normal", "数独 - {0}" },
+            { "game.diff.easy", "简单" },
+            { "game.diff.medium", "中等" },
+            { "game.diff.hard", "困难" },
+            { "game.mode.input", "数字" },
+            { "game.mode.note", "笔记" },
+            { "game.undo", "撤销" },
+            { "game.redo", "重做" },
+            { "game.erase", "擦除" },
+            { "game.hint", "提示" },
+            { "game.back", "返回" },
+            { "game.hintcount", "提示 {0}/{1}" },
+            { "game.time", "用时 {0}" },
+            { "game.exit.title", "退出对局" },
+            { "game.exit.message", "当前进度将丢失,确定退出?" },
+
+            // 结算弹窗
+            { "settlement.title.daily", "每日挑战完成" },
+            { "settlement.title.normal", "对局完成" },
+            { "settlement.message", "星级 {0}/3   用时 {1}   错误 {2}{3}" },
+            { "settlement.hints", "  提示 {0}" },
+        };
+
+        static readonly Dictionary<string, string> _en = new Dictionary<string, string>
+        {
+            // 主菜单
+            { "menu.title", "Sudoku Box" },
+            { "menu.start", "Start" },
+            { "menu.daily", "Daily Challenge" },
+            { "menu.settings", "Settings" },
+
+            // 设置弹窗
+            { "settings.title", "Settings" },
+            { "settings.soundOn", "Sound: On" },
+            { "settings.soundOff", "Sound: Off" },
+            { "settings.musicOn", "Music: On" },
+            { "settings.musicOff", "Music: Off" },
+            { "settings.themeLight", "Theme: Light" },
+            { "settings.themeDark", "Theme: Dark" },
+            { "settings.langZh", "Language: 中文" },
+            { "settings.langEn", "Language: English" },
+            { "settings.done", "Done" },
+
+            // 难度选择
+            { "diff.title", "Select Difficulty" },
+            { "diff.easy", "Easy" },
+            { "diff.medium", "Medium" },
+            { "diff.hard", "Hard" },
+
+            // 对局视图
+            { "game.title.daily", "Daily Challenge" },
+            { "game.title.normal", "Sudoku - {0}" },
+            { "game.diff.easy", "Easy" },
+            { "game.diff.medium", "Medium" },
+            { "game.diff.hard", "Hard" },
+            { "game.mode.input", "Number" },
+            { "game.mode.note", "Notes" },
+            { "game.undo", "Undo" },
+            { "game.redo", "Redo" },
+            { "game.erase", "Erase" },
+            { "game.hint", "Hint" },
+            { "game.back", "Back" },
+            { "game.hintcount", "Hints {0}/{1}" },
+            { "game.time", "Time {0}" },
+            { "game.exit.title", "Quit Game" },
+            { "game.exit.message", "Progress will be lost. Quit?" },
+
+            // 结算弹窗
+            { "settlement.title.daily", "Daily Challenge Complete" },
+            { "settlement.title.normal", "Level Complete" },
+            { "settlement.message", "Stars {0}/3   Time {1}   Mistakes {2}{3}" },
+            { "settlement.hints", "   Hints {0}" },
+        };
+    }
+}

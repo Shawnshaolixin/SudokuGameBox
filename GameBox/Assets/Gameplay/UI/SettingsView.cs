@@ -12,7 +12,7 @@ namespace Box.Gameplay
     /// 设置弹窗(Phase 5 5-2):音效/音乐/主题/语言 基础设置。
     /// 值走 ISettingsService(PlayerPrefs 偏好,§8.1「PlayerPrefs 只留音量/语言等偏好」);切换即生效并落盘。
     /// 主题:0=浅色 1=深色,弹窗背景色即时预览(玩法场景换肤 v1.0 后置,注释见 §10.2);
-    /// 语言:zh 中文 / en English(本地化管线后置,此处仅存偏好,按钮文案仍中文)。
+    /// 语言:zh 中文 / en English —— L10n.SetLanguage 广播 LanguageChanged,其余视图订阅后即时刷新(FR-17)。
     /// prefab: Resources/UI/Popups/SettingsPopup(Phase5SceneSetup 生成):Title + 4 个切换按钮 + CloseButton,
     /// 按钮文案子节点约定 "Label"(与 Phase4 弹窗一致)。
     /// </summary>
@@ -82,7 +82,8 @@ namespace Box.Gameplay
         void ToggleLanguage()
         {
             var s = ServiceLocator.Settings;
-            if (s != null) s.Language = s.Language == "zh" ? "en" : "zh";
+            string next = s != null && s.Language == "en" ? "zh" : "en";
+            L10n.SetLanguage(next); // 写偏好 + 广播 LanguageChanged → 全 UI 即时刷新
             Refresh();
         }
 
@@ -101,11 +102,11 @@ namespace Box.Gameplay
             int theme = s == null ? 0 : s.ThemeIndex;
             string lang = s == null ? "zh" : s.Language;
 
-            SetLabel("SoundButton", "音效:" + (sound ? "开" : "关"));
-            SetLabel("MusicButton", "音乐:" + (music ? "开" : "关"));
-            SetLabel("ThemeButton", "主题:" + (theme == 0 ? "浅色" : "深色"));
-            SetLabel("LangButton", "语言:" + (lang == "zh" ? "中文" : "English"));
-            SetLabel("CloseButton", "完成");
+            SetLabel("SoundButton", L10n.Get(sound ? "settings.soundOn" : "settings.soundOff"));
+            SetLabel("MusicButton", L10n.Get(music ? "settings.musicOn" : "settings.musicOff"));
+            SetLabel("ThemeButton", L10n.Get(theme == 0 ? "settings.themeLight" : "settings.themeDark"));
+            SetLabel("LangButton", L10n.Get(lang == "en" ? "settings.langEn" : "settings.langZh"));
+            SetLabel("CloseButton", L10n.Get("settings.done"));
 
             // 主题即时预览:弹窗背景色切换(玩法场景换肤属于全 UI 主题系统,v1.0 后置)
             if (_bg != null) _bg.color = theme == 0 ? ThemeLightBg : ThemeDarkBg;
