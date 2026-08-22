@@ -1,0 +1,26 @@
+{
+    "name": "Box.Gameplay.Tests",
+    "rootNamespace": "Box.Gameplay.Tests",
+    "references": [
+        "Box.Gameplay",
+        "Box.Services.Abstractions",
+        "UniTask",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "autoReferenced": false,
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

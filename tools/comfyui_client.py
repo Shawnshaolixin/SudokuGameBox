@@ -17,6 +17,10 @@ comfyui_client.py — ComfyUI 本地生成客户端(接入 AIGC 精灵管线)
     # 随机种子 / 固定种子 / 自定义采样步数
     python comfyui_client.py txt2img --prompt "..." --seed 42 --steps 30
 
+    # ControlNet 布局控制: 给一张线框草图,让生成的 UI 严格遵循布局
+    #   (草图画个圆角矩形,生成出来的就是规整按钮)
+    python comfyui_client.py txt2img --prompt "..." --control sketch.png --control-strength 0.8
+
 工作流:
     ComfyUI 出图 → tools/ai_output/ → sprite_pipeline.py batch 去背景/裁切/缩放 → Unity Art 目录
 """
@@ -41,10 +45,12 @@ DEFAULT_CKPT = "sd_xl_base_1.0.safetensors"
 # 输出目录:与 sprite_pipeline.py 的 batch 输入约定一致
 OUTPUT_DIR = Path(__file__).resolve().parent / "ai_output"
 
-# 通用负面提示词(SDXL 避免的常见瑕疵)
+# 通用负面提示词(SDXL 避免的常见瑕疵 + UI 素材专项)
 DEFAULT_NEGATIVE = (
     "lowres, bad anatomy, bad hands, text, watermark, signature, blurry, "
-    "jpeg artifacts, cropped, out of frame, duplicate, error, deformed"
+    "jpeg artifacts, cropped, out of frame, duplicate, error, deformed, "
+    "asymmetric, lopsided, uneven, crooked, distorted, malformed, "
+    "low quality, worst quality, ugly, oversaturated"
 )
 
 
@@ -67,14 +73,14 @@ def api_post(server: str, path: str, body: dict) -> dict:
         return json.loads(resp.read())
 
 
-def check_server(server: str) -> dict:
+def check_server(server: str, ckpt: str = DEFAULT_CKPT) -> dict:
     """自检:服务器在线 + 模型就位 + GPU 可用"""
     stats = api_get(server, "/system_stats")
     ckpts = api_get(server, "/object_info/CheckpointLoaderSimple")
     names = list(ckpts["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0])
-    if DEFAULT_CKPT not in names:
+    if ckpt not in names:
         raise RuntimeError(
-            f"模型 {DEFAULT_CKPT} 未找到,可用: {names[:5]}...\n"
+            f"模型 {ckpt} 未找到,可用: {names[:5]}...\n"
             f"请确认已下载到 d:/Projects/AI/ComfyUI/models/checkpoints/"
         )
     devices = stats.get("devices", [])
@@ -87,16 +93,17 @@ def check_server(server: str) -> dict:
 # ============================================================
 
 def build_txt2img_workflow(prompt: str, negative: str, width: int, height: int,
-                           steps: int, cfg: float, seed: int, prefix: str) -> dict:
-    """SDXL 标准工作流: Checkpoint → 双 CLIP 条件 → KSampler → VAE → SaveImage"""
-    return {
-        "3": {"class_type": "KSampler", "inputs": {
-            "seed": seed, "steps": steps, "cfg": cfg,
-            "sampler_name": "euler", "scheduler": "normal", "denoise": 1.0,
-            "model": ["4", 0], "positive": ["6", 0], "negative": ["7", 0],
-            "latent_image": ["5", 0],
-        }},
-        "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": DEFAULT_CKPT}},
+                           steps: int, cfg: float, seed: int, prefix: str,
+                           ckpt: str = DEFAULT_CKPT,
+                           control_net: dict | None = None) -> dict:
+    """SDXL 工作流: Checkpoint → 双 CLIP 条件 → [ControlNet] → KSampler → VAE → SaveImage
+
+    control_net: {"name": 模型文件名, "image": ComfyUI input 目录下的图, "strength": 力度}
+    """
+    positive_src: list = ["6", 0]
+    negative_src: list = ["7", 0]
+    nodes: dict = {
+        "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
         "5": {"class_type": "EmptyLatentImage", "inputs": {
             "width": width, "height": height, "batch_size": 1,
         }},
@@ -107,6 +114,28 @@ def build_txt2img_workflow(prompt: str, negative: str, width: int, height: int,
             "filename_prefix": prefix, "images": ["8", 0],
         }},
     }
+
+    # ControlNet 布局控制: 线稿图 → 条件注入(全程生效)
+    if control_net:
+        nodes["10"] = {"class_type": "ControlNetLoader",
+                       "inputs": {"control_net_name": control_net["name"]}}
+        nodes["11"] = {"class_type": "LoadImage",
+                       "inputs": {"image": control_net["image"]}}
+        nodes["12"] = {"class_type": "ControlNetApplyAdvanced", "inputs": {
+            "positive": ["6", 0], "negative": ["7", 0],
+            "control_net": ["10", 0], "image": ["11", 0],
+            "strength": control_net.get("strength", 0.8),
+            "start_percent": 0.0, "end_percent": 1.0,
+        }}
+        positive_src, negative_src = ["12", 0], ["12", 1]
+
+    nodes["3"] = {"class_type": "KSampler", "inputs": {
+        "seed": seed, "steps": steps, "cfg": cfg,
+        "sampler_name": "euler", "scheduler": "normal", "denoise": 1.0,
+        "model": ["4", 0], "positive": positive_src, "negative": negative_src,
+        "latent_image": ["5", 0],
+    }}
+    return nodes
 
 
 def submit_and_wait(server: str, workflow: dict, timeout: int = 600) -> dict:
@@ -133,6 +162,23 @@ def submit_and_wait(server: str, workflow: dict, timeout: int = 600) -> dict:
                 return {"prompt_id": prompt_id, "images": images}
         time.sleep(2)
     raise TimeoutError(f"等待 {timeout}s 未出图,请检查 ComfyUI 控制台日志")
+
+
+CONTROL_NET_NAME = "controlnet-canny-sdxl-1.0.fp16.safetensors"
+COMFY_INPUT_DIR = Path(r"d:/Projects/AI/ComfyUI/input")
+
+
+def prepare_control_net(sketch_path: str, strength: float) -> dict:
+    """把本地草图复制到 ComfyUI input 目录,返回 ControlNet 工作流参数"""
+    src = Path(sketch_path)
+    if not src.exists():
+        raise RuntimeError(f"草图不存在: {src}")
+    COMFY_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    dst = COMFY_INPUT_DIR / f"sketch_{src.stem}.png"
+    import shutil
+    shutil.copy2(src, dst)
+    print(f"📐 ControlNet: {src.name} → {dst.name} (strength={strength})")
+    return {"name": CONTROL_NET_NAME, "image": dst.name, "strength": strength}
 
 
 def download_image(server: str, image: dict, out_path: Path):
@@ -162,9 +208,14 @@ def main():
     p_gen.add_argument("--filename", default="output", help="输出文件名(不带扩展名,建议带 _btn/_panel/_icon/_bg 后缀)")
     p_gen.add_argument("--width", type=int, default=1024, help="宽度(默认 1024, SDXL 训练尺寸)")
     p_gen.add_argument("--height", type=int, default=1024, help="高度")
-    p_gen.add_argument("--steps", type=int, default=25)
-    p_gen.add_argument("--cfg", type=float, default=7.0)
+    p_gen.add_argument("--steps", type=int, default=28)
+    p_gen.add_argument("--cfg", type=float, default=5.5, help="CFG(默认 5.5, UI 素材高 CFG 易畸形)")
+    p_gen.add_argument("--ckpt", default=DEFAULT_CKPT, help="模型文件(checkpoints 目录下)")
     p_gen.add_argument("--seed", type=int, default=-1, help="-1 = 随机")
+    p_gen.add_argument("--control", default=None,
+                       help="ControlNet 布局控制: 草图/线稿图片路径(自动复制到 ComfyUI input)")
+    p_gen.add_argument("--control-strength", type=float, default=0.8,
+                       help="ControlNet 力度(0-1, 默认 0.8; 越接近 1 越严格遵循草图)")
     p_gen.add_argument("--timeout", type=int, default=600)
 
     args = ap.parse_args()
@@ -180,13 +231,19 @@ def main():
             return
 
         if args.cmd == "txt2img":
-            check_server(args.server)
+            check_server(args.server, ckpt=args.ckpt)
             seed = args.seed if args.seed >= 0 else int(time.time() * 1000) % 2**31
             OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
             prefix = f"sdxl_{args.filename}_{seed % 100000}"
+
+            control_net = None
+            if args.control:
+                control_net = prepare_control_net(args.control, args.control_strength)
+
             wf = build_txt2img_workflow(
                 args.prompt, args.negative, args.width, args.height,
-                args.steps, args.cfg, seed, prefix,
+                args.steps, args.cfg, seed, prefix, ckpt=args.ckpt,
+                control_net=control_net,
             )
             print(f"🎨 提交任务 seed={seed} {args.width}x{args.height} steps={args.steps} ...")
             result = submit_and_wait(args.server, wf, timeout=args.timeout)
