@@ -15,6 +15,7 @@ using UnityEngine.Networking;
 ///   • 选择模型（自动扫描 ComfyUI/models/checkpoints/）
 ///   • 输入提示词 / 负面词（带常用模板）
 ///   • 参数：尺寸、步数、CFG、种子
+///   • 布局控制（ControlNet）：给一张线框草图,生成结果严格遵循布局
 ///   • 生成 → 预览 → 一键去背景并导入 Unity Art 目录
 ///
 /// 依赖：本机 ComfyUI 已启动（d:/Projects/AI/ComfyUI/start_comfyui.bat）
@@ -57,6 +58,9 @@ public class ComfyUIGeneratorWindow : EditorWindow
     private const string PSteps = "AIGC.Steps";
     private const string PCfg = "AIGC.Cfg";
     private const string PType = "AIGC.TypeIndex";
+    private const string PControlOn = "AIGC.ControlOn";
+    private const string PControlSketch = "AIGC.ControlSketch";
+    private const string PControlStrength = "AIGC.ControlStrength";
 
     // ============================================================
     // 字段
@@ -74,6 +78,11 @@ public class ComfyUIGeneratorWindow : EditorWindow
     private int _width = 1024, _height = 1024, _steps = 28;
     private float _cfg = 5.5f;
     private long _seed = -1;
+
+    // ControlNet 布局控制(草图 → 规整 UI)
+    private bool _controlEnabled;
+    private string _sketchPath = "";
+    private float _controlStrength = 0.85f;
 
     // 运行状态
     private bool _busy;
@@ -219,15 +228,19 @@ public class ComfyUIGeneratorWindow : EditorWindow
 
     private void HandleSubmitDone()
     {
+        if (_request == null) return;
         var req = _request;
+        // 先读数据再销毁: AbortRequest 会 Dispose 请求,之后访问 result/text 会抛 NRE
+        bool ok = req.result == UnityWebRequest.Result.Success;
+        string error = req.error;
+        string json = ok ? req.downloadHandler.text : "";
         AbortRequest();
-        if (req.result != UnityWebRequest.Result.Success)
+        if (!ok)
         {
-            FinishWithError($"无法连接 ComfyUI（{req.error}）\n请确认已运行 start_comfyui.bat");
+            FinishWithError($"无法连接 ComfyUI（{error}）\n请确认已运行 start_comfyui.bat");
             return;
         }
 
-        string json = req.downloadHandler.text;
         var m = Regex.Match(json, "\"prompt_id\"\\s*:\\s*\"([^\"]+)\"");
         if (m.Success)
         {
@@ -254,16 +267,18 @@ public class ComfyUIGeneratorWindow : EditorWindow
 
     private void HandleHistoryDone()
     {
+        if (_request == null) return;
         var req = _request;
+        // 先读数据再销毁(见 HandleSubmitDone 注释)
+        bool ok = req.result == UnityWebRequest.Result.Success;
+        string json = ok ? req.downloadHandler.text : "";
         AbortRequest();
-        if (req.result != UnityWebRequest.Result.Success)
+        if (!ok)
         {
             // 轮询请求失败,下个周期重试
             _pollTimer = 0;
             return;
         }
-
-        string json = req.downloadHandler.text;
 
         // 出错检测
         if (json.Contains("\"status_str\":\"error\"") || json.Contains("\"status_str\": \"error\""))
@@ -296,14 +311,19 @@ public class ComfyUIGeneratorWindow : EditorWindow
 
     private void HandleDownloadDone()
     {
+        if (_request == null) return;
         var req = _request;
+        // 先读数据再销毁(见 HandleSubmitDone 注释)
+        bool ok = req.result == UnityWebRequest.Result.Success;
+        string error = req.error;
+        byte[] data = ok ? req.downloadHandler.data : null;
         AbortRequest();
-        if (req.result != UnityWebRequest.Result.Success)
+        if (!ok)
         {
-            FinishWithError($"下载失败:{req.error}");
+            FinishWithError($"下载失败:{error}");
             return;
         }
-        _imageBytes = req.downloadHandler.data;
+        _imageBytes = data;
         FinishGeneration();
     }
 
@@ -352,21 +372,47 @@ public class ComfyUIGeneratorWindow : EditorWindow
         }
     }
 
-    /// <summary>SDXL 标准工作流(JSON)</summary>
+    /// <summary>SDXL 工作流(JSON): 可选 ControlNet 布局控制</summary>
     private string BuildWorkflow(long seed)
     {
         string cfg = _cfg.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        bool ctrl = _controlEnabled && !string.IsNullOrEmpty(_sketchPath);
+
+        // KSampler 条件来源: 无 ControlNet 直连 CLIP;有则接 ControlNetApplyAdvanced 输出
+        string positiveSrc = "[\"6\",0]", negativeSrc = "[\"7\",0]", extra = "";
+        if (ctrl)
+        {
+            // 复制草图到 ComfyUI input 目录
+            string inputDir = Path.Combine(_comfyDir, "input");
+            Directory.CreateDirectory(inputDir);
+            string sketchName = "sketch_" + Path.GetFileName(_sketchPath);
+            File.Copy(_sketchPath, Path.Combine(inputDir, sketchName), true);
+
+            string strength = _controlStrength.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+            positiveSrc = "[\"12\",0]";
+            negativeSrc = "[\"12\",1]";
+            // 每个节点前带逗号: 9 号节点后不需要(由这里补充)
+            extra =
+                ",\"10\":{\"class_type\":\"ControlNetLoader\",\"inputs\":{\"control_net_name\":\"controlnet-canny-sdxl-1.0.fp16.safetensors\"}}" +
+                ",\"11\":{\"class_type\":\"LoadImage\",\"inputs\":{\"image\":\"" + sketchName + "\"}}" +
+                ",\"12\":{\"class_type\":\"ControlNetApplyAdvanced\",\"inputs\":{" +
+                "\"positive\":[\"6\",0],\"negative\":[\"7\",0],\"control_net\":[\"10\",0],\"image\":[\"11\",0]," +
+                "\"strength\":" + strength + ",\"start_percent\":0.0,\"end_percent\":1.0}}";
+        }
+
         return "{" +
             "\"3\":{\"class_type\":\"KSampler\",\"inputs\":{" +
             $"\"seed\":{seed},\"steps\":{_steps},\"cfg\":{cfg}," +
             "\"sampler_name\":\"euler\",\"scheduler\":\"normal\",\"denoise\":1.0," +
-            "\"model\":[\"4\",0],\"positive\":[\"6\",0],\"negative\":[\"7\",0],\"latent_image\":[\"5\",0]}}," +
+            $"\"model\":[\"4\",0],\"positive\":{positiveSrc},\"negative\":{negativeSrc},\"latent_image\":[\"5\",0]}}" +
+            "}," +
             "\"4\":{\"class_type\":\"CheckpointLoaderSimple\",\"inputs\":{\"ckpt_name\":\"" + EscapeJson(_model) + "\"}}," +
             $"\"5\":{{\"class_type\":\"EmptyLatentImage\",\"inputs\":{{\"width\":{_width},\"height\":{_height},\"batch_size\":1}}}}," +
             "\"6\":{\"class_type\":\"CLIPTextEncode\",\"inputs\":{\"text\":\"" + EscapeJson(_prompt) + "\",\"clip\":[\"4\",1]}}," +
             "\"7\":{\"class_type\":\"CLIPTextEncode\",\"inputs\":{\"text\":\"" + EscapeJson(_negative) + "\",\"clip\":[\"4\",1]}}," +
             "\"8\":{\"class_type\":\"VAEDecode\",\"inputs\":{\"samples\":[\"3\",0],\"vae\":[\"4\",2]}}," +
             "\"9\":{\"class_type\":\"SaveImage\",\"inputs\":{\"filename_prefix\":\"unity_" + _assetName + "\",\"images\":[\"8\",0]}}" +
+            extra +
             "}";
     }
 
@@ -500,6 +546,30 @@ public class ComfyUIGeneratorWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.EndVertical();
 
+        // ---- 布局控制(ControlNet)----
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.BeginHorizontal();
+        _controlEnabled = EditorGUILayout.Toggle("布局控制(草图)", _controlEnabled);
+        if (_controlEnabled)
+            GUILayout.Label("📐 按草图线框生成规整 UI", EditorStyles.miniLabel);
+        EditorGUILayout.EndHorizontal();
+        if (_controlEnabled)
+        {
+            EditorGUILayout.BeginHorizontal();
+            _sketchPath = EditorGUILayout.TextField("草图文件", _sketchPath);
+            if (GUILayout.Button("浏览", GUILayout.Width(56)))
+            {
+                string picked = EditorUtility.OpenFilePanel("选择布局草图", "", "png,jpg,jpeg");
+                if (!string.IsNullOrEmpty(picked)) _sketchPath = picked;
+            }
+            EditorGUILayout.EndHorizontal();
+            _controlStrength = EditorGUILayout.Slider("遵循力度", _controlStrength, 0.0f, 1.0f);
+            EditorGUILayout.HelpBox(
+                "草图上画圆角矩形/圆形线框,生成结果会严格遵循布局。力度 1.0 = 完全照草图。",
+                MessageType.Info);
+        }
+        EditorGUILayout.EndVertical();
+
         // ---- 生成按钮 ----
         GUILayout.Space(6);
         using (new EditorGUI.DisabledScope(_busy))
@@ -567,6 +637,9 @@ public class ComfyUIGeneratorWindow : EditorWindow
         _steps = EditorPrefs.GetInt(PSteps, 28);
         _cfg = EditorPrefs.GetFloat(PCfg, 5.5f);
         _typeIndex = EditorPrefs.GetInt(PType, 0);
+        _controlEnabled = EditorPrefs.GetBool(PControlOn, false);
+        _sketchPath = EditorPrefs.GetString(PControlSketch, "");
+        _controlStrength = EditorPrefs.GetFloat(PControlStrength, 0.85f);
     }
 
     private void SavePrefs()
@@ -581,5 +654,8 @@ public class ComfyUIGeneratorWindow : EditorWindow
         EditorPrefs.SetInt(PSteps, _steps);
         EditorPrefs.SetFloat(PCfg, _cfg);
         EditorPrefs.SetInt(PType, _typeIndex);
+        EditorPrefs.SetBool(PControlOn, _controlEnabled);
+        EditorPrefs.SetString(PControlSketch, _sketchPath);
+        EditorPrefs.SetFloat(PControlStrength, _controlStrength);
     }
 }
