@@ -21,11 +21,26 @@ namespace Box.UI
 
         public bool IsShown { get; private set; }
 
+        bool _rootInited;
+
         protected virtual void Awake()
         {
             // 安全区由 SafeAreaFitter 托管:横竖屏/键盘变化时动态刷新(§3.5 第 8 条 / 11 文档 §10.1)
             if (GetComponent<SafeAreaFitter>() == null)
                 gameObject.AddComponent<SafeAreaFitter>();
+        }
+
+        /// <summary>
+        /// 场景根视图初始化(Scene 直挂、不进 Router 栈的常驻视图,如 MainMenu/Gameplay):
+        /// Create+Show 一次,使 OnCreate 接线与 OnShow 启动逻辑与 Router 推入视图一致。
+        /// 子类在 Awake 中调用;Router 管理的视图禁止调用(生命周期由路由驱动)。
+        /// </summary>
+        protected async UniTask InitSceneRoot()
+        {
+            if (_rootInited) return;
+            _rootInited = true;
+            await CreateAsync();
+            await ShowAsync(null);
         }
 
         // ---- 生命周期(由 UIRouter 调用,子类覆写) ----
@@ -36,15 +51,44 @@ namespace Box.UI
         protected virtual UniTask OnDestroy() => UniTask.CompletedTask;
         protected virtual UniTask OnRefresh() => UniTask.CompletedTask;
 
-        internal async UniTask CreateAsync() => await OnCreate();
-        internal async UniTask ShowAsync(object args) { IsShown = true; gameObject.SetActive(true); await OnShow(args); }
-        internal async UniTask HideAsync() { IsShown = false; await OnHide(); gameObject.SetActive(false); }
+        // 生命周期内动画(BoxTween)在视图销毁/场景切换时被取消会抛 OCE:
+        // 属正常控制流,在此吞掉防止从 async void(Awake) 或 Forget() 逃逸为未处理异常。
+        internal async UniTask CreateAsync()
+        {
+            try { await OnCreate(); }
+            catch (OperationCanceledException) { /* 视图销毁/场景切换:静默 */ }
+        }
+
+        internal async UniTask ShowAsync(object args)
+        {
+            try
+            {
+                IsShown = true;
+                gameObject.SetActive(true);
+                await OnShow(args);
+            }
+            catch (OperationCanceledException) { /* 视图销毁/场景切换:静默 */ }
+        }
+
+        internal async UniTask HideAsync()
+        {
+            try
+            {
+                IsShown = false;
+                await OnHide();
+                gameObject.SetActive(false);
+            }
+            catch (OperationCanceledException) { /* 视图销毁/场景切换:静默 */ }
+        }
+
         internal async UniTask DestroyAsync()
         {
-            await OnDestroy();
+            try { await OnDestroy(); }
+            catch (OperationCanceledException) { /* 视图销毁/场景切换:静默 */ }
             if (Application.isPlaying) Destroy(gameObject);
             else DestroyImmediate(gameObject); // EditMode 测试/预览安全
         }
+
         internal async UniTask RefreshAsync() => await OnRefresh();
     }
 }

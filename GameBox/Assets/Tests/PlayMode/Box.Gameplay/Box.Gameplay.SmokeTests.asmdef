@@ -1,0 +1,26 @@
+{
+    "name": "Box.Gameplay.SmokeTests",
+    "rootNamespace": "Box.Gameplay.Tests",
+    "references": [
+        "Box.Gameplay",
+        "Box.UI",
+        "Box.Services.Abstractions",
+        "Sudoku.Core",
+        "UniTask",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "autoReferenced": false,
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

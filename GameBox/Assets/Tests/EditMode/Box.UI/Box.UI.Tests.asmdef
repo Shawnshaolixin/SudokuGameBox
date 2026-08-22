@@ -4,6 +4,7 @@
     "references": [
         "Box.UI",
         "Box.UI.Tests.Helpers",
+        "Box.Services.Abstractions",
         "UniTask",
         "UnityEngine.UI",
         "UnityEngine.TestRunner",

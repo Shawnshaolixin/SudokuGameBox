@@ -33,6 +33,13 @@ namespace Box.UI
         public PopupArbiter Popup { get; }
         public UILayerManager Layers { get; } = new();
 
+        /// <summary>
+        /// 返回键自定义处理(Phase 4:对局视图注册,返回键=Undo)。
+        /// 返回 true=已消费(路由不再处理);false=交还 Router(弹栈)。
+        /// 仅允许注册一个;注册前自动注销旧的,视图 OnHide 时自行注销。
+        /// </summary>
+        public Func<UniTask<bool>> CustomBackHandler { get; private set; }
+
         BackKeyRunner _backRunner;
 
         public UIService(IViewLoader loader, IAnalyticsService analytics = null)
@@ -41,7 +48,20 @@ namespace Box.UI
             Popup = new PopupArbiter(Router);
             EnsureEventSystem();
             _backRunner = new GameObject("BoxUI_BackKey").AddComponent<BackKeyRunner>();
-            _backRunner.Init(Router);
+            _backRunner.Init(this);
+        }
+
+        public void RegisterBackHandler(Func<UniTask<bool>> handler) => CustomBackHandler = handler;
+
+        /// <summary>注销返回键自定义处理(视图 OnDestroy 时调用,防残留闭包)。</summary>
+        public void ClearBackHandler() => CustomBackHandler = null;
+
+        /// <summary>Android 返回键统一入口:自定义 handler 优先,未消费则交还路由。</summary>
+        public async UniTask HandleBackAsync()
+        {
+            if (CustomBackHandler != null && await CustomBackHandler())
+                return; // 已消费(如对局 Undo)
+            await Router.HandleBackAsync();
         }
 
         /// <summary>
@@ -58,18 +78,18 @@ namespace Box.UI
         /// <summary>逐帧监听 Android 返回键(Escape,新输入系统,无 InputAction 资产零配置)。</summary>
         sealed class BackKeyRunner : MonoBehaviour
         {
-            UIRouter _router;
+            UIService _service;
 
-            public void Init(UIRouter router)
+            public void Init(UIService service)
             {
-                _router = router;
-                DontDestroyOnLoad(gameObject);
+                _service = service;
+                if (Application.isPlaying) DontDestroyOnLoad(gameObject); // EditMode 测试禁止调用
             }
 
             void Update()
             {
                 if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
-                    _router.HandleBackAsync().Forget();
+                    _service.HandleBackAsync().Forget();
             }
         }
     }

@@ -4,7 +4,9 @@
     "references": [
         "Box.Services.Abstractions",
         "Box.UI",
-        "UniTask"
+        "Sudoku.Core",
+        "UniTask",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
