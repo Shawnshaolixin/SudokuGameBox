@@ -20,6 +20,11 @@ import os
 import sys
 from pathlib import Path
 
+# Windows 控制台默认 GBK,emoji 打印会崩(UnicodeEncodeError);强制 UTF-8 输出
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # ============================================================
 # 路径配置 — 按你的项目结构修改这里
 # ============================================================

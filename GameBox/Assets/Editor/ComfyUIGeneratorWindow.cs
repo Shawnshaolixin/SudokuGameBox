@@ -61,6 +61,7 @@ public class ComfyUIGeneratorWindow : EditorWindow
     private const string PControlOn = "AIGC.ControlOn";
     private const string PControlSketch = "AIGC.ControlSketch";
     private const string PControlStrength = "AIGC.ControlStrength";
+    private const string PLastOutput = "AIGC.LastOutput";
 
     // ============================================================
     // 字段
@@ -130,6 +131,7 @@ public class ComfyUIGeneratorWindow : EditorWindow
     private void OnDisable()
     {
         EditorApplication.update -= Tick;
+        SavePrefs();
         AbortRequest();
     }
 
@@ -204,6 +206,18 @@ public class ComfyUIGeneratorWindow : EditorWindow
         {
             EditorUtility.DisplayDialog("没有模型", "请先刷新模型列表并选择一个模型。", "确定");
             return;
+        }
+
+        // SDXL 尺寸下限保护: 低于 512 直接修正(否则生成模糊畸形图)
+        _width = Mathf.Clamp(_width, 512, 1536);
+        _height = Mathf.Clamp(_height, 512, 1536);
+        if (_width < 768 || _height < 768)
+        {
+            if (!EditorUtility.DisplayDialog("分辨率过小",
+                    $"当前 {_width}×{_height} 低于 SDXL 合理范围,生成结果会严重模糊畸形。\n\n修正为 1024×1024 再继续?", "修正并生成", "取消"))
+                return;
+            _width = 1024;
+            _height = 1024;
         }
 
         long seed = _seed >= 0 ? _seed : (long)(DateTime.UtcNow.Ticks % int.MaxValue);
@@ -461,15 +475,24 @@ public class ComfyUIGeneratorWindow : EditorWindow
         }
     }
 
-    /// <summary>主线程轮询后处理进程,结束后刷新 Asset</summary>
+    /// <summary>主线程轮询后处理进程,结束后刷新 Asset;失败要看退出码,不能假装成功</summary>
     private void CheckProcessDone()
     {
         if (_pendingProcess == null) return;
         if (_pendingProcess.HasExited)
         {
+            int code = _pendingProcess.ExitCode;
             _pendingProcess = null;
-            _status = "已导入 Unity Art 目录(Asset 已刷新)";
-            AssetDatabase.Refresh();
+            if (code == 0)
+            {
+                _status = "已导入 Unity Art 目录(Asset 已刷新)";
+                AssetDatabase.Refresh();
+            }
+            else
+            {
+                _status = $"后处理失败(退出码 {code}),详见 Console 的 [sprite_pipeline] 日志";
+                _isError = true;
+            }
         }
     }
 
@@ -477,8 +500,11 @@ public class ComfyUIGeneratorWindow : EditorWindow
     // GUI
     // ============================================================
 
+    private Vector2 _scroll;
     private void OnGUI()
     {
+        // 内容多(连接/提示词/参数/布局控制/预览),包滚动视图防止按钮被挤出可视区
+        _scroll = EditorGUILayout.BeginScrollView(_scroll);
         GUILayout.Space(8);
         var titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 15, alignment = TextAnchor.MiddleCenter };
         GUILayout.Label("🎨 AI 素材生成器(本地 ComfyUI)", titleStyle);
@@ -531,10 +557,16 @@ public class ComfyUIGeneratorWindow : EditorWindow
         // ---- 生成参数 ----
         EditorGUILayout.BeginVertical("box");
         EditorGUILayout.LabelField("生成参数", EditorStyles.boldLabel);
+        // SDXL 训练于 1024,过小会生成模糊畸形图;用滑块防呆
+        EditorGUILayout.LabelField($"分辨率(SDXL 建议 1024,勿低于 768)", EditorStyles.miniLabel);
         EditorGUILayout.BeginHorizontal();
-        _width = EditorGUILayout.IntField("宽度", _width);
-        _height = EditorGUILayout.IntField("高度", _height);
+        _width = Mathf.RoundToInt(EditorGUILayout.Slider("宽度", _width, 512, 1536));
         EditorGUILayout.EndHorizontal();
+        EditorGUILayout.BeginHorizontal();
+        _height = Mathf.RoundToInt(EditorGUILayout.Slider("高度", _height, 512, 1536));
+        EditorGUILayout.EndHorizontal();
+        if (_width < 768 || _height < 768)
+            EditorGUILayout.HelpBox("⚠ 低于 768 会严重失真(模糊/畸形),建议 1024×1024", MessageType.Warning);
         EditorGUILayout.BeginHorizontal();
         _steps = EditorGUILayout.IntField("步数", _steps);
         _cfg = EditorGUILayout.FloatField("CFG", _cfg);
@@ -601,6 +633,11 @@ public class ComfyUIGeneratorWindow : EditorWindow
             GUILayout.Space(8);
             var rect = GUILayoutUtility.GetRect(300, 300, GUILayout.ExpandWidth(true));
             GUI.DrawTexture(rect, _preview, ScaleMode.ScaleToFit);
+        }
+
+        // ---- 后处理操作:只要有已生成文件就显示按钮(不依赖预览图,窗口重开也有效)----
+        if (_preview != null || !string.IsNullOrEmpty(_lastOutput))
+        {
             GUILayout.Space(4);
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("🔄 去背景并导入 Unity Art", GUILayout.Height(32)))
@@ -616,6 +653,8 @@ public class ComfyUIGeneratorWindow : EditorWindow
         GUILayout.FlexibleSpace();
         var hint = new GUIStyle(EditorStyles.miniLabel) { normal = { textColor = Color.gray }, wordWrap = true };
         GUILayout.Label("💡 生成文件保存到 tools/ai_output/,文件名带 _btn/_panel/_icon/_bg 后缀会自动触发 Unity 导入设置。", hint);
+
+        EditorGUILayout.EndScrollView();
     }
 
     // ============================================================
@@ -640,6 +679,10 @@ public class ComfyUIGeneratorWindow : EditorWindow
         _controlEnabled = EditorPrefs.GetBool(PControlOn, false);
         _sketchPath = EditorPrefs.GetString(PControlSketch, "");
         _controlStrength = EditorPrefs.GetFloat(PControlStrength, 0.85f);
+        // 上次生成的文件:窗口重开后仍显示"去背景并导入"按钮(文件还在才有效)
+        _lastOutput = EditorPrefs.GetString(PLastOutput, "");
+        if (!string.IsNullOrEmpty(_lastOutput) && !System.IO.File.Exists(_lastOutput))
+            _lastOutput = "";
     }
 
     private void SavePrefs()
@@ -657,5 +700,7 @@ public class ComfyUIGeneratorWindow : EditorWindow
         EditorPrefs.SetBool(PControlOn, _controlEnabled);
         EditorPrefs.SetString(PControlSketch, _sketchPath);
         EditorPrefs.SetFloat(PControlStrength, _controlStrength);
+        if (!string.IsNullOrEmpty(_lastOutput))
+            EditorPrefs.SetString(PLastOutput, _lastOutput);
     }
 }
