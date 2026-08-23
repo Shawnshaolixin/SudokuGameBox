@@ -29,6 +29,8 @@ pipeline {
     // 本机 Unity 路径（如与实际不符只改这一处；14 号文档步骤 5）
     environment {
         UNITY = 'C:\\Program Files\\Unity\\Hub\\Editor\\6000.3.20f1\\Editor\\Unity.exe'
+        // 本机 Python(用户级安装,SYSTEM 账户 PATH 无 python/py,必须绝对路径;14 号文档 FAQ)
+        PYTHON = 'C:\\Users\\slx97\\AppData\\Local\\Programs\\Python\\Python312\\python.exe'
         // 自定义工作区：避开 SYSTEM profile 路径大小写问题（Unity 大小写敏感，见文件头注释）
         WS = 'D:/JenkinsWS/SudokuGameBox-CI'
     }
@@ -69,9 +71,13 @@ pipeline {
                         # -Wait mandatory for GUI exe (14 doc FAQ); redirects fix pipe-zombie (licensing child)
                         Write-Host "Unity exit code = $($p.ExitCode)"
                         if ($p.ExitCode -ne 0) { exit $p.ExitCode }
+                        # Unity 产出 NUnit3 嵌套 suite XML,JUnit 插件解析不了(JENKINS-6545)
+                        # → 用本地转换器拍平为 JUnit 扁平 XML(见 tools/nunit3_to_junit.py)
+                        & $env:PYTHON "$ws\\tools\\nunit3_to_junit.py" "$ws\\TestResults\\ci-editmode.xml" "$ws\\TestResults\\ci-editmode-junit.xml"
+                        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
                     ''')
                     // JUnit 解析 NUnit XML → Jenkins 测试趋势页（相对 ws 内路径）
-                    junit allowEmptyResults: true, testResults: 'TestResults/ci-editmode.xml'
+                    junit allowEmptyResults: true, testResults: 'TestResults/ci-editmode-junit.xml'
                 }
             }
         }
@@ -100,8 +106,11 @@ pipeline {
                         ) -RedirectStandardOutput "$ws\\Build\\Logs\\ci-playmode-stdout.log" -RedirectStandardError "$ws\\Build\\Logs\\ci-playmode-stderr.log" -PassThru -Wait
                         Write-Host "Unity exit code = $($p.ExitCode)"
                         if ($p.ExitCode -ne 0) { exit $p.ExitCode }
+                        # 同 CI-1:NUnit3 → JUnit 扁平转换,否则 JUnit 插件解析 0 结果
+                        & $env:PYTHON "$ws\\tools\\nunit3_to_junit.py" "$ws\\TestResults\\ci-playmode.xml" "$ws\\TestResults\\ci-playmode-junit.xml"
+                        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
                     ''')
-                    junit allowEmptyResults: true, testResults: 'TestResults/ci-playmode.xml'
+                    junit allowEmptyResults: true, testResults: 'TestResults/ci-playmode-junit.xml'
                 }
             }
         }
@@ -112,12 +121,8 @@ pipeline {
                 ws("$WS") {
                     powershell(script: '''
                         $ws = $env:WORKSPACE
-                        # 优先 python，不在 PATH 则退回 py 启动器（Windows 官方，14 号文档 FAQ）
-                        python "$ws\\tools\\asset_check.py"
-                        if ($LASTEXITCODE -ne 0) {
-                            Write-Host "python 不在 PATH，退回 py 启动器"
-                            py -3 "$ws\\tools\\asset_check.py"
-                        }
+                        # SYSTEM 账户 PATH 无 python/py,直调绝对路径(14 号文档 FAQ)
+                        & $env:PYTHON "$ws\\tools\\asset_check.py"
                         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
                     ''')
                 }
