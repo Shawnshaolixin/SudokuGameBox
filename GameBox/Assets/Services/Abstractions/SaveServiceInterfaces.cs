@@ -82,6 +82,9 @@ namespace Box.Services
         public static ISaveService Save { get; private set; }
         public static ISettingsService Settings { get; private set; }
 
+        /// <summary>资源服务(Phase 6 接入;AppBootstrap 注册后为 Addressables 壳层实现)。</summary>
+        public static IAssetService Assets { get; private set; }
+
         /// <summary>服务是否已注册(运行时 AppBootstrap 注册后恒为 true)。</summary>
         public static bool IsReady => Save != null && Settings != null;
 
@@ -91,11 +94,18 @@ namespace Box.Services
             Settings = settings;
         }
 
+        /// <summary>注册资源服务(Phase 6:Addressables 壳层;热更侧只经本属性使用)。</summary>
+        public static void RegisterAssets(IAssetService assets)
+        {
+            Assets = assets;
+        }
+
         /// <summary>测试清理用(置空,防跨测试污染)。</summary>
         public static void Reset()
         {
             Save = null;
             Settings = null;
+            Assets = null;
         }
     }
 }

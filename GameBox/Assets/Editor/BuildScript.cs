@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
@@ -24,6 +25,19 @@ public static class BuildScript
     static void BuildAndroid(bool aab)
     {
         EditorUserBuildSettings.buildAppBundle = aab;
+
+        // Phase 6:Addressables 资源先构建(分组 Core/UI_Local/Art_Audio;UI 经 Addressables 加载)
+        // m_BuildAddressablesWithPlayerBuild=0 → 需显式构建,否则 AAB 内缺 bundle 运行时加载失败
+        try
+        {
+            AddressableAssetSettings.BuildPlayerContent();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[BuildScript] Addressables BuildPlayerContent failed: " + e.Message);
+            EditorApplication.Exit(1);
+            return;
+        }
 
         var scenes = EditorBuildSettings.scenes
             .Where(s => s.enabled)

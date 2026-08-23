@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: UI_Local
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: UI_Local
+  m_GUID: a6e768bea49cb9549b10063b32d05245
+  m_SerializeEntries:
+  - m_GUID: 077b18ec0c9753a4d8f70ff59755e295
+    m_Address: UI/Popups/SettlementPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 298e28ba998a15a4a816f05e53f73237
+    m_Address: UI/MainMenuView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 49129d769a415784785c9896cce7795b
+    m_Address: UI/Popups/SettingsPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aebffbd1e2d1fe344ab4e0e97b86c45b
+    m_Address: UI/Popups/ExitConfirm
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c24d016dc7c667b42be870a8a0bb6f4f
+    m_Address: UI/GameplayView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d3ab740af3f7980478fcebdbfb710ddc
+    m_Address: UI/Popups/DifficultySelect
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 68b66f896e1f0094f97398d17cf2c77b, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 8ae5a1b1845e0e248ae0a6661be7aca1, type: 2}
+    - {fileID: 11400000, guid: c8bd93c714e888d4caad9e55184f6190, type: 2}

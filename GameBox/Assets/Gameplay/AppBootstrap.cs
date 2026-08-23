@@ -17,13 +17,16 @@ namespace Box.Gameplay
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Boot()
         {
-            var ui = new UIService(new ResourceViewLoader(), new AnalyticsServiceStub());
+            // Phase 6:视图加载切 Addressables(资源在 Resources → Addressables 分组,见 Phase6AddressablesSetup);
+            // 模块清单(ModuleCatalog)体积 <1KB、启动链路过短,保留 Resources 兜底为遗留,Phase 9 再清理。
+            var ui = new UIService(new AddressablesViewLoader(), new AnalyticsServiceStub());
             UIService.Register(ui);
 
             // Phase 5:存档 + 偏好(构造即加载;主/备损坏自动回退重建,不阻塞启动)
             var save = new SaveService();
             var settings = new SettingsService();
             ServiceLocator.Register(save, settings);
+            ServiceLocator.RegisterAssets(new AddressablesAssetService()); // Phase 6:资源服务壳层
             L10n.Init(settings.Language); // 启动同步语言偏好 → 首屏即按偏好语言渲染(FR-17)
 
             // 模块清单:Resources 兜底路径(Phase 6 迁 Addressables)。
