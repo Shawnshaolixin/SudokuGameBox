@@ -3,6 +3,7 @@
     "rootNamespace": "Box.Gameplay.Tests",
     "references": [
         "Box.Gameplay",
+        "Box.ModuleFramework",
         "Box.Services.Abstractions",
         "UniTask",
         "UnityEngine.TestRunner",

@@ -8,12 +8,14 @@ using UnityEngine;
 namespace Box.Gameplay
 {
     /// <summary>
-    /// 主菜单/大厅雏形(Phase 4 4-1 + Phase 4.5 + Phase 5):
+    /// 主菜单/大厅(Phase 4 4-1 + Phase 4.5 + Phase 5 + 大厅改造):
     /// 入口按钮 → IModuleLoader.EnterAsync(中间态:玩法模块内部开弹窗/切场景,决策 B);
-    /// 设置 → Phase 5 正式设置弹窗(SettingsView,偏好走 ISettingsService)。
+    /// 设置按钮 → 右上角,Phase 5 正式设置弹窗(SettingsView,偏好走 ISettingsService);
+    /// More Games 按钮(原设置位置)→ MoreGamesView 弹窗:读 ModuleLoader.Entries 动态渲染
+    /// 全部玩法入口(enabled==true 按 sortOrder 排序,13 文档 §5),每次新增玩法清单加 1 条
+    /// 即可,大厅零改动;入口展示由配置决定(v1.1 远程清单 module_overrides)。
     /// 进入玩法前由壳写入 box.lastModuleId(§8.1:box.* 仅 Shell 可写,D-5)。
-    /// 不再静态引用玩法类型 —— Box.Gameplay(AOT) 不依赖 HotUpdate.Sudoku,
-    /// v1.1 热更下发后大厅零改动接入新玩法(读 ModuleCatalog 渲染入口,网格化留给第二玩法)。
+    /// 不再静态引用玩法类型 —— Box.Gameplay(AOT) 不依赖 HotUpdate.Sudoku。
     /// 本地化:订阅 L10n.LanguageChanged,语言切换后标题/按钮文案即时刷新(FR-17)。
     /// </summary>
     public sealed class MainMenuView : UIView
@@ -40,6 +42,10 @@ namespace Box.Gameplay
             var settings = transform.Find("SettingsButton")?.GetComponent<BoxButton>();
             if (settings != null)
                 settings.OnClick(() => UIService.Instance?.Router.PushAsync<SettingsView>("UI/Popups/SettingsPopup").Forget());
+
+            var more = transform.Find("MoreGamesButton")?.GetComponent<BoxButton>();
+            if (more != null)
+                more.OnClick(() => UIService.Instance?.Router.PushAsync<MoreGamesView>("UI/Popups/MoreGamesPopup").Forget());
 
             // 语言变更全 UI 刷新:订阅一次,OnDestroy 退订
             if (!_langSubscribed)
@@ -69,6 +75,7 @@ namespace Box.Gameplay
             SetText("Title", L10n.Get("menu.title"));
             SetLabel("StartButton", L10n.Get("menu.start"));
             SetLabel("DailyChallengeButton", L10n.Get("menu.daily"));
+            SetLabel("MoreGamesButton", L10n.Get("menu.moreGames"));
             SetLabel("SettingsButton", L10n.Get("menu.settings"));
         }
 

@@ -62,6 +62,11 @@ namespace Box.Services
             { "menu.start", "开始游戏" },
             { "menu.daily", "每日挑战" },
             { "menu.settings", "设置" },
+            { "menu.moreGames", "更多游戏" },
+
+            // More Games 弹窗
+            { "moreGames.title", "更多游戏" },
+            { "moreGames.close", "完成" },
 
             // 设置弹窗
             { "settings.title", "设置" },
@@ -112,7 +117,12 @@ namespace Box.Services
             { "menu.title", "Sudoku Box" },
             { "menu.start", "Start" },
             { "menu.daily", "Daily Challenge" },
+            { "menu.moreGames", "More Games" },
             { "menu.settings", "Settings" },
+
+            // More Games 弹窗
+            { "moreGames.title", "More Games" },
+            { "moreGames.close", "Done" },
 
             // 设置弹窗
             { "settings.title", "Settings" },
