@@ -31,6 +31,10 @@ pipeline {
         UNITY = 'C:\\Program Files\\Unity\\Hub\\Editor\\6000.3.20f1\\Editor\\Unity.exe'
         // 本机 Python(用户级安装,SYSTEM 账户 PATH 无 python/py,必须绝对路径;14 号文档 FAQ)
         PYTHON = 'C:\\Users\\slx97\\AppData\\Local\\Programs\\Python\\Python312\\python.exe'
+        // Android 工具链显式注入:CI 账户不继承用户 GUI Preferences。
+        // Unity 6000.3 内置 NDK r27 校验失败(已知问题),项目终版用 r27c(用户本地点过的,2026-08-24 实测)
+        ANDROID_NDK = 'D:/Projects/AI/AndroidNDK/android-ndk-r27c'
+        ANDROID_JDK = 'C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.20.8-hotspot'
         // 自定义工作区：避开 SYSTEM profile 路径大小写问题（Unity 大小写敏感，见文件头注释）
         WS = 'D:/JenkinsWS/SudokuGameBox-CI'
     }
@@ -145,9 +149,13 @@ pipeline {
                         $projFwd = $proj -replace '\\\\', '/'
                         # APK+AAB 双产物一次会话构建（BuildScript.BuildAndroidApkAndAab）;
                         # APK 本地装机测试,AAB 上架;-quit is correct for build mode
+                        # -androidNdkRoot/-androidJdkRoot 显式注入(SYSTEM 账户无 GUI Preferences,
+                        #   内置 NDK r27 校验失败,用项目终版 r27c + JDK17,见文件头环境注释)
                         $p = Start-Process -FilePath $unity -WorkingDirectory $proj -ArgumentList @(
                             "-batchmode", "-quit",
                             "-projectPath", $projFwd,
+                            "-androidNdkRoot", "$env:ANDROID_NDK",
+                            "-androidJdkRoot", "$env:ANDROID_JDK",
                             "-executeMethod", "BuildScript.BuildAndroidApkAndAab",
                             "-logFile", "$ws\\Build\\Logs\\ci-aab.log"
                         ) -RedirectStandardOutput "$ws\\Build\\Logs\\ci-aab-stdout.log" -RedirectStandardError "$ws\\Build\\Logs\\ci-aab-stderr.log" -PassThru -Wait
