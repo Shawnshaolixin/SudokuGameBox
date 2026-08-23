@@ -32,10 +32,11 @@ pipeline {
         // 本机 Python(用户级安装,SYSTEM 账户 PATH 无 python/py,必须绝对路径;14 号文档 FAQ)
         PYTHON = 'C:\\Users\\slx97\\AppData\\Local\\Programs\\Python\\Python312\\python.exe'
         // Android 工具链显式注入:CI 账户不继承用户 GUI Preferences。
-        // Unity 6000.3 内置 NDK r27 校验失败(已知问题),项目终版用 r27c(用户本地点过的,2026-08-24 实测)。
-        // 注入方式 = 环境变量 ANDROID_NDK_HOME(官方探测顺序:Preferences → 环境变量 → 内置;
-        //   -androidNdkRoot 命令行参数 6000 已废弃,实测无效,勿用)
-        ANDROID_NDK_HOME = 'D:/Projects/AI/AndroidNDK/android-ndk-r27c'
+        // Unity 6000.3 官方推荐 NDK = 27.2.12479018(r27c),内置 r27(27.0.12077973)
+        // 版本不匹配 → Detect Android NDK 校验失败;项目终版 r27c(用户本地点过,2026-08-24 实测)。
+        // 注入方式 = 环境变量 ANDROID_NDK_ROOT(Unity IssueTracker 实证的 headless workaround;
+        //   ANDROID_NDK_HOME 单独不够;-androidNdkRoot 参数 6000 已废弃,实测无效,勿用)
+        ANDROID_NDK_ROOT = 'D:/Projects/AI/AndroidNDK/android-ndk-r27c'
         // 自定义工作区：避开 SYSTEM profile 路径大小写问题（Unity 大小写敏感，见文件头注释）
         WS = 'D:/JenkinsWS/SudokuGameBox-CI'
     }
