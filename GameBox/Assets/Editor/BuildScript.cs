@@ -22,10 +22,46 @@ public static class BuildScript
     [MenuItem("Box/Build/Android AAB (release)")]
     public static void BuildAndroidAab() => BuildAndroid(aab: true);
 
+    /// <summary>
+    /// 一次会话产出 APK + AAB 双产物(本地测试 + 上架,Phase 6.5 CI-3 用):
+    /// Addressables 只构建一次,两次 BuildPlayer 复用 —— 比两次 CLI 调用省一次资源管线构建。
+    /// CLI 无头调用:
+    ///   unity build GameBox --target Android --execute-method BuildScript.BuildAndroidApkAndAab
+    /// </summary>
+    [MenuItem("Box/Build/Android APK + AAB (test + release)")]
+    public static void BuildAndroidApkAndAab()
+    {
+        // Phase 6:Addressables 资源先构建(分组 Core/UI_Local/Art_Audio;UI 经 Addressables 加载)
+        // m_BuildAddressablesWithPlayerBuild=0 → 需显式构建,否则产物内缺 bundle 运行时加载失败
+        try
+        {
+            AddressableAssetSettings.BuildPlayerContent();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[BuildScript] Addressables BuildPlayerContent failed: " + e.Message);
+            EditorApplication.Exit(1);
+            return;
+        }
+
+        var scenes = EditorBuildSettings.scenes
+            .Where(s => s.enabled)
+            .Select(s => s.path)
+            .ToArray();
+        if (scenes.Length == 0)
+        {
+            Debug.LogError("[BuildScript] No enabled scenes in Build Settings.");
+            EditorApplication.Exit(1);
+            return;
+        }
+
+        Directory.CreateDirectory(OutputDir);
+        BuildAndroidInternal(scenes, aab: false); // 本地测试 APK
+        BuildAndroidInternal(scenes, aab: true);  // 上架 AAB
+    }
+
     static void BuildAndroid(bool aab)
     {
-        EditorUserBuildSettings.buildAppBundle = aab;
-
         // Phase 6:Addressables 资源先构建(分组 Core/UI_Local/Art_Audio;UI 经 Addressables 加载)
         // m_BuildAddressablesWithPlayerBuild=0 → 需显式构建,否则 AAB 内缺 bundle 运行时加载失败
         try
@@ -51,6 +87,13 @@ public static class BuildScript
         }
 
         Directory.CreateDirectory(OutputDir);
+        BuildAndroidInternal(scenes, aab);
+    }
+
+    static void BuildAndroidInternal(string[] scenes, bool aab)
+    {
+        EditorUserBuildSettings.buildAppBundle = aab;
+
         var ext = aab ? ".aab" : ".apk";
         var output = Path.Combine(OutputDir, "GameBox" + ext);
 

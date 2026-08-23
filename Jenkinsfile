@@ -143,19 +143,20 @@ pipeline {
                         New-Item -ItemType Directory -Force "$ws\\Build\\Logs", "$env:LOCALAPPDATA\\Unity\\Caches" | Out-Null
                         # 正斜杠传 -projectPath（Unity 规范化路径比较的坑）
                         $projFwd = $proj -replace '\\\\', '/'
-                        # AAB build (BuildScript.cs); -quit is correct for build mode
+                        # APK+AAB 双产物一次会话构建（BuildScript.BuildAndroidApkAndAab）;
+                        # APK 本地装机测试,AAB 上架;-quit is correct for build mode
                         $p = Start-Process -FilePath $unity -WorkingDirectory $proj -ArgumentList @(
                             "-batchmode", "-quit",
                             "-projectPath", $projFwd,
-                            "-executeMethod", "BuildScript.BuildAndroidAab",
+                            "-executeMethod", "BuildScript.BuildAndroidApkAndAab",
                             "-logFile", "$ws\\Build\\Logs\\ci-aab.log"
                         ) -RedirectStandardOutput "$ws\\Build\\Logs\\ci-aab-stdout.log" -RedirectStandardError "$ws\\Build\\Logs\\ci-aab-stderr.log" -PassThru -Wait
                         Write-Host "Unity exit code = $($p.ExitCode)"
                         if ($p.ExitCode -ne 0) { exit $p.ExitCode }
                     ''')
-                    // 归档 AAB → 构建记录 Artifacts（本机方案替代 GitHub Actions artifact）
+                    // 归档 APK + AAB → 构建记录 Artifacts（本机方案替代 GitHub Actions artifact）
                     // 输出在工程目录内（BuildScript.cs OutputDir 相对工程），工作区根是 GameBox/ 子目录
-                    archiveArtifacts artifacts: 'GameBox/Build/Android/GameBox.aab', onlyIfSuccessful: true
+                    archiveArtifacts artifacts: 'GameBox/Build/Android/GameBox.apk,GameBox/Build/Android/GameBox.aab', onlyIfSuccessful: true
                 }
             }
         }
