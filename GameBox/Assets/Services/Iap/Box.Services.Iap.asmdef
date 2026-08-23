@@ -2,7 +2,9 @@
     "name": "Box.Services.Iap",
     "rootNamespace": "Box.Services",
     "references": [
-        "Box.Services.Abstractions"
+        "Box.Services.Abstractions",
+        "UnityEngine.Purchasing",
+        "UnityEngine.Purchasing.Stores"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
