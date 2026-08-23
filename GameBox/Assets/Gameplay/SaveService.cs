@@ -26,8 +26,11 @@ namespace Box.Gameplay
         public string lastModuleId = "";
     }
 
+    /// <summary>模块存档记录(id + 模块自定义数据 JSON 原文)。
+    /// 注意:不能叫 ModuleEntry——与 Box.ModuleFramework 公共类型同名会被遮蔽(CS0050/CS0051),
+    /// 且语义上这是存档记录而非模块清单条目。</summary>
     [Serializable]
-    sealed class ModuleEntry
+    sealed class ModuleSave
     {
         public string id = "";
         public string json = ""; // 模块自定义 [Serializable] 数据的 JSON 原文
@@ -38,7 +41,7 @@ namespace Box.Gameplay
     {
         public int schemaVersion = 1; // §8.2:单调递增,客户端只升不降
         public BoxData box = new BoxData();
-        public List<ModuleEntry> modules = new List<ModuleEntry>();
+        public List<ModuleSave> modules = new List<ModuleSave>();
     }
 
     /// <summary>
@@ -92,7 +95,8 @@ namespace Box.Gameplay
         public SaveService(string filePath = null)
         {
             _filePath = filePath ?? Path.Combine(Application.persistentDataPath, DefaultFileName);
-            _data = LoadOrCreate();
+            _data = LoadOrCreate(out var created);
+            if (created) Save(); // 首次建档:installedAt 已写入内存,须在 _data 赋值后落盘(否则序列化 null)
         }
 
         public bool TryGetSignin(out string lastDate, out int streak)
@@ -121,7 +125,7 @@ namespace Box.Gameplay
             var e = FindModule(moduleId);
             if (e == null)
             {
-                e = new ModuleEntry { id = moduleId };
+                e = new ModuleSave { id = moduleId };
                 _data.modules.Add(e);
             }
             e.json = JsonUtility.ToJson(data);
@@ -145,16 +149,18 @@ namespace Box.Gameplay
 
         // ---- 内部 ----
 
-        ModuleEntry FindModule(string moduleId)
+        ModuleSave FindModule(string moduleId)
         {
             foreach (var e in _data.modules)
                 if (e.id == moduleId) return e;
             return null;
         }
 
-        /// <summary>加载策略:主文件 → 备份 → 全损坏重建(保留 .corrupt)。</summary>
-        SaveFileData LoadOrCreate()
+        /// <summary>加载策略:主文件 → 备份 → 全损坏重建(保留 .corrupt)。
+        /// created 为 true 表示本次新建空档(installedAt 已生成),由构造函数在 _data 赋值后统一落盘。</summary>
+        SaveFileData LoadOrCreate(out bool created)
         {
+            created = false;
             var d = TryRead(_filePath);
             if (d != null) return d;
 
@@ -179,9 +185,8 @@ namespace Box.Gameplay
                 catch (Exception ex) { Debug.LogWarning($"[SaveService] 保留损坏文件失败: {ex.Message}"); }
             }
 
-            var fresh = NewFile();
-            Save(); // 立即落盘,installedAt 自此固定
-            return fresh;
+            created = true; // 新建空档,installedAt 自此固定(由构造函数落盘)
+            return NewFile();
         }
 
         static SaveFileData NewFile()

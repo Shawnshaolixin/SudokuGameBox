@@ -33,6 +33,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UI
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 86e1fbc11f2f4f64ebbd0cdf3ebb4708
+    m_Address: UI/Popups/MoreGamesPopup
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: aebffbd1e2d1fe344ab4e0e97b86c45b
     m_Address: UI/Popups/ExitConfirm
     m_ReadOnly: 0

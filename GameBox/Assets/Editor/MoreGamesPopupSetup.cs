@@ -67,7 +67,7 @@ public static class MoreGamesPopupSetup
         CreateButton(content.transform, "ItemTemplate", "玩法", new Vector2(0, 0), new Vector2(520, 96), false);
         content.transform.Find("ItemTemplate").gameObject.SetActive(false);
 
-        CreateButton(root.transform, "CloseButton", "完成", new Vector2(0, -380), new Vector2(420, 96));
+        CreateButton(root.transform, "CloseButton", "完成", new Vector2(0, -380), new Vector2(420, 96), true);
 
         PrefabUtility.SaveAsPrefabAsset(root, path);
         Object.DestroyImmediate(root);
@@ -92,7 +92,7 @@ public static class MoreGamesPopupSetup
         // 原设置位置 (0,-170) 改放 More Games 按钮(缺则建,有则校准尺寸)
         var more = go.transform.Find("MoreGamesButton");
         if (more == null)
-            more = CreateButton(go.transform, "MoreGamesButton", "更多游戏", new Vector2(0, -170), new Vector2(420, 90), true);
+            more = CreateButton(go.transform, "MoreGamesButton", "更多游戏", new Vector2(0, -170), new Vector2(420, 90), true).transform;
         else
             SetRect(more, new Vector2(0, -170), new Vector2(420, 90));
 
