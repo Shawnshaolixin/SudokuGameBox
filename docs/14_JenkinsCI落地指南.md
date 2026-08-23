@@ -177,6 +177,8 @@ Dashboard → New Item → 名称「SudokuGameBox-CI」→ 类型选「Pipeline�
 | JUnit 插件报 "None of the test reports contained any result" | **Unity 的 NUnit3 XML 是嵌套 test-suite 结构,标准 JUnit 解析器处理不了(JENKINS-6545)**——文件存在、有 test-case 也解析 0 结果 | 2026-08-23 实测:新增 `tools/nunit3_to_junit.py` 把所有 test-case 拍平为单层 testsuite 的 JUnit 扁平 XML,CI-1/CI-1b 转换后再 junit 解析(仅标准库,零依赖) |
 | `python` / `py` 报 CommandNotFoundException | Jenkins 服务(LocalSystem)的 PATH **不含用户级 Python** | Jenkinsfile `environment` 已写死绝对路径 `C:\Users\<用户>\AppData\Local\Programs\Python\Python312\python.exe`,不要靠 PATH 探测 |
 | 用 curl REST 触发构建报 400 "Nothing is submitted" | 带参数的 Pipeline job 要用 `buildWithParameters` 端点;`build` 端点收空 body 会 400 | `POST /job/<name>/buildWithParameters`(需 crumb + session cookie + Basic 认证) |
+| CI-3 报 "Android NDK not found or invalid" | ① SYSTEM 账户无 GUI Preferences → 自动探测到 Unity 内置 NDK r27,Unity 6000.3 对其校验失败(已知问题)② `-androidNdkRoot` 命令行参数在 6000 **已废弃,实测无效** | Jenkinsfile `environment` 注入 `ANDROID_NDK_HOME` 环境变量指向项目终版 r27c(官方探测顺序:Preferences → 环境变量 → 内置;Start-Process 子进程继承) |
+| REST 带参数触发后构建参数丢失 | quiet period 内多次触发(手动 + SCM 轮询)会合并,合并后可能以默认参数构建 | 触发后立即查 `lastBuild/api/json?tree=actions[parameters]` 确认;必要时重触发 |
 | 轮询不触发 | ① 日程语法错 ② Git 插件缺 ③ 服务账号无权限读仓库路径 | H/5 格式;确认插件;给仓库目录加读权限 |
 | 构建报 "references a local directory ... ALLOW_LOCAL_CHECKOUT" | Git 插件默认禁止本地目录 checkout(安全策略,4.7+ 引入) | jenkins.xml 的 `<arguments>` 加 `-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true` 后重启服务;属性在类加载时读取,运行时 System.setProperty 无效 |
 | 中文乱码 | Unity 日志 stdout 编码问题 | 一律用 `-logFile` 写文件(项目已定型),不在 stdout 解析 |
