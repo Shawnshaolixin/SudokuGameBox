@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Build; // NamedBuildTarget(CS0103: UnityEditor.Build 命名空间,CI #19 抓出)
 using UnityEngine;
 
 /// <summary>
