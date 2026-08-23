@@ -152,6 +152,16 @@ Dashboard → New Item → 名称「SudokuGameBox-CI」→ 类型选「Pipeline�
 4. **构建 AAB**:再次 Build with Parameters,勾选 `BUILD_AAB` → CI-3 产 AAB,构建页「Artifacts」可下载 `GameBox.aab`
 5. 确认构建历史页:绿 = 可交付,红 = 找原因(见 FAQ)
 
+### 2026-08-24 实测记录(全部通过)
+
+| 验收项 | 构建号 | 实测结果 |
+|---|---|---|
+| 自动触发 | #21 | 提交 `cb836f7`(meta 补交)后 SCM 轮询自动触发,无需手动 |
+| 测试阶段通过 | #20/#21 | 双绿,Unity exit 0,144 用例;测试趋势页数据落库 |
+| 失败拦截(非故意) | #19 | 提交 `cf16686` 编译错误(`NamedBuildTarget` 缺 using)2 分钟内被 CI-1 抓出标红 |
+| 故意失败 CI-2 | #23 | `play_btn.png` 改名 `play.png` → CI-1 绿、CI-2 抓出"文件命名不符合白名单"、CI-3 被跳过 → FAILURE;恢复后提交 `a42422f` |
+| CI-3 双产物 | — | CI-3 一次会话产出 **APK(本地装机测试)+ AAB(上架)**,Artifacts 均可下载(2026-08-24 增补:BuildScript.BuildAndroidApkAndAab) |
+
 ---
 
 ## FAQ(按踩坑概率排序)
@@ -163,9 +173,10 @@ Dashboard → New Item → 名称「SudokuGameBox-CI」→ 类型选「Pipeline�
 | MSI 安装报 1618「另一个安装已在进行」 | 上次失败安装残留挂死的 msiexec 进程,锁住 Windows Installer 互斥 | `taskkill /F /PID <残留进程>` 后重跑安装 |
 | CI-1 报 "Lockfile exists" | Unity 上次异常退出残留 `Temp/UnityLockfile` | Jenkinsfile 已内置删除,无需手动;手动跑时同样先删 |
 | PowerShell 立即返回/拿不到退出码 | Unity.exe 是 GUI 程序,`&` 调用不等待 | Jenkinsfile 已用 `Start-Process -PassThru -Wait`(13 号文档定型做法) |
-| CI-1 显示绿但没有测试趋势 | JUnit 插件未装 / XML 路径不对 | 装 JUnit 插件;junit 路径相对 workspace,保持 `TestResults/ci-editmode.xml` |
-| CI-2 报存量资产违规 | 开发期临时命名不符白名单 | **设计如此(存量豁免+增量约束)**:这些文件列入 `tools/legacy_assets.txt`,只约束新增资产 |
-| `python` 提示未安装/是商店占位 | Jenkins 服务账号 PATH 不含 Python | Jenkinsfile 已内置退回 `py -3` 启动器;还不行就把 Python 绝对路径写进脚本 |
+| CI-1 显示绿但没有测试趋势 | JUnit 插件未装 / XML 路径不对 | 装 JUnit 插件;junit 路径相对 workspace,保持 `TestResults/ci-editmode-junit.xml` |
+| JUnit 插件报 "None of the test reports contained any result" | **Unity 的 NUnit3 XML 是嵌套 test-suite 结构,标准 JUnit 解析器处理不了(JENKINS-6545)**——文件存在、有 test-case 也解析 0 结果 | 2026-08-23 实测:新增 `tools/nunit3_to_junit.py` 把所有 test-case 拍平为单层 testsuite 的 JUnit 扁平 XML,CI-1/CI-1b 转换后再 junit 解析(仅标准库,零依赖) |
+| `python` / `py` 报 CommandNotFoundException | Jenkins 服务(LocalSystem)的 PATH **不含用户级 Python** | Jenkinsfile `environment` 已写死绝对路径 `C:\Users\<用户>\AppData\Local\Programs\Python\Python312\python.exe`,不要靠 PATH 探测 |
+| 用 curl REST 触发构建报 400 "Nothing is submitted" | 带参数的 Pipeline job 要用 `buildWithParameters` 端点;`build` 端点收空 body 会 400 | `POST /job/<name>/buildWithParameters`(需 crumb + session cookie + Basic 认证) |
 | 轮询不触发 | ① 日程语法错 ② Git 插件缺 ③ 服务账号无权限读仓库路径 | H/5 格式;确认插件;给仓库目录加读权限 |
 | 构建报 "references a local directory ... ALLOW_LOCAL_CHECKOUT" | Git 插件默认禁止本地目录 checkout(安全策略,4.7+ 引入) | jenkins.xml 的 `<arguments>` 加 `-Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true` 后重启服务;属性在类加载时读取,运行时 System.setProperty 无效 |
 | 中文乱码 | Unity 日志 stdout 编码问题 | 一律用 `-logFile` 写文件(项目已定型),不在 stdout 解析 |
@@ -192,8 +203,8 @@ Dashboard → New Item → 名称「SudokuGameBox-CI」→ 类型选「Pipeline�
 | `parameters.RUN_PLAY_MODE` | CI-1b 开关,默认 false(项目回归以 EditMode 为主,13 号文档 §6) |
 | `environment.UNITY` | 本机 Unity.exe 路径,改 Unity 版本只动这一处 |
 | `Start-Process -PassThru -Wait` | Windows 下等待 GUI 程序退出的标准做法 |
-| `junit ...` | 解析 `TestResults/*.xml`,沿用项目现有 XML 产出(phase3/phase6 同格式) |
-| `archiveArtifacts` | 归档 AAB,本机方案替代 GitHub Actions artifact |
+| `junit ...` | 解析 `TestResults/*-junit.xml`(Unity NUnit3 XML 需先经 `tools/nunit3_to_junit.py` 拍平,JENKINS-6545) |
+| `archiveArtifacts` | 归档 **APK + AAB** 双产物(本机方案替代 GitHub Actions artifact),构建记录可下载 |
 
 ## 附录 B:tools/asset_check.py 说明(仓库已创建)
 
