@@ -50,16 +50,17 @@ pipeline {
                     powershell(script: '''
                         $unity = $env:UNITY
                         $ws    = $env:WORKSPACE
+                        # Unity 工程在 GameBox/ 子目录（仓库根不是工程，13 号文档 §6 命令模板）
+                        $proj  = "$ws\\GameBox"
                         # prep: stale lockfile, result dirs, Unity cache dir (SYSTEM profile)
-                        Remove-Item "$ws\\Temp\\UnityLockfile" -Force -ErrorAction SilentlyContinue
+                        Remove-Item "$proj\\Temp\\UnityLockfile" -Force -ErrorAction SilentlyContinue
                         New-Item -ItemType Directory -Force "$ws\\TestResults", "$ws\\Build\\Logs", "$env:LOCALAPPDATA\\Unity\\Caches" | Out-Null
-                        # Unity 用精确字符串比较 -projectPath 与内部规范化路径（反斜杠 vs 正斜杠不等 → 路径翻倍）；
-                        # 自定义 ws 已无大小写问题，这里统一转正斜杠（'\\' 在 PowerShell 正则里匹配单个反斜杠）
-                        $wsReal = $ws -replace '\\\\', '/'
+                        # 正斜杠传 -projectPath（Unity 规范化路径比较的坑，见 14 号文档 FAQ）
+                        $projFwd = $proj -replace '\\\\', '/'
                         # -runTests must NOT use -quit (Phase 6 lesson)
-                        $p = Start-Process -FilePath $unity -WorkingDirectory $ws -ArgumentList @(
+                        $p = Start-Process -FilePath $unity -WorkingDirectory $proj -ArgumentList @(
                             "-batchmode",
-                            "-projectPath", $wsReal,
+                            "-projectPath", $projFwd,
                             "-runTests",
                             "-testPlatform", "EditMode",
                             "-testResults", "$ws\\TestResults\\ci-editmode.xml",
@@ -83,13 +84,15 @@ pipeline {
                     powershell(script: '''
                         $unity = $env:UNITY
                         $ws    = $env:WORKSPACE
-                        Remove-Item "$ws\\Temp\\UnityLockfile" -Force -ErrorAction SilentlyContinue
+                        # Unity 工程在 GameBox/ 子目录（仓库根不是工程）
+                        $proj  = "$ws\\GameBox"
+                        Remove-Item "$proj\\Temp\\UnityLockfile" -Force -ErrorAction SilentlyContinue
                         New-Item -ItemType Directory -Force "$ws\\TestResults", "$ws\\Build\\Logs", "$env:LOCALAPPDATA\\Unity\\Caches" | Out-Null
-                        # Unity 精确字符串比较路径，统一转正斜杠（'\\' 正则匹配单个反斜杠）
-                        $wsReal = $ws -replace '\\\\', '/'
-                        $p = Start-Process -FilePath $unity -WorkingDirectory $ws -ArgumentList @(
+                        # 正斜杠传 -projectPath（Unity 规范化路径比较的坑）
+                        $projFwd = $proj -replace '\\\\', '/'
+                        $p = Start-Process -FilePath $unity -WorkingDirectory $proj -ArgumentList @(
                             "-batchmode",
-                            "-projectPath", $wsReal,
+                            "-projectPath", $projFwd,
                             "-runTests",
                             "-testPlatform", "PlayMode",
                             "-testResults", "$ws\\TestResults\\ci-playmode.xml",
@@ -129,14 +132,16 @@ pipeline {
                     powershell(script: '''
                         $unity = $env:UNITY
                         $ws    = $env:WORKSPACE
-                        Remove-Item "$ws\\Temp\\UnityLockfile" -Force -ErrorAction SilentlyContinue
+                        # Unity 工程在 GameBox/ 子目录（仓库根不是工程）
+                        $proj  = "$ws\\GameBox"
+                        Remove-Item "$proj\\Temp\\UnityLockfile" -Force -ErrorAction SilentlyContinue
                         New-Item -ItemType Directory -Force "$ws\\Build\\Logs", "$env:LOCALAPPDATA\\Unity\\Caches" | Out-Null
-                        # Unity 精确字符串比较路径，统一转正斜杠（'\\' 正则匹配单个反斜杠）
-                        $wsReal = $ws -replace '\\\\', '/'
+                        # 正斜杠传 -projectPath（Unity 规范化路径比较的坑）
+                        $projFwd = $proj -replace '\\\\', '/'
                         # AAB build (BuildScript.cs); -quit is correct for build mode
-                        $p = Start-Process -FilePath $unity -WorkingDirectory $ws -ArgumentList @(
+                        $p = Start-Process -FilePath $unity -WorkingDirectory $proj -ArgumentList @(
                             "-batchmode", "-quit",
-                            "-projectPath", $wsReal,
+                            "-projectPath", $projFwd,
                             "-executeMethod", "BuildScript.BuildAndroidAab",
                             "-logFile", "$ws\\Build\\Logs\\ci-aab.log"
                         ) -RedirectStandardOutput "$ws\\Build\\Logs\\ci-aab-stdout.log" -RedirectStandardError "$ws\\Build\\Logs\\ci-aab-stderr.log" -PassThru -Wait
@@ -144,7 +149,8 @@ pipeline {
                         if ($p.ExitCode -ne 0) { exit $p.ExitCode }
                     ''')
                     // 归档 AAB → 构建记录 Artifacts（本机方案替代 GitHub Actions artifact）
-                    archiveArtifacts artifacts: 'Build/Android/GameBox.aab', onlyIfSuccessful: true
+                    // 输出在工程目录内（BuildScript.cs OutputDir 相对工程），工作区根是 GameBox/ 子目录
+                    archiveArtifacts artifacts: 'GameBox/Build/Android/GameBox.aab', onlyIfSuccessful: true
                 }
             }
         }
