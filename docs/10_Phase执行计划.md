@@ -1,6 +1,6 @@
 # 10 — Phase 执行计划（权威执行手册）
 
-> 版本:v1.1 | 状态:Approved(2026-08-21 用户拍板;2026-08-23 增补 Phase 6.5 CI 管线 + D-17) | 说明:**本文是项目执行的唯一权威计划**。
+> 版本:v1.2 | 状态:Approved(2026-08-21 用户拍板;2026-08-23 增补 Phase 6.5 CI 管线 + D-17;2026-08-23 CI 工具拍板 Jenkins+SCM 轮询) | 说明:**本文是项目执行的唯一权威计划**。
 > 与 [06_项目路线图.md](./06_项目路线图.md)、[07_Unity2022落地版最小开发路线图.md](./07_Unity2022落地版最小开发路线图.md) 冲突时**以本文为准**（06/07 为早期讨论稿，技术基线已被 [11_Unity游戏盒子架构方案.md](./11_Unity游戏盒子架构方案.md) v2.2 与本文覆盖）。
 > 架构决策见 D-1~D-17（11 文档 + 本文 §3）。
 
@@ -31,7 +31,7 @@
 | 存档 | AES-GCM 单文件分区存档 + v0→v1 迁移器 | D-7 |
 | 预算 | 首包 ≤60MB / 新玩法 ≤8MB / 内存 ≤200MB / 冷启动 ≤2.5s | D-14 |
 | 权限 | SudokuCore 永久留 AOT，禁止进热更程序集 | 红线 |
-| CI | GitHub Actions + game-ci 工具链（Unity 无头测试/构建） | D-17 |
+| CI | Jenkins 本机部署（Windows 服务）+ SCM 轮询触发，本地 License 免 .ulf，无头测试/构建 | D-17 |
 
 ## 3. 决策清单 D-1 ~ D-17（2026-08-21 与 11 文档 D 表一次对齐，变更需用户拍板）
 
@@ -53,9 +53,9 @@
 | D-14 | 预算线：首包 ≤60MB / 新玩法 ≤8MB / 内存 ≤200MB / 冷启动 ≤2.5s（11 文档 §11） | ✅ |
 | D-15 | **UI 动画自研补间（UniTask 扩展 BoxTween），不引入第三方动画库（DOTween/PrimeTween）** | ✅（2026-08-21 用户拍板） |
 | D-16 | 每日挑战细化 | ⚠️ Phase 4 细化 |
-| D-17 | CI 管线（GitHub Actions + game-ci）：Unity 无头测试 + 资产校验 + AAB 构建自动化，作为 v1.0 发布前置质量闸门 | ✅（2026-08-23 用户拍板，Phase 6.5） |
+| D-17 | CI 管线（Jenkins 本机部署 + SCM 轮询）：Unity 无头测试 + 资产校验 + AAB 构建自动化。**核心价值 = 学习企业级 CI/自动化测试实践 + 面试素材**；v1.0 发布兜底仅为附带收益 | ✅（2026-08-23 用户拍板：Jenkins；Phase 6.5） |
 
-> 注：D-4/D-8/D-9 为 11 文档待拍板项（以 11 文档为准）；D-16 每日挑战细节 Phase 4 定；D-17 CI 管线 Phase 6.5 落地。
+> 注：D-4/D-8/D-9 为 11 文档待拍板项（以 11 文档为准）；D-16 每日挑战细节 Phase 4 定；D-17 CI 管线 Phase 6.5 落地（工具为 Jenkins，非 GitHub Actions）。
 
 ## 4. 红线（逐字保留，任何情况下不得违反）
 
@@ -201,22 +201,36 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 ## 13. Phase 6.5 — CI 管线（企业级自动化）
 
-> **背景（2026-08-23 拍板）**：10 文档原计划无 CI 阶段；为达成"每提交自动回归"的企业级工程实践（测试 / 资产校验 / 构建自动化），作为 v1.0 发布前质量闸门补充（D-17）。
+> **背景（2026-08-23 拍板）**：10 文档原计划无 CI 阶段。本 Phase **核心价值 = 学习企业级 CI/自动化测试实践 + 面试素材**（"每提交自动回归 + 资产命名契约进 CI"是休闲游戏岗位认可的企业实践，且 **Jenkins 是国内游戏公司 CI 标配**，面试按此逻辑讲）；v1.0 发布兜底仅为附带收益（D-17）。
+> **CI 工具（2026-08-23 拍板）**：**Jenkins 本机部署**（Windows 服务），不用 GitHub Actions——本地已激活 Unity 免 .ulf 流程、无分钟额度、国内网络零依赖、国内求职对口度更高。
 
-**目标**：GitHub Actions 上跑通 Unity 无头编译 + 测试 + 资产校验 + AAB 构建，失败阻止合并。
+**目标**：本机 Jenkins 跑通 Unity 无头编译 + 测试 + 资产校验 + AAB 构建，失败阻止交付/产物归档。
 
 | 任务 | 内容 |
 |---|---|
-| 6.5-1 | 首个 workflow：Unity 6000.3.20f1 无头编译 + EditMode/PlayMode 测试自动跑（game-ci/unity-test-runner） |
-| 6.5-2 | CI 资产校验 job：Assets/Art/ 下 PNG 命名约定白名单检查（_btn/_panel/_icon/_particle/_bg）+ 纹理尺寸上限审计，违反即失败 |
-| 6.5-3 | 构建 job：复用 BuildScript，CLI 产出 AAB，上传 artifact |
+| 6.5-1 | 首个 Jenkins job：Unity 6000.3.20f1 无头编译 + EditMode/PlayMode 测试自动跑（BatchMode 直接调本地 Unity，复用本地已激活 License） |
+| 6.5-2 | CI 资产校验 job：Assets/Art/ 下 PNG 命名约定白名单检查（_btn/_panel/_icon/_particle/_bg）+ 纹理尺寸上限审计，违反即失败（纯 Python，零 Unity 依赖） |
+| 6.5-3 | 构建 job：复用 BuildScript，CLI 产出 AAB，归档到 Jenkins 工作区 |
 
-**验收**：每次 push 自动跑测试 + 资产校验 + 构建；失败显示在 PR 检查中；产物可下载。
+**验收**：提交/推送后自动跑测试 + 资产校验（SCM 轮询触发）；构建 job 手动触发或 main 触发，产出 AAB 归档；失败显示在 Jenkins 构建历史中并阻止交付。
+
+**触发方式（2026-08-23 拍板）**：**SCM 轮询**（建议 1~5 分钟/次），**不用 GitHub Webhook**——本机无公网 IP，GitHub 无法回调本地 Jenkins；轮询指向本地 Git 仓库路径，检测变更自动触发，零网络依赖（红线 9：远程 push 仍由用户自理）。
+>
+> ⚠️ **本地 Jenkins 的限制（诚实记录）**：无法接入 PR 状态检查（GitHub 回调不进来），"失败阻止合并"改为"失败阻止交付/产物归档"；CI 结果在 Jenkins 页面查看，不上 GitHub。面试讲这个故事时说明理由（无公网 IP → SCM 轮询），反而是体现对 CI 原理理解的加分点。
+
+**成本纪律**（CI 又贵又折腾，必须克制）：
+- 换 Jenkins 后**没有 GitHub 分钟额度问题**，但本机维护成本替代之：PC 需保持开机、构建期间占用 CPU（可错开日常使用时段）
+- **6.5-2 资产校验用纯 Python**（读 PNG 头做尺寸审计 + 文件名白名单正则），不启动 Unity——唯一廉价的常驻 job
+- 6.5-1 测试 job 仅在提交 main / 手动触发时跑；6.5-3 构建 job 手动触发为主，避免每次提交都构建
+- **免 .ulf 流程**：复用本地已激活 Unity（6000.3.20f1），BatchMode 直接跑，无需云端 License 激活
+- **范围克制**：只做 6.5-1/2/3，不扩展多平台矩阵 / 缓存深度调优 / 自动化截图对比等锦上添花项（不符合目的导向）
 
 **前置（环境事实）**：
-- Unity CI 授权：Personal license 按 game-ci 标准激活流程，`UNITY_LICENSE` 存 GitHub Secret
 - 工具分工：全部 Unity CLI 无头/BatchMode，符合 §1 纪律
-- 远程推送由用户自理（红线 9），workflow 生效需用户 push `.github/workflows/`
+- Jenkins 部署前置：JDK + Jenkins Windows 服务 + Git 插件；SCM 指向本地仓库路径
+- 远程推送由用户自理（红线 9），Jenkins 轮询本地变更即触发
+- 6.5-3 复用现有 `Assets/Editor/BuildScript.cs`（双入口已具备）
+- 测试报告：Jenkins 解析 Unity 的 `TestResults/*.xml` 展示趋势（沿用现有 EditMode/PlayMode XML 产出）
 
 ## 14. Phase 7 — 商业化 + 合规（v1.0 发布前置）
 

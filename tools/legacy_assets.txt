@@ -1,0 +1,7 @@
+# 存量资产豁免清单（10 文档 6.5-2 / 14 号文档附录 B / tools/asset_check.py 读取）
+# 规则：存量资产暂不强制命名契约，增量资产必须合规（存量豁免 + 增量约束）。
+# 维护：以下为开发期临时命名，后续清理/重命名后从本清单移除（TODO，不留存量债）。
+GameBox/Assets/Art/UI/Buttons/playtest.png
+GameBox/Assets/Art/UI/Icons/icon2.png
+GameBox/Assets/Art/UI/Icons/playtest1.png
+GameBox/Assets/Art/UI/Panels/play111.png
