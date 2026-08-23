@@ -21,6 +21,15 @@ namespace Box.Services
 
         /// <summary>展示激励视频;回调参数 true 表示玩家看完并应发放奖励。</summary>
         void ShowRewardedAd(Action<bool> onReward);
+
+        /// <summary>展示插屏广告(时机由玩法层在局间/自然停顿点调用)。</summary>
+        /// <remarks>
+        /// 频控规则(04 文档 §广告频控,真实现内部执行):
+        /// 1. 已购去广告 → 零广告;
+        /// 2. 新用户前 3 局不弹插屏;
+        /// 3. 插屏局间至少间隔 4~6 分钟(取随机值,避免可预测节奏)。
+        /// </remarks>
+        void ShowInterstitial();
     }
 
     /// <summary>
@@ -47,5 +56,20 @@ namespace Box.Services
         void LogEvent(string eventName);
         void LogEvent(string eventName, string parameterName, object parameterValue);
         void LogNonFatal(string message);
+    }
+
+    /// <summary>
+    /// D-7 存档 box.commerce 分区数据(Phase 7 7-1):去广告购买状态持久化。
+    /// 15 号文档要求去广告状态写入存档分区(不再用 Stub 的 PlayerPrefs 键),
+    /// 由 Ads/Iap 真实现通过 SaveService.GetModule/SetModule("box.commerce") 读写。
+    /// </summary>
+    [Serializable]
+    public sealed class CommerceData
+    {
+        /// <summary>是否已购去广告(非消耗型商品,购买后永久有效)。</summary>
+        public bool RemoveAdsPurchased;
+
+        /// <summary>最后更新时间的 Unix 秒(排查/调试用)。</summary>
+        public long UpdatedAtUnixSec;
     }
 }

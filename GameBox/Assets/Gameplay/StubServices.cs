@@ -13,6 +13,9 @@ namespace Box.Gameplay
     {
         private const string KeyAdsRemoved = "sudoku.ads.removed";
 
+        /// <summary>对局计数键(频控:新用户前 3 局不弹插屏;桩与真实现共用同键,迁移无缝)。</summary>
+        private const string KeyGamesPlayed = "sudoku.ads.gamesPlayed";
+
         public bool IsInitialized => true;
         public bool IsRewardedReady => true;
         public bool IsAdsRemoved { get; private set; }
@@ -38,6 +41,18 @@ namespace Box.Gameplay
         {
             Debug.Log("[AdsStub] 模拟激励视频:直接视为看完并发放奖励");
             onReward?.Invoke(true);
+        }
+
+        /// <summary>桩插屏:不真正弹窗,按 04 文档频控规则做简化计数(新用户前 3 局不弹)。</summary>
+        public void ShowInterstitial()
+        {
+            if (IsAdsRemoved) return; // 去广告零广告
+            int games = PlayerPrefs.GetInt(KeyGamesPlayed, 0);
+            games += 1;
+            PlayerPrefs.SetInt(KeyGamesPlayed, games);
+            PlayerPrefs.Save();
+            if (games < 3) return; // 新用户前 3 局不弹插屏
+            Debug.Log("[AdsStub] 模拟插屏展示(接入 AdMob 后由真实现做完整频控:局间隔 4~6 分钟)");
         }
     }
 

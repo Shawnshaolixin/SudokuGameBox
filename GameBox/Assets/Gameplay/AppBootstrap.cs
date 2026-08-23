@@ -29,6 +29,33 @@ namespace Box.Gameplay
             ServiceLocator.RegisterAssets(new AddressablesAssetService()); // Phase 6:资源服务壳层
             L10n.Init(settings.Language); // 启动同步语言偏好 → 首屏即按偏好语言渲染(FR-17)
 
+            // ===== Phase 7 7-1:广告 / 内购接入(真实现 + #if 编译符号;无符号时自动回退 Stub) =====
+            // 说明:SUDOKU_IAP 已写入 ProjectSettings.asset(manifest 已声明 com.unity.purchasing 包);
+            // SUDOKU_ADMOB 需先导入 google_mobile_ads v11 .unitypackage,再执行 Editor 菜单
+            // 「Box/商业化/应用 AdMob+IAP 编译符号」(Phase7AdMobSetup.cs)后才会写入。
+            // 这样设计:未导入 AdMob 插件前代码可正常编译,不影响日常开发与 CI。
+#if SUDOKU_IAP
+            var iap = new UnityIapService(save); // 真实现:Google Play 商店连接 + 非消耗品 remove_ads
+#else
+            var iap = new IapServiceStub();      // 桩:模拟购买,便于无 SDK 环境跑通流程
+#endif
+            ServiceLocator.RegisterIap(iap);
+
+#if SUDOKU_ADMOB
+            var ads = new AdMobAdsService(save); // 真实现:UMP 同意 + 激励视频 + 插屏(频控)
+#else
+            var ads = new AdsServiceStub();      // 桩:直接"看完"并发放奖励,插屏按前 3 局简化频控
+#endif
+            ServiceLocator.RegisterAds(ads);
+
+            // 去广告链路(08 文档 §5.1):IAP 购买/恢复成功 → 广告服务置为去广告,此后不再展示任何广告
+            iap.PurchaseCompleted += () => ads.SetRemoveAds(true);
+
+            // 异步初始化:真实现中 AdMob 含 UMP 同意流程与广告预加载,IAP 异步连接商店。
+            // 初始化结果不影响启动流程(广告先弹后投、商店未就绪时购买按钮给出提示)。
+            ads.Initialize();
+            iap.Initialize();
+
             // 模块清单:Resources 兜底路径(Phase 6 迁 Addressables)。
             // 缺失时注册空清单,大厅入口静默不渲染(Editor 脚本 Phase45ModuleSetup 保证资产存在并入库)。
             var catalog = Resources.Load<ModuleCatalog>("Config/ModuleCatalog");

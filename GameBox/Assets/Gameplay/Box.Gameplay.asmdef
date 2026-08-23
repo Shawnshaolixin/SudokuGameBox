@@ -4,6 +4,8 @@
     "references": [
         "Box.ModuleFramework",
         "Box.Services.Abstractions",
+        "Box.Services.Ads",
+        "Box.Services.Iap",
         "Box.UI",
         "UniTask",
         "Unity.TextMeshPro",

@@ -85,6 +85,12 @@ namespace Box.Services
         /// <summary>资源服务(Phase 6 接入;AppBootstrap 注册后为 Addressables 壳层实现)。</summary>
         public static IAssetService Assets { get; private set; }
 
+        /// <summary>广告服务(Phase 7 7-1:真实现 AdMobAdsService / 未接入时 AdsServiceStub)。</summary>
+        public static IAdsService Ads { get; private set; }
+
+        /// <summary>内购服务(Phase 7 7-1:真实现 UnityIapService / 未接入时 IapServiceStub)。</summary>
+        public static IIapService Iap { get; private set; }
+
         /// <summary>服务是否已注册(运行时 AppBootstrap 注册后恒为 true)。</summary>
         public static bool IsReady => Save != null && Settings != null;
 
@@ -92,6 +98,18 @@ namespace Box.Services
         {
             Save = save;
             Settings = settings;
+        }
+
+        /// <summary>注册广告服务(含去广告/激励/插屏,玩法层通过 ServiceLocator.Ads 调用)。</summary>
+        public static void RegisterAds(IAdsService ads)
+        {
+            Ads = ads;
+        }
+
+        /// <summary>注册内购服务(去广告购买,玩法层通过 ServiceLocator.Iap 调用)。</summary>
+        public static void RegisterIap(IIapService iap)
+        {
+            Iap = iap;
         }
 
         /// <summary>注册资源服务(Phase 6:Addressables 壳层;热更侧只经本属性使用)。</summary>
@@ -106,6 +124,8 @@ namespace Box.Services
             Save = null;
             Settings = null;
             Assets = null;
+            Ads = null;
+            Iap = null;
         }
     }
 }
