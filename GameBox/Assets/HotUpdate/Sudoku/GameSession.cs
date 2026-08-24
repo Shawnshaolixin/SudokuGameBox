@@ -42,12 +42,24 @@ namespace Box.HotUpdate.Sudoku
         public int SelectedIndex { get; private set; } = -1;
         public InputMode Mode { get; private set; } = InputMode.Number;
         public int MistakeCount { get; private set; }
+
+        /// <summary>免费提示上限(04 文档:每局 3 次)。</summary>
         public int HintCount { get; } = 3;
+
+        /// <summary>广告回奖提示数(Phase 7:提示用尽后看激励视频获得,每局上限 MaxAdsBonusHints)。</summary>
+        public int AdsBonusHints { get; private set; }
+
+        /// <summary>每局广告提示上限(防刷:激励视频按次计费,过度提供会压 eCPM)。</summary>
+        public const int MaxAdsBonusHints = 2;
+
         public int HintsUsed { get; private set; }
         public bool IsFinished { get; private set; }
         public bool CanUndo => _undo.Count > 0;
         public bool CanRedo => _redo.Count > 0;
-        public bool CanUseHint => !IsFinished && HintsUsed < HintCount;
+        public bool CanUseHint => !IsFinished && HintsUsed < HintCount + AdsBonusHints;
+
+        /// <summary>是否还可请求广告提示(未完成且未达上限;频控在 AdsService 内部)。</summary>
+        public bool CanRequestAdHint => !IsFinished && AdsBonusHints < MaxAdsBonusHints;
 
         /// <summary>已用时长(未完成=实时,完成=冻结)。</summary>
         public float ElapsedSeconds => _finished ? _frozenSeconds : _clock.Now - _startTime;
@@ -148,10 +160,21 @@ namespace Box.HotUpdate.Sudoku
             BoardChanged?.Invoke();
         }
 
+        /// <summary>
+        /// 广告看完回奖 1 次提示(Phase 7:提示用尽后的激励视频链路)。
+        /// 调用方须先校验 CanRequestAdHint;回奖后 CanUseHint 恢复,视图刷新按钮即可用。
+        /// </summary>
+        public void GrantAdHint()
+        {
+            if (IsFinished || AdsBonusHints >= MaxAdsBonusHints) return; // 完成后/达上限不回奖
+            AdsBonusHints++;
+            BoardChanged?.Invoke();
+        }
+
         /// <summary>提示一步(优先逻辑单步);提示不占撤销栈,错误数不受影响(提示值必然正确)。</summary>
         public bool TryUseHint()
         {
-            if (IsFinished || HintsUsed >= HintCount) return false;
+            if (!CanUseHint) return false;
             if (!HintEngine.GetHint(Board, out var hint)) return false;
 
             int idx = SudokuBoard.Index(hint.Row, hint.Col);
@@ -161,7 +184,7 @@ namespace Box.HotUpdate.Sudoku
             HintsUsed++;
             BoardChanged?.Invoke();
             CheckFinish();
-            if (HintsUsed >= HintCount) HintExhausted?.Invoke();
+            if (!CanUseHint) HintExhausted?.Invoke();
             return true;
         }
 

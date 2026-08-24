@@ -21,7 +21,11 @@ namespace Box.Gameplay
         static readonly Color ThemeLightBg = new Color(0.94f, 0.94f, 0.92f, 0.98f);
         static readonly Color ThemeDarkBg = new Color(0.08f, 0.08f, 0.10f, 0.97f);
 
+        /// <summary>隐私政策 URL 占位(A6:账号 + GitHub Pages 就绪后替换为真实地址)。</summary>
+        const string PrivacyUrl = "https://YOUR_GITHUB_PAGES_URL/privacy-policy.html"; // TODO(A6): 替换真实 URL
+
         UIService _svc;
+        IIapService _iap;
         Image _bg;
         TextMeshProUGUI _title;
 
@@ -41,8 +45,34 @@ namespace Box.Gameplay
             Bind("ThemeButton", ToggleTheme);
             Bind("LangButton", ToggleLanguage);
             Bind("CloseButton", () => Close().Forget());
+
+            // Phase 7 7-1:去广告购买 + 隐私政策按钮
+            _iap = ServiceLocator.Iap;
+            if (_iap != null) _iap.PurchaseCompleted += OnPurchaseCompleted; // 购买成功 → 刷新按钮文案
+            Bind("RemoveAdsButton", OnRemoveAds);
+            Bind("PrivacyButton", OnPrivacy);
             return UniTask.CompletedTask;
         }
+
+        // 隐藏 MonoBehaviour.OnDestroy:退订防泄漏(sealed 类用 private new 避免 CS0628,同 GameplayView)
+        private new void OnDestroy()
+        {
+            if (_iap != null) _iap.PurchaseCompleted -= OnPurchaseCompleted;
+        }
+
+        /// <summary>去广告购买(非消耗品,已购幂等);成功后由 PurchaseCompleted 刷新文案。</summary>
+        void OnRemoveAds()
+        {
+            if (_iap != null && !_iap.IsRemoveAdsPurchased) _iap.BuyRemoveAds();
+        }
+
+        /// <summary>打开隐私政策页(浏览器,合规 FR-17/05 文档)。</summary>
+        void OnPrivacy()
+        {
+            Application.OpenURL(PrivacyUrl);
+        }
+
+        void OnPurchaseCompleted() => Refresh();
 
         protected override async UniTask OnShow(object args)
         {
@@ -107,6 +137,9 @@ namespace Box.Gameplay
             SetLabel("ThemeButton", L10n.Get(theme == 0 ? "settings.themeLight" : "settings.themeDark"));
             SetLabel("LangButton", L10n.Get(lang == "en" ? "settings.langEn" : "settings.langZh"));
             SetLabel("CloseButton", L10n.Get("settings.done"));
+            bool purchased = _iap != null && _iap.IsRemoveAdsPurchased;
+            SetLabel("RemoveAdsButton", L10n.Get(purchased ? "settings.removeAdsPurchased" : "settings.removeAds"));
+            SetLabel("PrivacyButton", L10n.Get("settings.privacy"));
 
             // 主题即时预览:弹窗背景色切换(玩法场景换肤属于全 UI 主题系统,v1.0 后置)
             if (_bg != null) _bg.color = theme == 0 ? ThemeLightBg : ThemeDarkBg;

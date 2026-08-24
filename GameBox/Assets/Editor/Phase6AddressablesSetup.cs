@@ -122,6 +122,48 @@ EditorUtility.SetDirty(settings);
         Debug.Log("[Phase6] Resources/UI 迁移完成 → " + GroupUiLocal + " (" + uiGroup.entries.Count + " entries)");
     }
 
+    /// <summary>
+    /// 注册 Assets/UI/Prefabs 下全部 prefab 到 UI_Local(Phase 7 后新增 prefab 走此入口,幂等):
+    /// 地址约定 = 相对 UI/Prefabs 的路径去扩展名(如 Popups/AdHintConfirm → "UI/Popups/AdHintConfirm")。
+    /// Phase 6 迁移表只覆盖当时 6 个资源;新增 prefab 直接放入 UI/Prefabs 后执行本方法即可被 Addressables 加载。
+    /// </summary>
+    [MenuItem("Box/Phase6/3. Ensure All UI Prefabs Registered")]
+    public static void EnsureUiRegistered()
+    {
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        if (settings == null)
+        {
+            EnsureSetup();
+            settings = AddressableAssetSettingsDefaultObject.Settings;
+        }
+        var uiGroup = settings.FindGroup(GroupUiLocal);
+        if (uiGroup == null)
+        {
+            Debug.LogError("[Phase6] 分组 " + GroupUiLocal + " 不存在,请先执行 EnsureSetup");
+            return;
+        }
+
+        const string prefabRoot = "Assets/UI/Prefabs";
+        const string addressPrefix = "UI/";
+        int added = 0;
+        foreach (var path in AssetDatabase.FindAssets("t:Prefab", new[] { prefabRoot }))
+        {
+            var assetPath = AssetDatabase.GUIDToAssetPath(path);
+            var guid = AssetDatabase.AssetPathToGUID(assetPath);
+            if (string.IsNullOrEmpty(guid) || settings.FindAssetEntry(guid) != null) continue; // 已入库
+            var entry = settings.CreateOrMoveEntry(guid, uiGroup, false);
+            if (entry == null) continue;
+            entry.address = addressPrefix + assetPath.Substring(prefabRoot.Length + 1)
+                .Replace(".prefab", "").Replace('\\', '/');
+            entry.labels.Add("UI");
+            added++;
+            Debug.Log("[Phase6] 新注册: " + assetPath + " → " + entry.address);
+        }
+        if (added > 0) EditorUtility.SetDirty(settings);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[Phase6] UI prefab 注册完成,新增 " + added + " 个 → " + GroupUiLocal);
+    }
+
     static void EnsureGroup(AddressableAssetSettings settings, string name, bool setAsDefault)
     {
         if (settings.FindGroup(name) != null) return;

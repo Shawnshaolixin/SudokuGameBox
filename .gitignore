@@ -11,6 +11,9 @@
 [Ll]ogs/
 [Bb]uild/
 [Bb]uilds/
+
+# 发布签名(Phase 7 7-3:上传密钥与证书公钥,密码纪律见 Build/keystore/README.md)
+Build/keystore/
 [Mm]emory[Cc]aptures/
 [Rr]ecordings/
 [Gg]radle/

@@ -171,6 +171,10 @@ namespace Box.HotUpdate.Sudoku
                     await UniTask.DelayFrame(1); // 防御:弹窗展示失败(资源缺失/路由占用)时 Action 不变,放行帧防同帧死循环(watchdog 断点)
             }
 
+            // 局间插屏候选点(Phase 7 7-1):结算弹窗关闭后展示,不打断结算阅读。
+            // 频控在 AdsService 内部(去广告零广告 / 前 3 局不弹 / 局间隔 4~6 分钟),桩实现同样生效。
+            ServiceLocator.Ads?.ShowInterstitial();
+
             if (result.Action == SettlementAction.Next)
             {
                 StartGame(GameContext.IsDaily
@@ -237,10 +241,51 @@ namespace Box.HotUpdate.Sudoku
             RefreshBoard();
         }
 
+        /// <summary>
+        /// 提示按钮(Phase 7 7-1 商业化接线):
+        /// 免费提示未用尽 → 直接用;用尽且未达广告提示上限 → 弹确认框 → 激励视频 → 回奖 1 次提示。
+        /// 广告提示链路(04 文档「提示币耗尽点提示」核心激励点;每局上限 MaxAdsBonusHints 防刷)。
+        /// </summary>
         void OnHint()
+        {
+            if (_session == null || _session.IsFinished) return;
+            if (_session.CanUseHint)
+            {
+                UseHint();
+                return;
+            }
+            if (!_session.CanRequestAdHint) return; // 已达广告提示上限:按钮置灰态(OnHintExhausted)
+            AskAdHint().Forget();
+        }
+
+        async UniTaskVoid AskAdHint()
+        {
+            if (_svc == null) return;
+            var dialog = await _svc.Router.PushAsync<BoxDialogView>("UI/Popups/AdHintConfirm");
+            if (dialog == null) return; // 资源缺失:放弃(提示按钮保持不可点)
+            dialog.SetTitle(L10n.Get("hint.ad.title"));
+            dialog.SetMessage(L10n.Format("hint.ad.message", GameSession.MaxAdsBonusHints));
+            dialog.OnCancel(() => _svc.Router.PopAsync().Forget());
+            dialog.OnConfirm(async () =>
+            {
+                await _svc.Router.PopAsync(); // 先关确认框,再展示激励视频
+                var ads = ServiceLocator.Ads;
+                if (ads == null) return;
+                ads.ShowRewardedAd(watched =>
+                {
+                    if (!watched || _session == null) return; // 中途关闭/未就绪:不发放
+                    if (!_session.CanRequestAdHint) return;
+                    _session.GrantAdHint(); // 回奖:提示数 +1,按钮恢复可点
+                    UseHint();
+                });
+            });
+        }
+
+        void UseHint()
         {
             if (_session != null && _session.TryUseHint())
                 _svc?.Router.Analytics?.LogEvent("sudoku.hint_used");
+            RefreshBoard(); // 回奖后同步按钮 interactable(HintExhausted 置灰 → 可点)
         }
 
         void OnHintExhausted()

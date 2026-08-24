@@ -94,6 +94,14 @@ public static class BuildScript
     {
         EditorUserBuildSettings.buildAppBundle = aab;
 
+        // Phase 7 7-3:上架产物(AAB)应用上传签名;密码经环境变量注入(CI 凭据模式),
+        // 构建完成立即清除 —— 防止密码写入 ProjectSettings.asset 进 git(15 号文档 §4.3 步骤 4)
+        bool signed = false;
+        if (aab)
+        {
+            signed = ApplyReleaseSigningIfAvailable();
+        }
+
         var ext = aab ? ".aab" : ".apk";
         var output = Path.Combine(OutputDir, "GameBox" + ext);
 
@@ -106,16 +114,62 @@ public static class BuildScript
             options = BuildOptions.None,
         };
 
-        var report = BuildPipeline.BuildPlayer(options);
-        var summary = report.summary;
-        if (summary.result == BuildResult.Succeeded)
+        try
         {
-            Debug.Log($"[BuildScript] SUCCESS -> {output} ({summary.totalSize / (1024f * 1024f):F1} MB)");
+            var report = BuildPipeline.BuildPlayer(options);
+            var summary = report.summary;
+            if (summary.result == BuildResult.Succeeded)
+            {
+                Debug.Log($"[BuildScript] SUCCESS -> {output} ({summary.totalSize / (1024f * 1024f):F1} MB)");
+            }
+            else
+            {
+                Debug.LogError($"[BuildScript] FAILED: {summary.result} ({summary.totalErrors} errors)");
+                EditorApplication.Exit(1);
+            }
         }
-        else
+        finally
         {
-            Debug.LogError($"[BuildScript] FAILED: {summary.result} ({summary.totalErrors} errors)");
-            EditorApplication.Exit(1);
+            if (signed) ClearReleaseSigning(); // 无论成败都清除密码字段
         }
+    }
+
+    /// <summary>
+    /// 应用上传签名(upload.keystore,Play App Signing 的 upload key):
+    /// keystore 存在于 Build/keystore 且环境变量 BOX_KEYSTORE_PASS 提供密码时生效;
+    /// 密码不进代码/不进 git,由本机环境或 Jenkins 凭据注入。
+    /// </summary>
+    static bool ApplyReleaseSigningIfAvailable()
+    {
+        var keystore = Path.GetFullPath("Build/keystore/upload.keystore");
+        if (!File.Exists(keystore))
+        {
+            Debug.Log("[BuildScript] 未找到上传 keystore,本次 AAB 使用 debug 签名(仅本地测试,不可上架)");
+            return false;
+        }
+        var storePass = System.Environment.GetEnvironmentVariable("BOX_KEYSTORE_PASS");
+        if (string.IsNullOrEmpty(storePass))
+        {
+            Debug.LogWarning("[BuildScript] 存在 upload.keystore 但未设置环境变量 BOX_KEYSTORE_PASS,跳过签名(AAB 不可上架)");
+            return false;
+        }
+
+        PlayerSettings.Android.useCustomKeystore = true;
+        PlayerSettings.Android.keystoreName = keystore;
+        PlayerSettings.Android.keystorePass = storePass;
+        PlayerSettings.Android.keyaliasName = "sudoku";
+        var keyPass = System.Environment.GetEnvironmentVariable("BOX_KEY_PASS");
+        PlayerSettings.Android.keyaliasPass = string.IsNullOrEmpty(keyPass) ? storePass : keyPass;
+        Debug.Log("[BuildScript] 已应用上传签名 upload.keystore(alias: sudoku)");
+        return true;
+    }
+
+    /// <summary>构建后清除签名密码字段(防泄露;签名时 apply 的密码仅本会话有效)。</summary>
+    static void ClearReleaseSigning()
+    {
+        PlayerSettings.Android.useCustomKeystore = false;
+        PlayerSettings.Android.keystorePass = string.Empty;
+        PlayerSettings.Android.keyaliasPass = string.Empty;
+        Debug.Log("[BuildScript] 已清除签名密码字段(useCustomKeystore=false,防入库)");
     }
 }

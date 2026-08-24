@@ -79,6 +79,9 @@ namespace Box.Services
             { "settings.langZh", "语言:中文" },
             { "settings.langEn", "语言:English" },
             { "settings.done", "完成" },
+            { "settings.removeAds", "去广告" },
+            { "settings.removeAdsPurchased", "去广告:已购买" },
+            { "settings.privacy", "隐私政策" },
 
             // 难度选择
             { "diff.title", "选择难度" },
@@ -100,6 +103,8 @@ namespace Box.Services
             { "game.hint", "提示" },
             { "game.back", "返回" },
             { "game.hintcount", "提示 {0}/{1}" },
+            { "hint.ad.title", "提示已用尽" },
+            { "hint.ad.message", "观看广告获得 1 次提示?本局最多可看 {0} 次" },
             { "game.time", "用时 {0}" },
             { "game.exit.title", "退出对局" },
             { "game.exit.message", "当前进度将丢失,确定退出?" },
@@ -135,6 +140,9 @@ namespace Box.Services
             { "settings.langZh", "Language: 中文" },
             { "settings.langEn", "Language: English" },
             { "settings.done", "Done" },
+            { "settings.removeAds", "Remove Ads" },
+            { "settings.removeAdsPurchased", "Remove Ads: Purchased" },
+            { "settings.privacy", "Privacy Policy" },
 
             // 难度选择
             { "diff.title", "Select Difficulty" },
@@ -156,6 +164,8 @@ namespace Box.Services
             { "game.hint", "Hint" },
             { "game.back", "Back" },
             { "game.hintcount", "Hints {0}/{1}" },
+            { "hint.ad.title", "Hints Exhausted" },
+            { "hint.ad.message", "Watch an ad for 1 more hint? Max {0} per game" },
             { "game.time", "Time {0}" },
             { "game.exit.title", "Quit Game" },
             { "game.exit.message", "Progress will be lost. Quit?" },

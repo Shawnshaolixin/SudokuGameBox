@@ -13,8 +13,9 @@ using UnityEngine.UI;
 /// </summary>
 public static class Phase4SceneSetup
 {
-    const string PrefabsDir = "Assets/Resources/UI";
-    const string PopupDir = "Assets/Resources/UI/Popups";
+    // Phase 6 已把 Resources/UI 迁至 Assets/UI/Prefabs(保 GUID,Addressables 地址 "UI/xxx"),生成器同步新路径
+    const string PrefabsDir = "Assets/UI/Prefabs";
+    const string PopupDir = "Assets/UI/Prefabs/Popups";
 
     [MenuItem("Box/Phase4/Build Scene Framework")]
     public static void Build()
@@ -25,8 +26,9 @@ public static class Phase4SceneSetup
         UpgradeSettlement();
         CreateDifficultySelect();
         CreateExitConfirm();
+        CreateAdHintConfirm(); // Phase 7:提示用尽 → 看广告再获提示 确认框
         AssetDatabase.SaveAssets();
-        Debug.Log("[Phase4] scene framework upgraded: MainMenu/Gameplay/Settlement + DifficultySelect + ExitConfirm");
+        Debug.Log("[Phase4] scene framework upgraded: MainMenu/Gameplay/Settlement + DifficultySelect + ExitConfirm + AdHintConfirm");
     }
 
     /// <summary>
@@ -195,6 +197,32 @@ public static class Phase4SceneSetup
         // 语义色:Confirm 红(退出,危险操作) Cancel 蓝
         var confirm = CreateButton(root.transform, "Confirm", "退出", new Vector2(-90, -120), new Vector2(240, 90));
         confirm.GetComponent<Image>().color = new Color(0.75f, 0.30f, 0.28f);
+        CreateButton(root.transform, "Cancel", "取消", new Vector2(90, -120), new Vector2(240, 90));
+
+        SavePrefab(root, path);
+    }
+
+    // ---- 广告提示确认弹窗(Phase 7 7-1:提示用尽后看激励视频,结构与 ExitConfirm 同构) ----
+
+    static void CreateAdHintConfirm()
+    {
+        var path = PopupDir + "/AdHintConfirm.prefab";
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
+
+        var root = new GameObject("AdHintConfirm", typeof(RectTransform), typeof(BoxDialogView), typeof(CanvasGroup));
+        var rt = root.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.sizeDelta = new Vector2(640, 400);
+        var bg = root.AddComponent<Image>();
+        bg.color = new Color(0.08f, 0.08f, 0.10f, 0.97f);
+
+        // 初始占位文案;运行时由 GameplayView.AskAdHint 按当前语言刷新(L10n)
+        CreateText(root.transform, "Title", "提示已用尽", new Vector2(0, 130), new Vector2(560, 80), 52, true);
+        CreateText(root.transform, "Message", "观看广告获得 1 次提示?", new Vector2(0, 20), new Vector2(560, 60), 34);
+        // 语义色:Confirm 橙黄(广告/激励操作) Cancel 蓝
+        var confirm = CreateButton(root.transform, "Confirm", "看广告", new Vector2(-90, -120), new Vector2(240, 90));
+        confirm.GetComponent<Image>().color = new Color(0.92f, 0.68f, 0.22f);
         CreateButton(root.transform, "Cancel", "取消", new Vector2(90, -120), new Vector2(240, 90));
 
         SavePrefab(root, path);

@@ -176,11 +176,13 @@ Play Console → 你的应用 → **App integrity / Setup → App signing** → 
 
 ### 4.4 验收清单
 
-- [ ] Android 平台 define = `SUDOKU_ADMOB;SUDOKU_IAP` 且编译无报错
-- [ ] 桩实现仍可编译（`##` 不定义符号时工程正常）
-- [ ] EditMode 回归 + PlayMode 冒烟（激励→回奖、去广告→零广告路径）全绿
-- [ ] 隐私政策页已生成并可托管访问（A6 后填真实 URL）
-- [ ] keystore 已生成、Unity 已配置、Build/keystore 已进 .gitignore
+> 状态更新（2026-08-24，Phase 7 收尾）：代码任务全部完成并通过验证；仅剩依赖账号的项。
+
+- [x] Android 平台 define = `SUDOKU_ADMOB;SUDOKU_IAP` 且编译无报错（2026-08-24 实测：符号已写入 ProjectSettings.asset，AdMob v11.4.0 插件导入后全量编译零错误）
+- [x] 桩实现仍可编译（`##` 不定义符号时工程正常）（桩保留在 StubServices.cs，`#else` 分支由 Phase 4~6 CI 持续验证）
+- [x] EditMode 回归 + PlayMode 冒烟（激励→回奖、去广告→零广告路径）全绿（2026-08-24：EditMode **153/153 全绿**，新增 GameSessionAdsHintTests(5) + CommerceTests(4)；PlayMode 未重跑，历史 3/3）
+- [x] 隐私政策页已生成并可托管访问（`docs/privacy-policy.html` 模板态，A6 后填真实 URL 并替换 SettingsView 占位地址）
+- [x] keystore 已生成、Unity 已配置、Build/keystore 已进 .gitignore（2026-08-24：upload.keystore + upload.cer + README；BuildScript 支持 `BOX_KEYSTORE_PASS` 环境变量注入签名，构建后自动清除密码字段防入库）
 - [ ] Data Safety / IARC 问卷核对完成（账号后提交）
 
 ---
@@ -189,9 +191,9 @@ Play Console → 你的应用 → **App integrity / Setup → App signing** → 
 
 | # | 事项 | 类型 | 说明 |
 |---|---|---|---|
-| G1 | 安装 `com.unity.purchasing` 4.12.x（改 Packages/manifest.json） | 授权 | 红线 7 要求 |
+| G1 | 安装 `com.unity.purchasing` 4.12.x（改 Packages/manifest.json） | 授权 | 红线 7 要求 —— ✅ 已完成（2026-08-23） |
 | G2 | D-4 玩法数量（v1.0 = 数独 + 井字棋）、D-9 AdMob 单栈 | 决策 | 文档 11 已给推荐值，沿用即可 |
-| G3 | keystore 现在生成（推荐）vs Phase 8 | 决策 | 见 4.3 步骤 1 |
+| G3 | keystore 现在生成（推荐）vs Phase 8 | 决策 | 见 4.3 步骤 1 —— ✅ 已生成（2026-08-24，占位密码见 Build/keystore/README.md，上架前请更换） |
 | G4 | 账号申请进度（A1~A7 均为延后项） | 用户操作 | 账号下来后逐项点亮 |
 
 ---
