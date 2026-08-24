@@ -37,7 +37,7 @@ namespace Box.HotUpdate.Sudoku.Tests
             var s = MakeSession();
 
             // 免费 3 次提示用尽
-            for (int i = 0; i < 3; i++) Assert.IsTrue(s.TryUseHint(), "免费提示第 {0} 次应成功", i + 1);
+            for (int i = 0; i < 3; i++) Assert.IsTrue(s.TryUseHint(out _), "免费提示第 {0} 次应成功", i + 1);
             Assert.IsFalse(s.CanUseHint, "免费提示用尽后不可再用");
             Assert.IsFalse(s.IsFinished, "8 洞谜题:提示 3 次后仍未完成");
             Assert.IsTrue(s.CanRequestAdHint);
@@ -47,7 +47,7 @@ namespace Box.HotUpdate.Sudoku.Tests
             Assert.AreEqual(1, s.AdsBonusHints);
             Assert.IsTrue(s.CanUseHint, "广告回奖后应恢复可用");
 
-            Assert.IsTrue(s.TryUseHint(), "广告回奖的提示应可使用");
+            Assert.IsTrue(s.TryUseHint(out _), "广告回奖的提示应可使用");
             Assert.AreEqual(4, s.HintsUsed);
         }
 
@@ -78,19 +78,19 @@ namespace Box.HotUpdate.Sudoku.Tests
             s.HintExhausted += () => exhaustedCount++;
 
             // 免费 3 次用尽:CanRequestAdHint 仍为 true → 不应触发 HintExhausted
-            for (int i = 0; i < 3; i++) Assert.IsTrue(s.TryUseHint(), "免费提示第 {0} 次应成功", i + 1);
+            for (int i = 0; i < 3; i++) Assert.IsTrue(s.TryUseHint(out _), "免费提示第 {0} 次应成功", i + 1);
             Assert.IsFalse(s.CanUseHint, "免费额度用尽");
             Assert.IsTrue(s.CanRequestAdHint, "仍可请求广告提示");
             Assert.AreEqual(0, exhaustedCount, "免费用尽不得置灰(应等待玩家点广告确认框)");
 
             // 回奖 1 次并用掉:额度 4/5,仍可再请求广告 → 不触发
             s.GrantAdHint();
-            Assert.IsTrue(s.TryUseHint(), "回奖提示应可用");
+            Assert.IsTrue(s.TryUseHint(out _), "回奖提示应可用");
             Assert.AreEqual(0, exhaustedCount, "广告回奖额度尚未用尽,仍不置灰");
 
             // 回奖第 2 次并用掉:5/5 总额度耗尽 → 恰好触发一次
             s.GrantAdHint();
-            Assert.IsTrue(s.TryUseHint(), "第 5 次提示应成功");
+            Assert.IsTrue(s.TryUseHint(out _), "第 5 次提示应成功");
             Assert.IsFalse(s.CanRequestAdHint, "广告上限 2 次已达");
             Assert.AreEqual(1, exhaustedCount, "总额度耗尽才触发一次 HintExhausted(按钮置灰)");
         }
@@ -105,7 +105,7 @@ namespace Box.HotUpdate.Sudoku.Tests
             // 免费 3 次 + 广告 2 次 = 5 次额度全部用尽 → HintExhausted 触发(计入广告回奖)
             s.GrantAdHint();
             s.GrantAdHint();
-            for (int i = 0; i < 5; i++) Assert.IsTrue(s.TryUseHint(), "第 {0} 次提示应成功", i + 1);
+            for (int i = 0; i < 5; i++) Assert.IsTrue(s.TryUseHint(out _), "第 {0} 次提示应成功", i + 1);
 
             Assert.IsFalse(s.CanUseHint);
             Assert.IsFalse(s.CanRequestAdHint);
@@ -116,7 +116,7 @@ namespace Box.HotUpdate.Sudoku.Tests
         public void AdHint_Request_BlockedAfterFinish()
         {
             var s = new GameSession(TestPuzzles.MakePuzzle(0), _clock); // 1 洞:1 次提示即完成
-            s.TryUseHint();
+            s.TryUseHint(out _);
 
             Assert.IsTrue(s.IsFinished);
             Assert.IsFalse(s.CanRequestAdHint, "局已完成后不可再请求广告提示");

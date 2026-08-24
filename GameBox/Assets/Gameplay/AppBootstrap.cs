@@ -51,6 +51,12 @@ namespace Box.Gameplay
             // 去广告链路(08 文档 §5.1):IAP 购买/恢复成功 → 广告服务置为去广告,此后不再展示任何广告
             iap.PurchaseCompleted += () => ads.SetRemoveAds(true);
 
+            // ===== Phase 8 体验打磨:音频系统(BGM 常驻 + SFX 池;开关联动设置页) =====
+            // 热更侧经 ServiceLocator.Audio(IAudioService)调用,实现细节(Addressables 加载/源池)在壳层。
+            var audio = new AudioManager(ServiceLocator.Assets, settings);
+            ServiceLocator.RegisterAudio(audio);
+            audio.Initialize(); // 创建常驻对象 + 按偏好播 BGM(主菜单常驻,对局不切)
+
             // 异步初始化:真实现中 AdMob 含 UMP 同意流程与广告预加载,IAP 异步连接商店。
             // 初始化结果不影响启动流程(广告先弹后投、商店未就绪时购买按钮给出提示)。
             ads.Initialize();

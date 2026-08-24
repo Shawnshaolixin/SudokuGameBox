@@ -110,34 +110,36 @@ namespace Box.HotUpdate.Sudoku
             Mode = Mode == InputMode.Number ? InputMode.Note : InputMode.Number;
         }
 
-        /// <summary>数字/笔记模式输入;再点同数=清除(旧工程规则)。</summary>
-        public void InputNumber(int number)
+        /// <summary>数字/笔记模式输入;再点同数=清除(旧工程规则)。返回是否实际产生输入(视图据此播填数音效)。</summary>
+        public bool InputNumber(int number)
         {
-            if (IsFinished || SelectedIndex < 0 || number < 1 || number > SudokuBoard.Size) return;
+            if (IsFinished || SelectedIndex < 0 || number < 1 || number > SudokuBoard.Size) return false;
             int idx = SelectedIndex;
-            if (IsGiven(idx)) return; // 给定格不可改
+            if (IsGiven(idx)) return false; // 给定格不可改
 
             if (Mode == InputMode.Note)
             {
                 ToggleNote(idx, number);
-                return;
+                return true;
             }
 
             int oldValue = Board[idx];
             if (oldValue == number)
             {
                 SetValue(idx, 0); // 再点同数=清除
-                return;
+                return true;
             }
             SetValue(idx, number);
+            return true;
         }
 
-        /// <summary>擦除当前格的值(笔记保留,便于重填)。</summary>
-        public void Erase()
+        /// <summary>擦除当前格的值(笔记保留,便于重填)。返回是否实际擦除(视图据此播擦除音效)。</summary>
+        public bool Erase()
         {
-            if (IsFinished || SelectedIndex < 0 || IsGiven(SelectedIndex)) return;
-            if (Board[SelectedIndex] == 0) return;
+            if (IsFinished || SelectedIndex < 0 || IsGiven(SelectedIndex)) return false;
+            if (Board[SelectedIndex] == 0) return false;
             SetValue(SelectedIndex, 0);
+            return true;
         }
 
         public void Undo()
@@ -171,9 +173,13 @@ namespace Box.HotUpdate.Sudoku
             BoardChanged?.Invoke();
         }
 
-        /// <summary>提示一步(优先逻辑单步);提示不占撤销栈,错误数不受影响(提示值必然正确)。</summary>
-        public bool TryUseHint()
+        /// <summary>
+        /// 提示一步(优先逻辑单步);提示不占撤销栈,错误数不受影响(提示值必然正确)。
+        /// hintIndex 输出被提示的格索引(视图据此在该格播放提示特效)。
+        /// </summary>
+        public bool TryUseHint(out int hintIndex)
         {
+            hintIndex = -1;
             if (!CanUseHint) return false;
             if (!HintEngine.GetHint(Board, out var hint)) return false;
 
@@ -182,6 +188,7 @@ namespace Box.HotUpdate.Sudoku
             Board[idx] = hint.Value;
             AutoClearPeerNotes(idx, hint.Value);
             HintsUsed++;
+            hintIndex = idx;
             BoardChanged?.Invoke();
             CheckFinish();
             // 仅在「免费 + 广告回奖」全部额度耗尽时才触发置灰事件;

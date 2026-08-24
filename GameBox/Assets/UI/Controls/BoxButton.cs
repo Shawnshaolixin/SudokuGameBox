@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using Box.Services;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -66,6 +67,9 @@ namespace Box.UI
         {
             if (_firing) return; // 防重入:回调内再次点击不递归
             _firing = true;
+            // 统一点击音(Phase 8 音频系统):棋盘格等密集网格 PressFeedbackEnabled=false 不响,
+            // 其选格音由玩法层单独负责(避免格子+数字盘双响)。
+            if (PressFeedbackEnabled) ServiceLocator.Audio?.PlaySfx(AudioSfx.Click);
             foreach (var cb in _clicks)
             {
                 try { cb(); }

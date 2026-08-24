@@ -91,6 +91,9 @@ namespace Box.Services
         /// <summary>内购服务(Phase 7 7-1:真实现 UnityIapService / 未接入时 IapServiceStub)。</summary>
         public static IIapService Iap { get; private set; }
 
+        /// <summary>音频服务(Phase 8 体验打磨:壳层 AudioManager 实现;热更侧只经本属性调用)。</summary>
+        public static IAudioService Audio { get; private set; }
+
         /// <summary>服务是否已注册(运行时 AppBootstrap 注册后恒为 true)。</summary>
         public static bool IsReady => Save != null && Settings != null;
 
@@ -118,6 +121,12 @@ namespace Box.Services
             Assets = assets;
         }
 
+        /// <summary>注册音频服务(Phase 8:壳层 AudioManager;热更侧只经本属性调用)。</summary>
+        public static void RegisterAudio(IAudioService audio)
+        {
+            Audio = audio;
+        }
+
         /// <summary>测试清理用(置空,防跨测试污染)。</summary>
         public static void Reset()
         {
@@ -126,6 +135,7 @@ namespace Box.Services
             Assets = null;
             Ads = null;
             Iap = null;
+            Audio = null;
         }
     }
 }

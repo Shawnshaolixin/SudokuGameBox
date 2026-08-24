@@ -222,7 +222,7 @@ namespace Box.HotUpdate.Sudoku.Tests
         [Test]
         public void Hint_Fills_Correct_Value()
         {
-            _session.TryUseHint();
+            _session.TryUseHint(out _);
 
             Assert.AreEqual(1, _session.HintsUsed);
             // 提示必正确:抽查被填格的值与解一致
@@ -238,7 +238,7 @@ namespace Box.HotUpdate.Sudoku.Tests
             int fired = 0;
             _session.HintExhausted += () => fired++;
 
-            for (int i = 0; i < 5; i++) _session.TryUseHint();
+            for (int i = 0; i < 5; i++) _session.TryUseHint(out _);
 
             Assert.AreEqual(3, _session.HintsUsed, "提示上限 3 次");
             Assert.IsFalse(_session.CanUseHint);

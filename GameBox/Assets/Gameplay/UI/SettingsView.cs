@@ -88,17 +88,24 @@ namespace Box.Gameplay
 
         // ---- 切换(读-翻转-写;ISettingsService setter 即时落盘) ----
 
+        // 开关经音频服务代理:写偏好 + 即时生效(BGM 停/续播)。无音频服务时(测试/启动早期)直接翻偏好兜底。
         void ToggleSound()
         {
             var s = ServiceLocator.Settings;
-            if (s != null) s.SoundEnabled = !s.SoundEnabled;
+            if (s == null) return;
+            var audio = ServiceLocator.Audio;
+            if (audio != null) audio.SetSoundEnabled(!s.SoundEnabled);
+            else s.SoundEnabled = !s.SoundEnabled;
             Refresh();
         }
 
         void ToggleMusic()
         {
             var s = ServiceLocator.Settings;
-            if (s != null) s.MusicEnabled = !s.MusicEnabled;
+            if (s == null) return;
+            var audio = ServiceLocator.Audio;
+            if (audio != null) audio.SetMusicEnabled(!s.MusicEnabled);
+            else s.MusicEnabled = !s.MusicEnabled;
             Refresh();
         }
 

@@ -39,6 +39,7 @@ namespace Box.HotUpdate.Sudoku
         {
             _svc = UIService.Instance;
             _board = transform.Find("BoardPlaceholder")?.gameObject;
+            FxPool.Init(); // 特效池预热(幂等;跨场景常驻)
             BuildBoardCells();
 
             _titleText = transform.Find("TitleText")?.GetComponent<BoxText>();
@@ -48,7 +49,10 @@ namespace Box.HotUpdate.Sudoku
             BindButton("ModeButton", out _modeBtn, OnMode);
             BindButton("UndoButton", out _undoBtn, () => _session?.Undo());
             BindButton("RedoButton", out _redoBtn, () => _session?.Redo());
-            BindButton("EraseButton", out _eraseBtn, () => _session?.Erase());
+            BindButton("EraseButton", out _eraseBtn, () =>
+            {
+                if (_session != null && _session.Erase()) PlaySfx(AudioSfx.Erase); // 实际擦除才响
+            });
             BindButton("HintButton", out _hintBtn, OnHint);
             BindButton("BackButton", out _, OnExitButton); // 左上角返回=退出对局(确认框);实体返回键仍=Undo
 
@@ -56,7 +60,15 @@ namespace Box.HotUpdate.Sudoku
             {
                 int n = i; // 闭包捕获
                 var btn = transform.Find("Num" + n)?.GetComponent<BoxButton>();
-                if (btn != null) btn.OnClick(() => _session?.InputNumber(n));
+                if (btn != null) btn.OnClick(() =>
+                {
+                    if (_session != null && _session.InputNumber(n))
+                    {
+                        PlaySfx(AudioSfx.Place); // 实际输入(含清格/笔记)才响
+                        FxPool.PlayBurst(FxPool.StarTex, CellWorldPos(_session.SelectedIndex), 12, 0.8f,
+                            new Color(0.65f, 0.82f, 1f)); // 填数反馈:淡蓝小星爆发
+                    }
+                });
             }
             return UniTask.CompletedTask;
         }
@@ -140,6 +152,8 @@ namespace Box.HotUpdate.Sudoku
         void OnGameFinished()
         {
             RefreshBoard();
+            PlaySfx(AudioSfx.Win); // TODO(试听):胜利音临时占位(switch 系列尾部),待正式 fanfare 替换
+            if (_board != null) FxPool.Celebrate(_board.transform.position); // 胜利庆祝:棋盘中心双爆发
             _svc?.Router.Analytics?.LogEvent("sudoku.level_complete");
 
             var result = new SettlementResult
@@ -283,8 +297,13 @@ namespace Box.HotUpdate.Sudoku
 
         void UseHint()
         {
-            if (_session != null && _session.TryUseHint())
+            if (_session != null && _session.TryUseHint(out int hintIdx))
+            {
+                PlaySfx(AudioSfx.Hint); // 提示落子轻音
+                FxPool.PlayBurst(FxPool.SparkTex, CellWorldPos(hintIdx), 16, 1f,
+                    new Color(1f, 0.85f, 0.4f)); // 提示反馈:金色火花出现在被提示格
                 _svc?.Router.Analytics?.LogEvent("sudoku.hint_used");
+            }
             RefreshBoard(); // 回奖后同步按钮 interactable(HintExhausted 置灰 → 可点)
         }
 
@@ -337,8 +356,12 @@ namespace Box.HotUpdate.Sudoku
                     var btn = go.GetComponent<Button>();
                     btn.transition = Selectable.Transition.None; // 格子不闪默认高亮
                     var boxBtn = go.GetComponent<BoxButton>();
-                    boxBtn.PressFeedbackEnabled = false; // 密集网格不做缩放反馈
-                    boxBtn.OnClick(() => _session?.SelectCell(index));
+                    boxBtn.PressFeedbackEnabled = false; // 密集网格不做缩放反馈(统一点击音也随之跳过,防格子+数字盘双响)
+                    boxBtn.OnClick(() =>
+                    {
+                        if (_session != null) _session.SelectCell(index);
+                        PlaySfx("click1"); // 选格轻点击音
+                    });
 
                     // 数字子节点:TMP 组件 + BoxText 同节点(BoxText.Awake 于 AddComponent 时 GetComponent,
                     // 顺序 TextMeshProUGUI 在前);缺 TMP 时 BoxText._text 为 null → 数字静默不显示
@@ -424,6 +447,16 @@ namespace Box.HotUpdate.Sudoku
         }
 
         // ---- 工具 ----
+
+        /// <summary>音效快捷方式(Phase 8 音频系统):经 IAudioService,短名常量见 AudioSfx。</summary>
+        static void PlaySfx(string name) => ServiceLocator.Audio?.PlaySfx(name);
+
+        /// <summary>格子 UI 世界坐标(overlay 下即屏幕位置;越界返回原点防空引用)。</summary>
+        Vector3 CellWorldPos(int index)
+        {
+            if (_cells == null || index < 0 || index >= _cells.Length) return Vector3.zero;
+            return _cells[index].transform.position;
+        }
 
         void BindButton(string path, out BoxButton btn, Action callback)
         {
