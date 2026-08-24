@@ -22,7 +22,7 @@ namespace Box.Gameplay
         static readonly Color ThemeDarkBg = new Color(0.08f, 0.08f, 0.10f, 0.97f);
 
         /// <summary>隐私政策 URL 占位(A6:账号 + GitHub Pages 就绪后替换为真实地址)。</summary>
-        const string PrivacyUrl = "https://YOUR_GITHUB_PAGES_URL/privacy-policy.html"; // TODO(A6): 替换真实 URL
+        const string PrivacyUrl = "https://shawnshaolixin.github.io/SudokuGameBox/privacy-policy.html"; // TODO(A6): 替换真实 URL
 
         UIService _svc;
         IIapService _iap;

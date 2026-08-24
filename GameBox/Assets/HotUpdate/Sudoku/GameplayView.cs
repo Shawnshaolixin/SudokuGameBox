@@ -397,7 +397,9 @@ namespace Box.HotUpdate.Sudoku
 
             if (_undoBtn != null) _undoBtn.SetInteractable(_session.CanUndo);
             if (_redoBtn != null) _redoBtn.SetInteractable(_session.CanRedo);
-            if (_hintBtn != null) _hintBtn.SetInteractable(_session.CanUseHint);
+            // 提示按钮:免费额度可用或仍可请求广告回奖额度时保持可点;
+            // 否则(两者皆耗尽)置灰——修复:免费用尽后仍应可点,点击走广告确认框(Phase 7)。
+            if (_hintBtn != null) _hintBtn.SetInteractable(_session.CanUseHint || _session.CanRequestAdHint);
             RefreshHintText(); // L10n:提示 x/y
             var modeLabel = _modeBtn != null ? _modeBtn.transform.Find("Label")?.GetComponent<BoxText>() : null;
             if (modeLabel != null)

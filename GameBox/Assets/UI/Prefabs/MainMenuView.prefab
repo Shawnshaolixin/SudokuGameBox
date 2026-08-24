@@ -446,6 +446,7 @@ GameObject:
   - component: {fileID: 8327916669084913118}
   - component: {fileID: 3004704318824127453}
   - component: {fileID: 7803678898617007734}
+  - component: {fileID: 4642409199011552368}
   m_Layer: 0
   m_Name: MainMenuView
   m_TagString: Untagged
@@ -502,6 +503,18 @@ CanvasGroup:
   m_Interactable: 1
   m_BlocksRaycasts: 1
   m_IgnoreParentGroups: 0
+--- !u!114 &4642409199011552368
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3844077977107250446}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 288d8ee4d8b5c2c4d8918c247f7d16c9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Box.UI::Box.UI.SafeAreaFitter
 --- !u!1 &4735230032006465631
 GameObject:
   m_ObjectHideFlags: 0
@@ -824,8 +837,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: -170}
-  m_SizeDelta: {x: 420, y: 90}
+  m_AnchoredPosition: {x: 400, y: 850}
+  m_SizeDelta: {x: 240, y: 88}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1062789082368128706
 CanvasRenderer:
@@ -988,7 +1001,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Daily Challenge
+  m_text: "\u6BCF\u65E5\u6311\u6218"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
   m_sharedMaterial: {fileID: 1966347448997178423, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}

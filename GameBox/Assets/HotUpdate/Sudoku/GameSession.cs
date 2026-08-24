@@ -184,7 +184,9 @@ namespace Box.HotUpdate.Sudoku
             HintsUsed++;
             BoardChanged?.Invoke();
             CheckFinish();
-            if (!CanUseHint) HintExhausted?.Invoke();
+            // 仅在「免费 + 广告回奖」全部额度耗尽时才触发置灰事件;
+            // 仅免费用尽(CAN 请求广告)时保持可点,让视图弹广告确认框(Phase 7 激励视频链路)。
+            if (!CanUseHint && !CanRequestAdHint) HintExhausted?.Invoke();
             return true;
         }
 

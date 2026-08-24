@@ -65,6 +65,36 @@ namespace Box.HotUpdate.Sudoku.Tests
             Assert.AreEqual(2, s.AdsBonusHints, "超限回奖应无效果");
         }
 
+        /// <summary>
+        /// 回归测试(Phase 7 修复):免费用尽但尚可请求广告时,不得触发置灰事件——
+        /// 否则提示按钮直接变灰,广告确认框永远弹不出来(用户报告的 bug)。
+        /// 只有「免费+广告」总额度(3+2=5)耗尽才触发一次,按钮才允许置灰。
+        /// </summary>
+        [Test]
+        public void FreeHints_Exhausted_NoEvent_UntilTotalUsed()
+        {
+            var s = MakeSession();
+            int exhaustedCount = 0;
+            s.HintExhausted += () => exhaustedCount++;
+
+            // 免费 3 次用尽:CanRequestAdHint 仍为 true → 不应触发 HintExhausted
+            for (int i = 0; i < 3; i++) Assert.IsTrue(s.TryUseHint(), "免费提示第 {0} 次应成功", i + 1);
+            Assert.IsFalse(s.CanUseHint, "免费额度用尽");
+            Assert.IsTrue(s.CanRequestAdHint, "仍可请求广告提示");
+            Assert.AreEqual(0, exhaustedCount, "免费用尽不得置灰(应等待玩家点广告确认框)");
+
+            // 回奖 1 次并用掉:额度 4/5,仍可再请求广告 → 不触发
+            s.GrantAdHint();
+            Assert.IsTrue(s.TryUseHint(), "回奖提示应可用");
+            Assert.AreEqual(0, exhaustedCount, "广告回奖额度尚未用尽,仍不置灰");
+
+            // 回奖第 2 次并用掉:5/5 总额度耗尽 → 恰好触发一次
+            s.GrantAdHint();
+            Assert.IsTrue(s.TryUseHint(), "第 5 次提示应成功");
+            Assert.IsFalse(s.CanRequestAdHint, "广告上限 2 次已达");
+            Assert.AreEqual(1, exhaustedCount, "总额度耗尽才触发一次 HintExhausted(按钮置灰)");
+        }
+
         [Test]
         public void AllHints_Exhausted_FiresEvent_AfterAdsBonus()
         {
