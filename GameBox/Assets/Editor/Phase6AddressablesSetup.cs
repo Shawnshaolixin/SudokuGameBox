@@ -164,6 +164,65 @@ EditorUtility.SetDirty(settings);
         Debug.Log("[Phase6] UI prefab 注册完成,新增 " + added + " 个 → " + GroupUiLocal);
     }
 
+    /// <summary>
+    /// 注册 Assets/Art 下的美术/音频资源到 Art_Audio 分组(Phase 7 收尾后首包资源入口,幂等):
+    /// 覆盖 t:AudioClip(ogg) 与 t:Texture2D(png),地址约定 = "Art/" + 相对路径去扩展名,
+    /// 如 Art/Audio/SFX/click1 → 运行时经 Addressables.LoadAssetAsync<AudioClip>("Art/Audio/SFX/click1") 加载。
+    /// 资源文件放入 Assets/Art/{Audio,Effects,UI} 后执行本方法即可被 Addressables 引用(首包内,不依赖远程)。
+    /// </summary>
+    [MenuItem("Box/Phase6/4. Ensure Art Assets Registered")]
+    public static void RegisterArtAssets()
+    {
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        if (settings == null)
+        {
+            EnsureSetup();
+            settings = AddressableAssetSettingsDefaultObject.Settings;
+        }
+        var artGroup = settings.FindGroup(GroupArtAudio);
+        if (artGroup == null)
+        {
+            Debug.LogError("[Phase6] 分组 " + GroupArtAudio + " 不存在,请先执行 EnsureSetup");
+            return;
+        }
+
+        const string artRoot = "Assets/Art";
+        const string addressPrefix = "Art/";
+        int added = 0;
+        // 只注册 AudioClip 与 Texture2D(跳过文件夹/其他资源类型)
+        foreach (var type in new[] { "t:AudioClip", "t:Texture2D" })
+        {
+            foreach (var guid in AssetDatabase.FindAssets(type, new[] { artRoot }))
+            {
+                var assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                // Texture2D 会命中同目录 .meta?不会——FindAssets 只返回主资源;但 sprite 子资源不入库
+                if (!assetPath.StartsWith(artRoot)) continue;
+                if (settings.FindAssetEntry(guid) != null) continue; // 已入库
+                var entry = settings.CreateOrMoveEntry(guid, artGroup, false);
+                if (entry == null) continue;
+                // 地址去扩展名(ogg/wav/png),运行时按 "Art/..." 不带扩展名加载
+                entry.address = addressPrefix + assetPath.Substring(artRoot.Length + 1)
+                    .Replace(".ogg", "").Replace(".wav", "").Replace(".png", "").Replace('\\', '/');
+                entry.labels.Add("Art");
+                added++;
+                Debug.Log("[Phase6] 新注册: " + assetPath + " → " + entry.address);
+            }
+        }
+
+        // 清理已失效条目(源文件被删除的资源从分组移除,防残留地址误导)
+        var stale = artGroup.entries
+            .Where(e => string.IsNullOrEmpty(AssetDatabase.GUIDToAssetPath(e.guid)))
+            .ToList();
+        foreach (var e in stale)
+        {
+            artGroup.RemoveAssetEntry(e);
+            Debug.Log("[Phase6] 清理失效条目: " + e.address);
+        }
+        if (added > 0) EditorUtility.SetDirty(settings);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[Phase6] Art 资源注册完成,新增 " + added + " 个 → " + GroupArtAudio + " (共 " + artGroup.entries.Count + " entries)");
+    }
+
     static void EnsureGroup(AddressableAssetSettings settings, string name, bool setAsDefault)
     {
         if (settings.FindGroup(name) != null) return;

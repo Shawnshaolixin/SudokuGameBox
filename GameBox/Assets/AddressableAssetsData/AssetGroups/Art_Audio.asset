@@ -14,7 +14,499 @@ MonoBehaviour:
   m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
   m_GroupName: Art_Audio
   m_GUID: 6d517158608709642ac8e29ff60110f3
-  m_SerializeEntries: []
+  m_SerializeEntries:
+  - m_GUID: 0951b03e34ead7d449bc11453f795549
+    m_Address: Art/Audio/SFX/switch36
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 095b9a0cd37ef2947a2fcd21547d39b5
+    m_Address: Art/Audio/SFX/switch34
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0b71f49ca8cc35c4594661ece6eb5607
+    m_Address: Art/UI/Buttons/play_btn
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 10b4aa1e55a348447998d8f05070e60a
+    m_Address: Art/Audio/SFX/switch37
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 11c8485de958bbe408d8a128dadbcfbc
+    m_Address: Art/UI/Buttons/button_rectangle_depth_flat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1202c47454e1c5147b749df8fd2e860a
+    m_Address: Art/Audio/SFX/click2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 13d2a52956c877d418f85e2252a9fc5c
+    m_Address: Art/Audio/SFX/mouserelease1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 143f9573cb2ba70468b6fb44cfb255d0
+    m_Address: Art/UI/Panels/button_square_depth_border
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 159c8ebe11e10354daba2bf11e24429b
+    m_Address: Art/Audio/SFX/switch3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 17408c0d482be0e47a12664de2c816c8
+    m_Address: Art/Audio/SFX/rollover2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1dbbc480d56c736408b5c447151ea82d
+    m_Address: Art/UI/Panels/play111
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2091d94461742b845a3509531485d996
+    m_Address: Art/Audio/SFX/switch28
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 230d7eb7deb2ae94db18c0f3be7a2c1a
+    m_Address: Art/UI/Icons/icon_cross
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 23acdb601e0b69449bcbfe5e01690a52
+    m_Address: Art/Effects/Particles/spark_01
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2772821b537594141adcb1feef234302
+    m_Address: Art/UI/Icons/icon_circle
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2bdd44524998c6648bcf06b227961ab0
+    m_Address: Art/UI/Buttons/button_round_depth_flat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2cb252d2068da114fae2e1d0d8f3e5b4
+    m_Address: Art/Audio/SFX/switch9
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2e6fb9d64a49a494f9a78824fb1fbc25
+    m_Address: Art/Audio/SFX/switch4
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 353af7c32644f03408d9e3c4b57c7c09
+    m_Address: Art/Audio/SFX/click1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 387ca69a25c7ba74b9dea699a37ccb70
+    m_Address: Art/Audio/SFX/switch10
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3c5aebc9bbc9f1b4fa8bd36ea6e7b3f7
+    m_Address: Art/Effects/Particles/magic_02
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 40fce0b42eda7054b857fc88843d7c4b
+    m_Address: Art/UI/Icons/arrow_basic_e
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 45182d4f5429ca8448fb885e24494846
+    m_Address: Art/Audio/SFX/rollover4
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4b07f58e2f4ea4d44aaef950804000d1
+    m_Address: Art/Audio/SFX/click5
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4feed55fc7ee2704ba00f15f51a2ca91
+    m_Address: Art/UI/Icons/icon_outline_cross
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 53822161f67948e49bcd1e30b8981905
+    m_Address: Art/Audio/SFX/switch16
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5488d005e05df0d4884eb32dd2e9d1c8
+    m_Address: Art/Audio/SFX/switch17
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5856cbfb0f573b542871919f29090e6c
+    m_Address: Art/Effects/Particles/circle_02
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 59dac36499f93d24daf7a9ba65c7f454
+    m_Address: Art/Audio/SFX/switch12
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5de581438c3e1ed42ae453312baf8b58
+    m_Address: Art/UI/Icons/arrow_basic_w
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5f7820f11d0b1db4ebf043387336070e
+    m_Address: Art/Effects/Particles/spark_04
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6064535f91170024aa81a9dfc8be5f37
+    m_Address: Art/Audio/SFX/rollover1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 612330f53b4dff5458d7027b9eb7bdfb
+    m_Address: Art/Audio/SFX/switch8
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 62f988edeba08c444be85f5402687f20
+    m_Address: Art/UI/Buttons/playtest
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 63e00accb799eb044b55a6f11cc0ab3f
+    m_Address: Art/Audio/SFX/switch38
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6508c3af79219fc4b92e63e2ad54fa2f
+    m_Address: Art/Audio/SFX/switch27
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 657390e69eba01d4bad17de2ae7e85a9
+    m_Address: Art/UI/Icons/icon_outline_checkmark
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 65d12edb6c5384b478f4dbfaa2c9c1c5
+    m_Address: Art/Audio/SFX/switch29
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 673df42a8d3eb9341bc1e30f601317e0
+    m_Address: Art/Audio/SFX/switch35
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6b1232c6bea151044893d233bd17ed64
+    m_Address: Art/Audio/SFX/switch26
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6d3e54e5854ff8147a4172e1ed65c569
+    m_Address: Art/Audio/SFX/switch13
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7062e19951842104d9d353ff94bc9339
+    m_Address: Art/Audio/SFX/switch33
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 76f5e1ac3a679f14ca6f13c219b018c1
+    m_Address: Art/Audio/SFX/switch15
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7a5bd136505997246aa79f7930481ee0
+    m_Address: Art/Audio/SFX/switch7
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7c89133585f6a314fa5efe544d88807e
+    m_Address: Art/Audio/SFX/switch11
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7f40f166f4c7d9845997a69803e83b59
+    m_Address: Art/Effects/Particles/light_01
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7fbd364e3b997e24b88c6e645ae94448
+    m_Address: Art/Audio/SFX/switch18
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 84c37479fc416704485680f381739776
+    m_Address: Art/Effects/Particles/flare_01
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8671d548493ef5d45acbd139a2af8e3e
+    m_Address: Art/Audio/SFX/switch5
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 86cd8c035358eba43a65ff45ab5e078c
+    m_Address: Art/Audio/SFX/switch32
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 90c55088306cd794fa15d19620761734
+    m_Address: Art/UI/Buttons/button_rectangle_depth_gradient
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 938e95296f3f0d940873224cf58dde30
+    m_Address: Art/Audio/SFX/mouseclick1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 93e2669f6bd86164c9bf6bd4365abe90
+    m_Address: Art/Audio/SFX/switch19
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 945456f5e49efd0468c2354b6bd72178
+    m_Address: Art/Audio/SFX/switch24
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 978bb9a9864acd9429d52e5f38c6b78e
+    m_Address: Art/Audio/SFX/switch23
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 99228011501d15f44aa67c8df2c9910f
+    m_Address: Art/Audio/SFX/switch1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a3c001a0c167f4b4d801f0b7cfe2cbe4
+    m_Address: Art/Effects/Particles/star_01
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a643d0d767d899e478f4ab24138bc886
+    m_Address: Art/Effects/Particles/circle_01
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a8b549d4e37eb6c46a7ae046986520b4
+    m_Address: Art/Audio/SFX/switch2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a8f98928cb19e4148841ffcc4f519b7f
+    m_Address: Art/Audio/SFX/rollover3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aa0967bd434b8f84cbde770dc2f4c0dd
+    m_Address: Art/Audio/SFX/click4
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: aad406b860e1076418012fabd79f342c
+    m_Address: Art/Audio/SFX/rollover5
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bce489dec1297d647ba2f26f6bedea6b
+    m_Address: Art/Audio/SFX/switch30
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bceead14e9afffa4b84ef2d22687cec6
+    m_Address: Art/Audio/BGM/bgm_main
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bf9043e150dbaba42907aa1227b3edce
+    m_Address: Art/Audio/SFX/switch14
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c0a777c4c4802fe479dbd5f3aecf4b4c
+    m_Address: Art/UI/Panels/button_rectangle_depth_border
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c1930cda26d22d94dad3923e2d3d99c1
+    m_Address: Art/Audio/SFX/switch31
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c4c42fe56f668f64a91ef8512ba95709
+    m_Address: Art/Audio/SFX/switch22
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c9143e61636965745bacf870239f17f8
+    m_Address: Art/Audio/SFX/switch25
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ca0890f85d340514f8d59c8d4e8d7bab
+    m_Address: Art/Audio/SFX/click3
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cf1050503d8ab8f41a43245a703959c4
+    m_Address: Art/Audio/SFX/switch6
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d06503ccbb413134abed6f2718780a97
+    m_Address: Art/Audio/SFX/rollover6
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d9a6739f2046fa0418baec5ab5ee6199
+    m_Address: Art/UI/Buttons/button_rectangle_gloss
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dbf77b57c171c0b4cbb4ff839fbd9038
+    m_Address: Art/Effects/Particles/star_04
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dc1b6c81d62ae4f46affcd890f717dec
+    m_Address: Art/Audio/SFX/switch21
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ddab7ab427b7fb341a35c719543fc64b
+    m_Address: Art/Effects/Particles/magic_01
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e8c6dea24bea9b7408046de40cd1c320
+    m_Address: Art/UI/Icons/icon_checkmark
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f09a176ce728702479a69cac11c33558
+    m_Address: Art/UI/Icons/playtest1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f2e0e2cf30360d345bb046117f28ba79
+    m_Address: Art/UI/Buttons/button_square_depth_flat
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f511ab5cbe996404ab1d55963245e8e0
+    m_Address: Art/UI/Icons/icon2
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f6e9a5f021f88504b9d89c6da5a1aea8
+    m_Address: Art/Audio/SFX/switch20
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: fd8afc70a1e262f42b4d63c120148161
+    m_Address: Art/UI/Icons/check_round_grey_circle
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 68b66f896e1f0094f97398d17cf2c77b, type: 2}
   m_SchemaSet:
