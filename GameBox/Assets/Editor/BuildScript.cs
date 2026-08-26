@@ -93,13 +93,22 @@ public static class BuildScript
     static void BuildAndroidInternal(string[] scenes, bool aab)
     {
         EditorUserBuildSettings.buildAppBundle = aab;
+        EnsureJdkConfigured(); // 无头构建兜底 JDK 偏好(见方法注释)
 
         // Phase 7 7-3:上架产物(AAB)应用上传签名;密码经环境变量注入(CI 凭据模式),
         // 构建完成立即清除 —— 防止密码写入 ProjectSettings.asset 进 git(15 号文档 §4.3 步骤 4)
+        // AAB 必须带上传签名:签名不可用直接中止构建,拒绝静默产出 debug 签名包
+        // (2026-08-26 曾静默回退 debug 签名被 Play Console 拒收)
         bool signed = false;
         if (aab)
         {
             signed = ApplyReleaseSigningIfAvailable();
+            if (!signed)
+            {
+                Debug.LogError("[BuildScript] AAB 未应用上传签名,中止构建(拒绝产出 debug 签名包)");
+                EditorApplication.Exit(1);
+                return;
+            }
         }
 
         var ext = aab ? ".aab" : ".apk";
@@ -141,16 +150,21 @@ public static class BuildScript
     /// </summary>
     static bool ApplyReleaseSigningIfAvailable()
     {
-        var keystore = Path.GetFullPath("Build/keystore/upload.keystore");
+        // keystore 固定在仓库根 Build/keystore(与 GameBox 工程平级,.gitignore 忽略)。
+        // 不能用相对 CWD 的路径:CLI 启动的 CWD 因调用方而异(编辑器菜单=工程目录/CI=工作区),
+        // 解析错会静默回退 debug 签名(2026-08-26 Play 拒收事故根因)。
+        var projectRoot = new DirectoryInfo(Application.dataPath).Parent!; // .../GameBox
+        var repoRoot = projectRoot.Parent!;                                // 仓库根
+        var keystore = Path.Combine(repoRoot.FullName, "Build", "keystore", "upload.keystore");
         if (!File.Exists(keystore))
         {
-            Debug.Log("[BuildScript] 未找到上传 keystore,本次 AAB 使用 debug 签名(仅本地测试,不可上架)");
+            Debug.LogError($"[BuildScript] 未找到上传 keystore:{keystore}");
             return false;
         }
         var storePass = System.Environment.GetEnvironmentVariable("BOX_KEYSTORE_PASS");
         if (string.IsNullOrEmpty(storePass))
         {
-            Debug.LogWarning("[BuildScript] 存在 upload.keystore 但未设置环境变量 BOX_KEYSTORE_PASS,跳过签名(AAB 不可上架)");
+            Debug.LogError("[BuildScript] 存在 upload.keystore 但未设置环境变量 BOX_KEYSTORE_PASS");
             return false;
         }
 
@@ -162,6 +176,28 @@ public static class BuildScript
         PlayerSettings.Android.keyaliasPass = string.IsNullOrEmpty(keyPass) ? storePass : keyPass;
         Debug.Log("[BuildScript] 已应用上传签名 upload.keystore(alias: sudoku)");
         return true;
+    }
+
+    /// <summary>
+    /// 无头构建兜底:batchmode 下 JDK 偏好为空时 Android 构建直接报 "JDK not found"
+    /// (GUI 编辑器会自动兜底内置 OpenJDK,batchmode 不会,2026-08-26 CLI 构建实测;
+    /// 偏好键 JdkPath 取自 UnityEditor.Android.Extensions.dll 反编译确认)。
+    /// 与 NDK 走 ANDROID_NDK_ROOT 同理(见 Jenkinsfile),构建前把内置 OpenJDK 写入 EditorPrefs。
+    /// </summary>
+    static void EnsureJdkConfigured()
+    {
+        if (!string.IsNullOrEmpty(EditorPrefs.GetString("JdkPath"))) return;
+        var editorRoot = Path.GetDirectoryName(EditorApplication.applicationPath);
+        var bundledJdk = Path.Combine(editorRoot, "Data", "PlaybackEngines", "AndroidPlayer", "OpenJDK");
+        if (Directory.Exists(bundledJdk))
+        {
+            EditorPrefs.SetString("JdkPath", bundledJdk);
+            Debug.Log($"[BuildScript] JDK 偏好为空,已写入内置 OpenJDK:{bundledJdk}");
+        }
+        else
+        {
+            Debug.LogError($"[BuildScript] 未找到内置 OpenJDK:{bundledJdk},请在 Preferences → External Tools 手动配置");
+        }
     }
 
     /// <summary>构建后清除签名密码字段(防泄露;签名时 apply 的密码仅本会话有效)。</summary>

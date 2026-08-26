@@ -59,6 +59,12 @@
 - 禁止在未编译验证（或 Console 仍有报错）时就汇报"完成"。
 - 禁止提交带编译错误的代码。
 
+## 规则 4：Android 发布构建必须走 AAB 构建指南（要求）
+
+任何 agent 执行 Android AAB 发布构建（上架 Google Play 的 release 包）时，必须先读
+`docs/17_AAB发布构建指南.md` 并按步骤执行：环境变量注入签名密码、构建后验证产物签名
+（jarsigner 须为 `CN=SudokuGameBox`）、**禁止产出或交付 debug 签名包**。
+
 ## 适用范围
 
 - 本文件是唯一权威规则来源；`CLAUDE.md` 与 `.github/copilot-instructions.md` 仅为入口，引用本文件，不重复维护内容。
