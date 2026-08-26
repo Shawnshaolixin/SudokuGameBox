@@ -33,6 +33,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UI
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7ed10e0d8f177924daa0ddfdc93ba5dc
+    m_Address: UI/Fonts/MiSans-Regular-Subset SDF
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 86e1fbc11f2f4f64ebbd0cdf3ebb4708
     m_Address: UI/Popups/MoreGamesPopup
     m_ReadOnly: 0
@@ -51,6 +57,12 @@ MonoBehaviour:
     m_SerializedLabels:
     - UI
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b8f5b6f8fc4a96a4fb646a0158e0cfe4
+    m_Address: UI/Fonts/MiSans-Bold-Subset
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c24d016dc7c667b42be870a8a0bb6f4f
     m_Address: UI/GameplayView
     m_ReadOnly: 0
@@ -59,6 +71,18 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d3ab740af3f7980478fcebdbfb710ddc
     m_Address: UI/Popups/DifficultySelect
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e7ddac0221a63e84fa8c90d1da5127e7
+    m_Address: UI/Fonts/MiSans-Bold-Subset SDF
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f53d11c33c355a84fb13d07cc935d0a5
+    m_Address: UI/Fonts/MiSans-Regular-Subset
     m_ReadOnly: 0
     m_SerializedLabels:
     - UI

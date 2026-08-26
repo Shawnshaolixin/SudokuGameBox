@@ -63,7 +63,14 @@ namespace Box.Gameplay
         /// <summary>去广告购买(非消耗品,已购幂等);成功后由 PurchaseCompleted 刷新文案。</summary>
         void OnRemoveAds()
         {
-            if (_iap != null && !_iap.IsRemoveAdsPurchased) _iap.BuyRemoveAds();
+            if (_iap == null) return;
+            if (!_iap.IsInitialized)
+            {
+                // 商店未初始化(无 GMS/网络不可达):明确反馈,避免"点了没反应"(Phase 9)
+                BoxToast.Show(L10n.Get("iap.notReady"));
+                return;
+            }
+            if (!_iap.IsRemoveAdsPurchased) _iap.BuyRemoveAds();
         }
 
         /// <summary>打开隐私政策页(浏览器,合规 FR-17/05 文档)。</summary>

@@ -2,7 +2,8 @@
     "name": "Box.Services.Ads",
     "rootNamespace": "Box.Services",
     "references": [
-        "Box.Services.Abstractions"
+        "Box.Services.Abstractions",
+        "UniTask"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -34,7 +34,13 @@ namespace Box.Services
             IsRemoveAdsPurchased = _save.GetModule<CommerceData>(CommerceModuleId)?.RemoveAdsPurchased ?? false;
         }
 
-        /// <summary>初始化商店并按 Google Play 商店配置商品（主线程、启动时调用一次）。</summary>
+        /// <summary>
+        /// 初始化商店并按 Google Play 商店配置商品（主线程、启动时调用一次）。
+        /// TODO(A4 上架流程):Unity IAP 4.12 要求先初始化 Unity Gaming Services
+        /// (UnityServices.InitializeAsync + ProjectSettings.cloudProjectId 绑定 Unity Dashboard)。
+        /// 当前阶段(未上架/未配置 UGS)真机初始化会失败(NoProductsAvailable),属预期限制,
+        /// 由 UI 层 Toast「商店暂不可用」兜底;上架 Play 内部测试轨道后按 TODO 补齐即可真机购买。
+        /// </summary>
         public void Initialize()
         {
             if (IsInitialized)

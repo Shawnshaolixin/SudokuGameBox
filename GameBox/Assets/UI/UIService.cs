@@ -65,14 +65,21 @@ namespace Box.UI
         }
 
         /// <summary>
-        /// UGUI 点击必需;Scene 场景未自带 EventSystem 时兜底创建。
+        /// UGUI 点击必需;场景未自带 EventSystem 时兜底创建(Phase 9 修复:常驻跨场景)。
+        /// 背景:本项目场景资产(MainMenu/Gameplay)此前各自带 EventSystem,
+        /// 而本方法在 BeforeSceneLoad 时执行——场景对象尚未加载,检测不到场景内置的
+        /// EventSystem,导致启动场景出现 2 个 EventSystem(Unity 官方要求恰好 1 个,
+        /// 多例会让 current 竞争,点击事件偶发丢失)。
+        /// 修复:创建时 DontDestroyOnLoad 常驻,并删除场景资产中的 EventSystem,
+        /// 任意时刻全局唯一。
         /// 项目为 New-only 输入(模板默认,6000.3 起 Android 不支持 Both),
         /// 故用 InputSystemUIInputModule 而非 StandaloneInputModule。
         /// </summary>
         static void EnsureEventSystem()
         {
             if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null) return;
-            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+            var go = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
+            UnityEngine.Object.DontDestroyOnLoad(go); // 跨场景常驻:热更场景切换不重建
         }
 
         /// <summary>逐帧监听 Android 返回键(Escape,新输入系统,无 InputAction 资产零配置)。</summary>

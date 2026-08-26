@@ -1,5 +1,7 @@
 #if SUDOKU_ADMOB
 using System;
+using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using GoogleMobileAds;
 using GoogleMobileAds.Api;
 using GoogleMobileAds.Ump.Api;
@@ -17,8 +19,24 @@ namespace Box.Services
     public sealed class AdMobAdsService : IAdsService
     {
         // 官方测试广告位 ID（15 号文档 §2 约定）；AdMob 账号（A2）与广告单元申请下来后替换。
-        private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
-        private const string InterstitialAdUnitId = "ca-app-pub-3940256099942544/1033173712";
+        // 注意:测试位 ID 在任何设备上都只返回测试广告(零收入,无违规风险),开发阶段无需注册测试设备;
+        // 换成真实广告位 ID 后,必须把真机注册为测试设备(见 TestDeviceIds),否则会被判定无效流量。
+        private const string RewardedAdUnitId = "ca-app-pub-6367116322180531/5022991846";
+        private const string InterstitialAdUnitId = "ca-app-pub-6367116322180531/4813896836";
+
+        // 真机测试设备 ID 列表(换真实广告位后的必做项,Phase 9):
+        // 真机首次请求广告后,logcat 会打印
+        //   Use RequestConfiguration.Builder().setTestDeviceIds(...) to get test ads on this device
+        // 把其中的设备 ID 填入下方数组,该设备将始终收到测试广告。
+        // 已填入:用户 OPPO 真机(2026-08-25 从老包 logcat 取得,设备级 ID 跨应用相同);
+        // 新设备首次请求广告后按 logcat 提示补充。填入后广告初始化前生效。
+        private static readonly List<string> TestDeviceIds = new() { "AAC1C00E2A99B28A43349D7BD59ADE49" };
+
+        // UMP 同意流程开关(Phase 9 真机):GDPR 只约束欧洲(EEA)用户,中国用户不需要同意表单。
+        // 真机实测:UMP 访问 consent.google.com 在国内网络会挂起,原生调用阻塞导致广告初始化
+        // 迟迟不执行(15 秒超时兜底都来不及触发)。测试期默认关闭,直接初始化广告;
+        // 上架面向欧美市场时置回 true 并确保 UMP 表单在 AdMob 后台「隐私与消息」已配置。
+        private const bool UmpEnabled = false;
 
         private const string CommerceModuleId = "box.commerce"; // D-7 存档分区：去广告状态
 
@@ -27,6 +45,18 @@ namespace Box.Services
 
         private RewardedAd _rewardedAd;      // 当前就绪的激励视频实例（展示完成后置空并预加载下一个）
         private InterstitialAd _interstitialAd; // 当前就绪的插屏实例
+
+        // 激励视频失败延迟重试(Phase 9 真机:国内网络访问 Google 广告服务器偶发超时,
+        // 插屏成功/激励 Internal error 即此类抖动;官方防限流:不在失败回调内立即重试,
+        // 而是延迟低频补加载)。
+        // 策略:前 2 次 60 秒快速重试,之后转为 5 分钟一次持续重试(不封顶)——测试位/网络
+        // 恢复后广告自动就绪,无需用户操作。官方测试位曾出现数小时 Internal error 波动,
+        // 短窗口重试会耗尽导致广告永久不可用。
+        private const int MaxRewardedRetry = 2;
+        private const int RewardedRetryIntervalSec = 60;   // 快速重试间隔
+        private const int RewardedRetryLongSec = 300;      // 持续重试间隔(5 分钟)
+        private int _rewardedRetryCount;
+        private bool _retryPending; // 防重入:已有重试在排队时不再追加(避免多路并发加载)
 
         public bool IsInitialized { get; private set; }
 
@@ -46,6 +76,9 @@ namespace Box.Services
         /// <summary>
         /// 初始化：UMP 更新同意状态并（需要时）展示同意表单，随后初始化 AdMob 并预加载两类广告。
         /// 必须在主线程启动时调用一次。
+        /// UMP 加 15 秒超时兜底(Phase 9 真机):国内网络访问 consent.google.com 偶发挂起,
+        /// 回调链卡住会导致 MobileAds.Initialize 永不执行、广告永不出(老项目无 UMP 因此正常);
+        /// 超时直接跳过同意流程初始化广告,测试位广告展示不受影响。
         /// 警告：不要在广告加载失败回调里立刻重试（官方建议，防止限流）；重试只发生在展示关闭后。
         /// </summary>
         public void Initialize()
@@ -56,8 +89,35 @@ namespace Box.Services
                 return;
             }
 
-            // —— 第一步：UMP 同意流程（GDPR/美国州法地区首次启动会弹表单，其余地区静默通过）——
-            // 参考官方示例：GoogleMobileAdsConsentController.GatherConsent() 的流程。
+            // —— 第零步:注册真机测试设备(TestDeviceIds 非空时生效;测试位 ID 阶段可跳过)——
+            if (TestDeviceIds.Count > 0)
+            {
+                var requestConfiguration = new RequestConfiguration
+                {
+                    TestDeviceIds = TestDeviceIds,
+                };
+                MobileAds.SetRequestConfiguration(requestConfiguration);
+                Debug.Log($"[AdMob] 已注册 {TestDeviceIds.Count} 台真机测试设备");
+            }
+
+            if (UmpEnabled)
+            {
+                // UMP 启用时走同意流程(带超时兜底);关闭时直接初始化(非 EEA 用户不需要)
+                UmpFlowWithTimeout().Forget();
+            }
+            else
+            {
+                InitializeAds();
+            }
+        }
+
+        /// <summary>
+        /// UMP 同意流程带超时(确定性兜底):Update →(需要时)表单 → 回调链结束或 15 秒超时,一律进入广告初始化。
+        /// 用 UniTask.WhenAny 竞速:表单流程回调(flow) vs 15 秒定时器,先完成者决定流程走向。
+        /// </summary>
+        async UniTaskVoid UmpFlowWithTimeout()
+        {
+            var flow = new UniTaskCompletionSource();
             var requestParameters = new ConsentRequestParameters { TagForUnderAgeOfConsent = false };
             ConsentInformation.Update(requestParameters, updateError =>
             {
@@ -67,7 +127,7 @@ namespace Box.Services
                     Debug.LogWarning($"[AdMob] UMP 更新同意状态失败：{updateError.Message}");
                 }
 
-                // —— 第二步：需要同意时才展示表单；表单展示/关闭后进入广告初始化 ——
+                // 需要同意时才展示表单；表单展示/关闭后进入广告初始化
                 ConsentForm.LoadAndShowConsentFormIfRequired(formError =>
                 {
                     if (formError != null)
@@ -75,9 +135,18 @@ namespace Box.Services
                         // 表单展示失败一般不影响广告（依赖上轮同意状态），仅告警
                         Debug.LogWarning($"[AdMob] UMP 同意表单展示失败：{formError.Message}");
                     }
-                    InitializeAds();
+                    flow.TrySetResult(); // 表单流程走完(无论成败),进入初始化
                 });
             });
+
+            int idx = await UniTask.WhenAny(flow.Task,
+                UniTask.Delay(TimeSpan.FromSeconds(15), ignoreTimeScale: true));
+            if (idx == 1)
+            {
+                // 回调链 15 秒未走完:国内网络访问同意服务挂起,跳过同意流程直接初始化
+                Debug.LogWarning("[AdMob] UMP 同意流程 15 秒超时,跳过直接初始化广告(国内网络兜底)");
+            }
+            InitializeAds();
         }
 
         /// <summary>初始化 AdMob 并预加载激励视频与插屏（UMP 表单流程完成后调用）。</summary>
@@ -184,14 +253,41 @@ namespace Box.Services
             {
                 if (error != null)
                 {
-                    Debug.LogWarning($"[AdMob] 激励视频加载失败：{error.GetMessage()}");
-                    return; // 不在失败回调中立刻重试（官方建议）
+                    // 输出错误码便于诊断(code=0 即 Internal error,多为网络超时/测试位波动)
+                    Debug.LogWarning($"[AdMob] 激励视频加载失败：code={error.GetCode()} {error.GetMessage()}");
+                    ScheduleRewardedRetry();
+                    return;
                 }
 
+                _rewardedRetryCount = 0; // 加载成功,重置重试计数
                 _rewardedAd = ad;
                 BindLifecycleEvents(ad);
                 Debug.Log("[AdMob] 激励视频加载成功");
             });
+        }
+
+        /// <summary>
+        /// 激励视频加载失败的延迟重试(网络抖动/测试位波动缓解)。
+        /// 前 MaxRewardedRetry 次 60 秒快速重试,之后 5 分钟一次持续重试直到加载成功——
+        /// 测试位或网络恢复后广告自动就绪。防重入:已有重试排队时不追加。
+        /// 官方建议「不在失败回调内立即重试」防限流——延迟低频重试不冲突。
+        /// </summary>
+        private async UniTaskVoid ScheduleRewardedRetry()
+        {
+            if (_retryPending)
+            {
+                return; // 已有重试在排队,避免多路并发加载同一单元
+            }
+
+            _retryPending = true;
+            var delaySec = _rewardedRetryCount < MaxRewardedRetry
+                ? RewardedRetryIntervalSec
+                : RewardedRetryLongSec;
+            _rewardedRetryCount++;
+            Debug.Log($"[AdMob] 激励视频第 {_rewardedRetryCount} 次延迟重试({delaySec}s)");
+            await UniTask.Delay(TimeSpan.FromSeconds(delaySec), ignoreTimeScale: true);
+            _retryPending = false;
+            LoadRewardedAd(); // 若仍失败会再次进入本方法,直到成功
         }
 
         /// <summary>绑定激励视频生命周期事件：收费上报（埋点）、点击、打开、关闭、展示失败。</summary>
@@ -230,7 +326,7 @@ namespace Box.Services
             {
                 if (error != null)
                 {
-                    Debug.LogWarning($"[AdMob] 插屏加载失败：{error.GetMessage()}");
+                    Debug.LogWarning($"[AdMob] 插屏加载失败：code={error.GetCode()} {error.GetMessage()}");
                     return; // 不在失败回调中立刻重试（官方建议）
                 }
 

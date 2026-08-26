@@ -275,6 +275,13 @@ namespace Box.HotUpdate.Sudoku
         async UniTaskVoid AskAdHint()
         {
             if (_svc == null) return;
+            // 广告未就绪(无 GMS/加载失败)时直接提示,不再弹确认框空等(Phase 9 真机反馈)
+            var ads = ServiceLocator.Ads;
+            if (ads != null && !ads.IsRewardedReady)
+            {
+                BoxToast.Show(L10n.Get("hint.ad.unavailable"));
+                return;
+            }
             var dialog = await _svc.Router.PushAsync<BoxDialogView>("UI/Popups/AdHintConfirm");
             if (dialog == null) return; // 资源缺失:放弃(提示按钮保持不可点)
             dialog.SetTitle(L10n.Get("hint.ad.title"));

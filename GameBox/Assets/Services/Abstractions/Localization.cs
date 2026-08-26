@@ -82,6 +82,7 @@ namespace Box.Services
             { "settings.removeAds", "去广告" },
             { "settings.removeAdsPurchased", "去广告:已购买" },
             { "settings.privacy", "隐私政策" },
+            { "iap.notReady", "商店暂不可用,请稍后重试" },
 
             // 难度选择
             { "diff.title", "选择难度" },
@@ -105,6 +106,7 @@ namespace Box.Services
             { "game.hintcount", "提示 {0}/{1}" },
             { "hint.ad.title", "提示已用尽" },
             { "hint.ad.message", "观看广告获得 1 次提示?本局最多可看 {0} 次" },
+            { "hint.ad.unavailable", "广告暂不可用,请稍后重试" },
             { "game.time", "用时 {0}" },
             { "game.exit.title", "退出对局" },
             { "game.exit.message", "当前进度将丢失,确定退出?" },
@@ -143,6 +145,7 @@ namespace Box.Services
             { "settings.removeAds", "Remove Ads" },
             { "settings.removeAdsPurchased", "Remove Ads: Purchased" },
             { "settings.privacy", "Privacy Policy" },
+            { "iap.notReady", "Store not ready. Try again later." },
 
             // 难度选择
             { "diff.title", "Select Difficulty" },
@@ -166,6 +169,7 @@ namespace Box.Services
             { "game.hintcount", "Hints {0}/{1}" },
             { "hint.ad.title", "Hints Exhausted" },
             { "hint.ad.message", "Watch an ad for 1 more hint? Max {0} per game" },
+            { "hint.ad.unavailable", "Ads not ready. Try again later." },
             { "game.time", "Time {0}" },
             { "game.exit.title", "Quit Game" },
             { "game.exit.message", "Progress will be lost. Quit?" },
