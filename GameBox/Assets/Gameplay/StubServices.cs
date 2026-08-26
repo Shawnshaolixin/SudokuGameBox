@@ -101,6 +101,11 @@ namespace Box.Gameplay
     /// </summary>
     public sealed class AnalyticsServiceStub : IAnalyticsService
     {
+        public void Initialize()
+        {
+            Debug.Log("[AnalyticsStub] 已初始化(未接入 Firebase,埋点走桩实现)");
+        }
+
         public void LogEvent(string eventName)
         {
             Debug.Log($"[AnalyticsStub] 事件:{eventName}");

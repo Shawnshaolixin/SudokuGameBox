@@ -18,7 +18,7 @@
 | Google User Messaging Platform | 单独提 | **随 AdMob 插件内置，无需单独安装** | 08 文档 §4.4 的 UMP 代码改为插件自带 API |
 | Unity IAP（com.unity.purchasing） | v4.x（如 4.12.x） | **保持 v4.x（4.12.x，Unity 6 Verified）** | Unity 官方 Registry 直接安装；v5 仍是新主线的过渡，暂不引入 |
 | External Dependency Manager | 手动装 | **随 AdMob 插件自带（1.2.188）** | 导入后运行 `Assets → External Dependency Manager → Android → Resolve` 即可 |
-| Firebase | v12.x | **Phase 11 再核对，本次不引入** | 链路③埋点留运营期（08 文档 §6） |
+| Firebase | v12.x | **13.15.0 已接入（2026-08，封闭测试前提前落地）** | 本地 tgz 经 manifest 引入（08 文档 §6 已同步更新） |
 
 > ⚠️ **API 差异提示**：08 文档 §4.4 的代码讲解基于 v8 事件名（`OnUserEarnedReward` 等）。
 > v9 起事件签名从 `EventHandler<T>` 改为 `Action<T>`，v11 进一步整合为统一事件回调。
@@ -78,7 +78,7 @@ SUDOKU_ADMOB;SUDOKU_IAP
 |---|---|---|
 | `GameBox/Assets/Services/Ads/AdMobAdsService.cs`（新建） | 实现 `IAdsService`：`Initialize`、`ShowRewardedAd`、插屏管理、`IsAdsRemoved` | v11 API：`MobileAds.Initialize`（主线程）、`RewardedAd.Load` + 统一事件回调、`InterstitialAd`；UMP：`ConsentInformation.Update` → `ConsentForm.LoadAndShowConsentFormIfRequired`；频控（新用户前 3 局零插屏、局间隔 4~6 分钟、去广告零广告） |
 | `GameBox/Assets/Services/Iap/UnityIapService.cs`（新建） | 实现 `IIapService`：`Initialize`、`BuyRemoveAds`、`RestorePurchases`、`PurchaseCompleted` 事件 | v4 API：`ConfigurationBuilder` + `StandardPurchasingModule.Instance(AppStore.GooglePlay)` + `IDetailedStoreListener`；商品 `remove_ads` 非消耗型；启动时收据校验自动恢复 |
-| `GameBox/Assets/Services/Analytics/`（本次不建） | — | 链路③ Firebase 留 Phase 11，继续用 `AnalyticsServiceStub` |
+| `GameBox/Assets/Services/Analytics/FirebaseAnalyticsService.cs`（已建） | 实现 `IAnalyticsService`：Analytics 埋点 + Crashlytics 非致命上报 | 链路③ Firebase 已提前接入（2026-08）：`#if SUDOKU_FIREBASE` 真实现；未定义符号仍自动回退 `AnalyticsServiceStub` |
 | `GameBox/Assets/Gameplay/AppBootstrap.cs`（修改） | 按 `#if SUDOKU_ADMOB / SUDOKU_IAP` 用真实现替换 AdMob/IAP 的 Stub 注册 | 当前 Bootstrap 只传 `AnalyticsServiceStub`，Ads/Iap 由调用方从 `ServiceLocator` 取；需补注册真实现 |
 | `GameBox/Assets/Gameplay/StubServices.cs` | 保持不动 | 桩实现保留：未定义符号时仍可跑通流程 |
 | 存档接入（改） | "去广告"状态写入 D-7 存档分区（如 `box.commerce`），不再用 Stub 的 PlayerPrefs 键 | 需与存档 Service 约定分区读写接口；D-7 是 AES-GCM 单文件存档 |

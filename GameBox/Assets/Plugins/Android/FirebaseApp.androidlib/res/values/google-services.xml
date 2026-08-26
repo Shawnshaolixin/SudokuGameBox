@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@string/gcm_defaultSenderId,@string/google_storage_bucket,@string/project_id,@string/google_api_key,@string/google_crash_reporting_api_key,@string/google_app_id">
+  <string name="gcm_defaultSenderId" translatable="false">739234381401</string>
+  <string name="google_storage_bucket" translatable="false">sudokugamebox.firebasestorage.app</string>
+  <string name="project_id" translatable="false">sudokugamebox</string>
+  <string name="google_api_key" translatable="false">AIzaSyBRIWFF3ErciJmmCra_gjetGPkOKqZOK6E</string>
+  <string name="google_crash_reporting_api_key" translatable="false">AIzaSyBRIWFF3ErciJmmCra_gjetGPkOKqZOK6E</string>
+  <string name="google_app_id" translatable="false">1:739234381401:android:c1295f6c7042448a37bb48</string>
+</resources>

@@ -57,6 +57,10 @@
         "com.unity.modules.wind": "1.0.0",
         "com.unity.modules.xr": "1.0.0",
         "com.unity.pipeline": "0.5.0-exp.1",
+        "com.google.external-dependency-manager": "file:com.google.external-dependency-manager-1.2.188.tgz",
+        "com.google.firebase.app": "file:com.google.firebase.app-13.15.0.tgz",
+        "com.google.firebase.analytics": "file:com.google.firebase.analytics-13.15.0.tgz",
+        "com.google.firebase.crashlytics": "file:com.google.firebase.crashlytics-13.15.0.tgz",
         "com.cysharp.unitask": "file:Packages/com.cysharp.unitask"
     }
 }

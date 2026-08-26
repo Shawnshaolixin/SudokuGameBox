@@ -6,6 +6,7 @@
         "Box.Services.Abstractions",
         "Box.Services.Ads",
         "Box.Services.Iap",
+        "Box.Services.Analytics",
         "Box.UI",
         "UniTask",
         "Unity.TextMeshPro",

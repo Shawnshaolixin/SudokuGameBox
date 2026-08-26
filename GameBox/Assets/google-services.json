@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "739234381401",
+    "project_id": "sudokugamebox",
+    "storage_bucket": "sudokugamebox.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:739234381401:android:c1295f6c7042448a37bb48",
+        "android_client_info": {
+          "package_name": "com.lixingames.rovilo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBRIWFF3ErciJmmCra_gjetGPkOKqZOK6E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

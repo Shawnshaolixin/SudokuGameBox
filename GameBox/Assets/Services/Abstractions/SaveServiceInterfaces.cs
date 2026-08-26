@@ -94,6 +94,9 @@ namespace Box.Services
         /// <summary>音频服务(Phase 8 体验打磨:壳层 AudioManager 实现;热更侧只经本属性调用)。</summary>
         public static IAudioService Audio { get; private set; }
 
+        /// <summary>分析服务(Phase 11 前置:真实现 FirebaseAnalyticsService / 未接入时 AnalyticsServiceStub)。</summary>
+        public static IAnalyticsService Analytics { get; private set; }
+
         /// <summary>服务是否已注册(运行时 AppBootstrap 注册后恒为 true)。</summary>
         public static bool IsReady => Save != null && Settings != null;
 
@@ -127,6 +130,12 @@ namespace Box.Services
             Audio = audio;
         }
 
+        /// <summary>注册分析服务(埋点/崩溃;玩法层经 ServiceLocator.Analytics 调用)。</summary>
+        public static void RegisterAnalytics(IAnalyticsService analytics)
+        {
+            Analytics = analytics;
+        }
+
         /// <summary>测试清理用(置空,防跨测试污染)。</summary>
         public static void Reset()
         {
@@ -136,6 +145,7 @@ namespace Box.Services
             Ads = null;
             Iap = null;
             Audio = null;
+            Analytics = null;
         }
     }
 }

@@ -53,6 +53,9 @@ namespace Box.Services
     /// </summary>
     public interface IAnalyticsService
     {
+        /// <summary>初始化分析服务(真实现为异步依赖修复,桩实现为日志)。</summary>
+        void Initialize();
+
         void LogEvent(string eventName);
         void LogEvent(string eventName, string parameterName, object parameterValue);
         void LogNonFatal(string message);

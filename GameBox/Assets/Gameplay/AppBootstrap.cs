@@ -17,9 +17,20 @@ namespace Box.Gameplay
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Boot()
         {
+            // ===== 分析服务(Phase 11 前置:Firebase 提前接入,2026-08 拍板) =====
+            // 真实现需 SUDOKU_FIREBASE 符号(编辑器菜单「Box/商业化/应用 Firebase 编译符号」,
+            // FirebaseSetup.cs)与 Assets/google-services.json;未定义符号时自动回退桩(事件打印 Console),
+            // 不影响日常开发与 CI。UIService 构造即需要分析服务,故在视图装配前创建。
+#if SUDOKU_FIREBASE
+            var analytics = new FirebaseAnalyticsService();
+#else
+            var analytics = new AnalyticsServiceStub();
+#endif
+            ServiceLocator.RegisterAnalytics(analytics); // 玩法层/壳层经 ServiceLocator.Analytics 上报
+
             // Phase 6:视图加载切 Addressables(资源在 Resources → Addressables 分组,见 Phase6AddressablesSetup);
             // 模块清单(ModuleCatalog)体积 <1KB、启动链路过短,保留 Resources 兜底为遗留,Phase 9 再清理。
-            var ui = new UIService(new AddressablesViewLoader(), new AnalyticsServiceStub());
+            var ui = new UIService(new AddressablesViewLoader(), analytics);
             UIService.Register(ui);
 
             // Phase 5:存档 + 偏好(构造即加载;主/备损坏自动回退重建,不阻塞启动)
@@ -57,10 +68,12 @@ namespace Box.Gameplay
             ServiceLocator.RegisterAudio(audio);
             audio.Initialize(); // 创建常驻对象 + 按偏好播 BGM(主菜单常驻,对局不切)
 
-            // 异步初始化:真实现中 AdMob 含 UMP 同意流程与广告预加载,IAP 异步连接商店。
+            // 异步初始化:真实现中 AdMob 含 UMP 同意流程与广告预加载,IAP 异步连接商店,
+            // Firebase 异步修复依赖(埋点在就绪前静默丢弃)。
             // 初始化结果不影响启动流程(广告先弹后投、商店未就绪时购买按钮给出提示)。
             ads.Initialize();
             iap.Initialize();
+            analytics.Initialize();
 
             // 模块清单:Resources 兜底路径(Phase 6 迁 Addressables)。
             // 缺失时注册空清单,大厅入口静默不渲染(Editor 脚本 Phase45ModuleSetup 保证资产存在并入库)。
