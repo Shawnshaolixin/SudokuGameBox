@@ -125,3 +125,6 @@ GameBox/Assets/Plugins/Android/*.androidlib.meta
 _art_originals_backup/
 rovilo_slices/
 rovilo_ui_layers/
+
+# Firebase 等 UPM 本地包 tgz(官方仅 tgz 分发,大体积不入库,clone 后需手动放置)
+GameBox/Packages/*.tgz
