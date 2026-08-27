@@ -22,16 +22,25 @@ description: 构建可上架的 Android AAB(上传签名 + 签名验证)。当�
 | NDK | r27c，需环境变量 `ANDROID_NDK_ROOT=D:/Projects/AI/AndroidNDK/android-ndk-r27c` |
 | JDK | 内置 OpenJDK，本机已设 `JdkUseEmbedded=1`（注册表 `HKCU\Software\Unity Technologies\Unity Editor 5.x`，GUI 等价于 Preferences → External Tools 选 "JDK installed with Unity"） |
 | Gradle | `D:\Tools\gradle-9.1.0`（GUI 偏好已存，无需处理） |
-| 产物 | `GameBox/Build/Android/GameBox.aab`（约 57 MB） |
+| 产物 | `GameBox/Build/Android/Rovilo.aab`（约 57 MB） |
 | 耗时 | 10~20 分钟（IL2CPP 全量），建议后台运行 |
 
 ## 构建步骤
 
-### 1. 检查 Unity 编辑器未占用工程
+### 1. 确认版本号已 +1（必须，否则 Play Console 拒收）
+
+Google Play 要求 `versionCode` 严格递增，**每次构建必须比 Console 上已存在的最新版本号大 1**。
+
+1. 询问用户 Play Console 当前最大的 versionCode（或用户自行确认）；
+2. 检查 `GameBox/ProjectSettings/ProjectSettings.asset` 的 `AndroidBundleVersionCode`；
+3. 若 `< Console 最新 + 1`，先改该字段（`AndroidBundleVersionCode: N`），**确认后再构建**；
+4. 已经启动的构建若版本号不对，必须停止重建（构建启动时会快照版本号，中途改不生效）。
+
+### 2. 检查 Unity 编辑器未占用工程
 
 编辑器开着本工程会导致 lock 冲突。检查 `GameBox/Temp/UnityLockfile` 是否存在；存在则请用户关闭编辑器再继续。
 
-### 2. 注入环境变量并启动 CLI 构建（关键！）
+### 3. 注入环境变量并启动 CLI 构建（关键！）
 
 ```bash
 export BOX_KEYSTORE_PASS="SudokuGameBox_Upload_2026"   # 必须与 Build/keystore/README.md 一致
@@ -47,7 +56,7 @@ export ANDROID_NDK_ROOT="D:/Projects/AI/AndroidNDK/android-ndk-r27c"
 - 密码经环境变量注入：**不要**把密码写进命令行/脚本/git
 - 若要本地测试 APK：`BuildScript.BuildAndroidApk`（APK 无需签名）
 
-### 3. 验证（必须做，构建成功 ≠ 签名正确）
+### 4. 验证（必须做，构建成功 ≠ 签名正确）
 
 ```bash
 # ① 日志确认签名分支生效（而非 debug 回退）
@@ -55,14 +64,14 @@ grep "已应用上传签名" "d:/Projects/AI/SudokuGameBox/Build/Logs/release-aa
 
 # ② jarsigner 验产物证书
 "C:/Program Files/Unity/Hub/Editor/6000.3.20f1/Editor/Data/PlaybackEngines/AndroidPlayer/OpenJDK/bin/jarsigner.exe" \
-  -verify -verbose -certs "d:/Projects/AI/SudokuGameBox/GameBox/Build/Android/GameBox.aab" 2>&1 | grep "CN="
+  -verify -verbose -certs "d:/Projects/AI/SudokuGameBox/GameBox/Build/Android/Rovilo.aab" 2>&1 | grep "CN="
 ```
 
 **通过标准**：日志有 `已应用上传签名 upload.keystore(alias: sudoku)`；jarsigner 全部条目为 `CN=SudokuGameBox`，**不得出现 `CN=Android Debug`**。
 
-### 4. 交付
+### 5. 交付
 
-验证通过后告知用户上传 `GameBox/Build/Android/GameBox.aab`。首次上传 Play Console 会要求 Play App Signing 注册，用 `Build/keystore/upload.cer`。
+验证通过后告知用户上传 `GameBox/Build/Android/Rovilo.aab`。首次上传 Play Console 会要求 Play App Signing 注册，用 `Build/keystore/upload.cer`。
 
 ## 常见坑（都是 2026-08-26 实战踩过的）
 

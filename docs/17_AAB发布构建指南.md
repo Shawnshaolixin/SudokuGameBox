@@ -31,7 +31,7 @@
 | NDK | `D:/Projects/AI/AndroidNDK/android-ndk-r27c` | 环境变量 `ANDROID_NDK_ROOT` 注入（14 号文档 FAQ 的 headless workaround） |
 | JDK | 内置 OpenJDK（AndroidPlayer 下） | 需 `JdkUseEmbedded=1`：注册表 `HKCU\Software\Unity Technologies\Unity Editor 5.x\JdkUseEmbedded_h2297287597` = 1（GUI 等价：Preferences → External Tools → JDK → JDK installed with Unity） |
 | Gradle | `D:\Tools\gradle-9.1.0` | GUI 偏好已存，无需处理 |
-| 产物 | `GameBox/Build/Android/GameBox.aab`（约 57 MB） | 本地测试 APK 同目录 |
+| 产物 | `GameBox/Build/Android/Rovilo.aab`（约 57 MB） | 本地测试 APK 同目录 |
 | 耗时 | 10~20 分钟 | IL2CPP 全量，建议后台执行 |
 
 ## 3. 构建步骤（CLI）
@@ -68,7 +68,7 @@ grep "已应用上传签名" "d:/Projects/AI/SudokuGameBox/Build/Logs/release-aa
 
 # ② 产物证书
 "C:/Program Files/Unity/Hub/Editor/6000.3.20f1/Editor/Data/PlaybackEngines/AndroidPlayer/OpenJDK/bin/jarsigner.exe" \
-  -verify -verbose -certs "d:/Projects/AI/SudokuGameBox/GameBox/Build/Android/GameBox.aab" 2>&1 | grep "CN="
+  -verify -verbose -certs "d:/Projects/AI/SudokuGameBox/GameBox/Build/Android/Rovilo.aab" 2>&1 | grep "CN="
 ```
 
 **通过标准**：日志含签名确认行；jarsigner 全部条目 `CN=SudokuGameBox`，**禁止出现 `CN=Android Debug`**。

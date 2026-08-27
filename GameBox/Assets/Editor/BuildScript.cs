@@ -112,7 +112,8 @@ public static class BuildScript
         }
 
         var ext = aab ? ".aab" : ".apk";
-        var output = Path.Combine(OutputDir, "GameBox" + ext);
+        // 产物文件名与应用名保持一致(Rovilo),避免与工程目录 GameBox 混淆;仅影响文件名,不影响应用显示名
+        var output = Path.Combine(OutputDir, "Rovilo" + ext);
 
         var options = new BuildPlayerOptions
         {
