@@ -229,37 +229,9 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 96190184}
     m_Modifications:
-    - target: {fileID: 1595011506898979968, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
-      propertyPath: m_Enabled
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1595011506898979968, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
     - target: {fileID: 3844077977107250446, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
       propertyPath: m_Name
       value: MainMenuView
-      objectReference: {fileID: 0}
-    - target: {fileID: 4709132498097432035, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
-    - target: {fileID: 5327059161761232750, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 5327059161761232750, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
-      objectReference: {fileID: 0}
-    - target: {fileID: 5897405304925830780, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 5897405304925830780, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
       objectReference: {fileID: 0}
     - target: {fileID: 8327916669084913118, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
       propertyPath: m_Pivot.x
@@ -340,14 +312,6 @@ PrefabInstance:
     - target: {fileID: 8327916669084913118, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8334772250368662813, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
-      propertyPath: m_Enabled
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 8334772250368662813, guid: 298e28ba998a15a4a816f05e53f73237, type: 3}
-      propertyPath: m_TextStyleHashCode
-      value: -1183493901
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
