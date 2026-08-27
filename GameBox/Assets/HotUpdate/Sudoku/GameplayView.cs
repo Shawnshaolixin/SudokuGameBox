@@ -59,7 +59,8 @@ namespace Box.HotUpdate.Sudoku
             for (int i = 1; i <= 9; i++)
             {
                 int n = i; // 闭包捕获
-                var btn = transform.Find("Num" + n)?.GetComponent<BoxButton>();
+                // 数字按钮在 NumberPanel 内由 HorizontalLayoutGroup 排布(Phase 8 换肤重构),Find 走完整路径
+                var btn = transform.Find("NumberPanel/Num" + n)?.GetComponent<BoxButton>();
                 if (btn != null) btn.OnClick(() =>
                 {
                     if (_session != null && _session.InputNumber(n))
@@ -319,6 +320,20 @@ namespace Box.HotUpdate.Sudoku
             if (_hintBtn != null) _hintBtn.SetInteractable(false);
         }
 
+        // ---- 棋盘配色:对齐 docs/UIDesignSystem 设计 Token(浅色奶油棕系,原深灰板废止) ----
+        // 宫间 8px 缝隙=Border 描边,格间 2px 缝隙=Background/Secondary,格底=Surface 两级
+        static readonly Color s_BoardGapColor = new Color(0.910f, 0.835f, 0.608f); // Border #E8D59B(棋盘底/宫分隔)
+        static readonly Color s_CellGapColor = new Color(0.984f, 0.910f, 0.651f); // Background/Secondary #FBE8A6(宫底)
+        static readonly Color s_CellBgDefault = new Color(1f, 0.976f, 0.914f); // Surface/Primary #FFF9E9(可编辑格)
+        static readonly Color s_CellBgGiven = new Color(1f, 0.953f, 0.816f); // Surface/Secondary #FFF3D0(给定格)
+        static readonly Color s_HlSelected = new Color(0.914f, 0.471f, 0.196f); // Primary #E97832(选中格,橙系与暖色主题统一)
+        static readonly Color s_HlSameNumber = new Color(0.965f, 0.847f, 0.459f); // Background/Primary #F6D875(同数高亮,黄橙)
+        static readonly Color s_HlPeer = new Color(0.984f, 0.910f, 0.651f); // Background/Secondary #FBE8A6(同行列宫)
+        static readonly Color s_HlMistake = new Color(0.910f, 0.459f, 0.380f); // 错误红,借 2048 #E87561
+        static readonly Color s_TextGiven = new Color(0.227f, 0.165f, 0.102f); // Text/Primary #3A2A1A(给定数字)
+        static readonly Color s_TextInput = new Color(0.914f, 0.471f, 0.196f); // Primary #E97832(输入数字)
+        static readonly Color s_TextNote = new Color(0.502f, 0.424f, 0.302f); // Text/Secondary #806C4D(笔记)
+
         // ---- 棋盘渲染(81 格全量刷新,UI 轻量无性能问题) ----
 
         void BuildBoardCells()
@@ -341,7 +356,7 @@ namespace Box.HotUpdate.Sudoku
                 var boxGo = new GameObject("Box" + box, typeof(RectTransform), typeof(Image), typeof(GridLayoutGroup));
                 boxGo.transform.SetParent(_board.transform, false);
                 var bg = boxGo.GetComponent<Image>();
-                bg.color = new Color(0.22f, 0.22f, 0.26f); // 宫底色
+                bg.color = s_CellGapColor; // 宫底色(格间 2px 缝隙透出,Background/Secondary)
                 var glg = boxGo.GetComponent<GridLayoutGroup>();
                 glg.cellSize = new Vector2((outer.cellSize.x - 2 * cellGap) / 3f, (outer.cellSize.y - 2 * cellGap) / 3f);
                 glg.spacing = new Vector2(cellGap, cellGap);
@@ -359,7 +374,7 @@ namespace Box.HotUpdate.Sudoku
                     var go = new GameObject("C" + index, typeof(RectTransform), typeof(Image), typeof(Button), typeof(BoxButton));
                     go.transform.SetParent(boxGo.transform, false);
                     var img = go.GetComponent<Image>();
-                    img.color = new Color(0.16f, 0.16f, 0.18f);
+                    img.color = s_CellBgDefault; // 格底默认色(Surface/Primary)
                     var btn = go.GetComponent<Button>();
                     btn.transition = Selectable.Transition.None; // 格子不闪默认高亮
                     var boxBtn = go.GetComponent<BoxButton>();
@@ -398,14 +413,15 @@ namespace Box.HotUpdate.Sudoku
                 {
                     text.Text = value.ToString();
                     text.SetFontSize(40);
-                    text.SetColor(_session.IsGiven(i) ? new Color(0.85f, 0.85f, 0.9f) : Color.white);
+                    // 选中(橙底)/错误(红底)实心高亮统一翻白字保对比;给定=深棕(Text/Primary),输入=主色橙(Primary)区分给定/自填
+                    text.SetColor(_session.IsMistake(i) || i == _session.SelectedIndex ? Color.white : _session.IsGiven(i) ? s_TextGiven : s_TextInput);
                     text.SetVisible(true);
                 }
                 else if (_session.Mode == GameSession.InputMode.Note && _session.GetNotes(i) != 0)
                 {
                     text.Text = NotesToString(_session.GetNotes(i));
                     text.SetFontSize(18);
-                    text.SetColor(new Color(0.6f, 0.6f, 0.7f));
+                    text.SetColor(s_TextNote);
                     text.SetVisible(true);
                 }
                 else
@@ -415,13 +431,15 @@ namespace Box.HotUpdate.Sudoku
                 }
 
                 // 高亮优先级:Mistake > Selected > SameNumber > Peer > 给定/默认
+                // 配色对齐 UIDesignSystem:选中=主色橙,同数=背景主黄橙,同行列宫=次级背景暖黄,
+                // 给定=次级 Surface,错误=2048 红(调色板唯一红系)
                 Color bg;
-                if (_session.IsMistake(i)) bg = new Color(0.55f, 0.16f, 0.18f);
-                else if (i == _session.SelectedIndex) bg = new Color(0.16f, 0.42f, 0.72f);
-                else if (_session.IsSameNumber(i)) bg = new Color(0.24f, 0.40f, 0.62f);
-                else if (_session.IsPeer(i)) bg = new Color(0.28f, 0.28f, 0.32f);
-                else if (_session.IsGiven(i)) bg = new Color(0.22f, 0.22f, 0.24f);
-                else bg = new Color(0.17f, 0.17f, 0.19f);
+                if (_session.IsMistake(i)) bg = s_HlMistake;
+                else if (i == _session.SelectedIndex) bg = s_HlSelected;
+                else if (_session.IsSameNumber(i)) bg = s_HlSameNumber;
+                else if (_session.IsPeer(i)) bg = s_HlPeer;
+                else if (_session.IsGiven(i)) bg = s_CellBgGiven;
+                else bg = s_CellBgDefault;
                 img.color = bg;
             }
 

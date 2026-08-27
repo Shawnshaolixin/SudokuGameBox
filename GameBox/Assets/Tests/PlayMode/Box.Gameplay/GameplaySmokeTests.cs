@@ -155,7 +155,8 @@ namespace Box.Gameplay.Tests
 
         static void ClickNum(GameplayView view, int n)
         {
-            var btn = view.transform.Find("Num" + n);
+            // 数字按钮在 NumberPanel 内(HLG 排布),与 GameplayView 绑定路径保持一致
+            var btn = view.transform.Find("NumberPanel/Num" + n);
             Assert.NotNull(btn, $"数字 {n}");
             btn.GetComponent<Button>().onClick.Invoke();
         }
