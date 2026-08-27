@@ -98,3 +98,30 @@ desktop.ini
 
 # CLI 测试输出（EditMode/PlayMode 结果 xml 与日志，不入库）
 [Tt]est[Rr]esults/
+
+# =========================================================
+# codely-cli(本地配置/自动存档/生成文档,个人环境不入库)
+# =========================================================
+.codely-cli/
+CODELY.md
+
+# =========================================================
+# Unity 本地生成/恢复产物(可重建,不入库)
+# =========================================================
+# Addressables 代码生成目录
+GameBox/Assets/GeneratedLocalRepo/
+GameBox/Assets/GeneratedLocalRepo.meta
+# 编辑器崩溃恢复目录
+GameBox/Assets/_Recovery/
+GameBox/Assets/_Recovery.meta
+# External Dependency Manager 解析产物(Firebase aar,构建时自动生成)
+GameBox/Assets/Plugins/Android/FirebaseApp.androidlib/
+GameBox/Assets/Plugins/Android/FirebaseCrashlytics.androidlib/
+GameBox/Assets/Plugins/Android/*.androidlib.meta
+
+# =========================================================
+# 素材中间产物与本地备份(不入库)
+# =========================================================
+_art_originals_backup/
+rovilo_slices/
+rovilo_ui_layers/
