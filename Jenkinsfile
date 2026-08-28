@@ -140,31 +140,44 @@ pipeline {
             when { expression { params.BUILD_AAB } }
             steps {
                 ws("$WS") {
-                    powershell(script: '''
-                        $unity = $env:UNITY
-                        $ws    = $env:WORKSPACE
-                        # Unity 工程在 GameBox/ 子目录（仓库根不是工程）
-                        $proj  = "$ws\\GameBox"
-                        Remove-Item "$proj\\Temp\\UnityLockfile" -Force -ErrorAction SilentlyContinue
-                        New-Item -ItemType Directory -Force "$ws\\Build\\Logs", "$env:LOCALAPPDATA\\Unity\\Caches" | Out-Null
-                        # 正斜杠传 -projectPath（Unity 规范化路径比较的坑）
-                        $projFwd = $proj -replace '\\\\', '/'
-                        # APK+AAB 双产物一次会话构建（BuildScript.BuildAndroidApkAndAab）;
-                        # APK 本地装机测试,AAB 上架;-quit is correct for build mode
-                        # NDK 注入走环境变量 ANDROID_NDK_HOME(pipeline environment 块,
-                        #   Start-Process 继承;SYSTEM 账户无 GUI Preferences,见文件头环境注释)
-                        $p = Start-Process -FilePath $unity -WorkingDirectory $proj -ArgumentList @(
-                            "-batchmode", "-quit",
-                            "-projectPath", $projFwd,
-                            "-executeMethod", "BuildScript.BuildAndroidApkAndAab",
-                            "-logFile", "$ws\\Build\\Logs\\ci-aab.log"
-                        ) -RedirectStandardOutput "$ws\\Build\\Logs\\ci-aab-stdout.log" -RedirectStandardError "$ws\\Build\\Logs\\ci-aab-stderr.log" -PassThru -Wait
-                        Write-Host "Unity exit code = $($p.ExitCode)"
-                        if ($p.ExitCode -ne 0) { exit $p.ExitCode }
-                    ''')
-                    // 归档 APK + AAB → 构建记录 Artifacts（本机方案替代 GitHub Actions artifact）
-                    // 输出在工程目录内（BuildScript.cs OutputDir 相对工程），工作区根是 GameBox/ 子目录
-                    archiveArtifacts artifacts: 'GameBox/Build/Android/GameBox.apk,GameBox/Build/Android/GameBox.aab', onlyIfSuccessful: true
+                    // 签名密码走 Jenkins 凭据(credentialsId 见 17 号文档 §5 / 15 号文档 §4.3:
+                    // 密码不写仓库、不写脚本;withCredentials 注入环境变量 → Start-Process 子进程继承)
+                    withCredentials([
+                        string(credentialsId: 'box-keystore-pass', variable: 'BOX_KEYSTORE_PASS'),
+                        string(credentialsId: 'box-key-pass', variable: 'BOX_KEY_PASS')
+                    ]) {
+                        powershell(script: '''
+                            $unity = $env:UNITY
+                            $ws    = $env:WORKSPACE
+                            # Unity 工程在 GameBox/ 子目录（仓库根不是工程）
+                            $proj  = "$ws\\GameBox"
+                            # keystore 被 .gitignore 忽略,CI 检出不含 → 从受控目录(D:/JenkinsWS/keystore)
+                            # 拷入工作区(BuildScript 从仓库根 Build/keystore 推导,见 17 号文档 §5)
+                            New-Item -ItemType Directory -Force "$proj\\Build\\keystore" | Out-Null
+                            Copy-Item "D:/JenkinsWS/keystore/upload.keystore" "$proj\\Build\\keystore\\upload.keystore" -Force
+                            # withCredentials 注入的变量在 PS 脚本里即 $env:BOX_KEYSTORE_PASS
+                            Remove-Item "$proj\\Temp\\UnityLockfile" -Force -ErrorAction SilentlyContinue
+                            New-Item -ItemType Directory -Force "$ws\\Build\\Logs", "$env:LOCALAPPDATA\\Unity\\Caches" | Out-Null
+                            # 正斜杠传 -projectPath（Unity 规范化路径比较的坑）
+                            $projFwd = $proj -replace '\\\\', '/'
+                            # 单 AAB 产物(17 号文档:APK+AAB 同会话曾 Bee 缓存挂死 #32,现产物名 Rovilo,4c1272f);
+                            # NDK 注入走 environment 块 ANDROID_NDK_ROOT(Start-Process 继承;SYSTEM 无 GUI Preferences)
+                            $p = Start-Process -FilePath $unity -WorkingDirectory $proj -ArgumentList @(
+                                "-batchmode", "-quit",
+                                "-projectPath", $projFwd,
+                                "-executeMethod", "BuildScript.BuildAndroidAab",
+                                "-logFile", "$ws\\Build\\Logs\\ci-aab.log"
+                            ) -RedirectStandardOutput "$ws\\Build\\Logs\\ci-aab-stdout.log" -RedirectStandardError "$ws\\Build\\Logs\\ci-aab-stderr.log" -PassThru -Wait
+                            Write-Host "Unity exit code = $($p.ExitCode)"
+                            if ($p.ExitCode -ne 0) { exit $p.ExitCode }
+                            # 签名验证:日志须含"已应用上传签名"(BuildScript 硬失败保证无 debug 签名产物)
+                            $signed = Select-String -Path "$ws\\Build\\Logs\\ci-aab.log" -Pattern "已应用上传签名" -Quiet
+                            if (-not $signed) { Write-Host "签名行缺失,视为失败"; exit 1 }
+                        ''')
+                        // 归档 AAB → 构建记录 Artifacts（本机方案替代 GitHub Actions artifact）
+                        // 输出在工程目录内（BuildScript.cs OutputDir 相对工程），工作区根是 GameBox/ 子目录
+                        archiveArtifacts artifacts: 'GameBox/Build/Android/Rovilo.aab', onlyIfSuccessful: true
+                    }
                 }
             }
         }
