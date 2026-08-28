@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ddab7ab427b7fb341a35c719543fc64b
+guid: 23acdb601e0b69449bcbfe5e01690a52
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 3329647025430923676
-    second: magic_01_0
+      213: -1172740179624419359
+    second: spark_01_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 0
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: magic_01_0
+      name: spark_01_0
       rect:
         serializedVersion: 2
-        x: 36
-        y: 32
-        width: 443
-        height: 480
+        x: 8
+        y: 27
+        width: 500
+        height: 485
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: c990f321458453e20800000000000000
-      internalID: 3329647025430923676
+      spriteID: 1ef98a3250799bfe0800000000000000
+      internalID: -1172740179624419359
       vertices: []
       indices: 
       edges: []

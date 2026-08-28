@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 7bf267c8063207349839100007188b34
+guid: a643d0d767d899e478f4ab24138bc886
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -7471229218347409849
-    second: redo-2_0
+      213: 768216927382997730
+    second: circle_01_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 0
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: redo-2_0
+      name: circle_01_0
       rect:
         serializedVersion: 2
-        x: 5
-        y: 5
-        width: 38
-        height: 38
+        x: 33
+        y: 33
+        width: 446
+        height: 479
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 74e12e43c9cd05890800000000000000
-      internalID: -7471229218347409849
+      spriteID: 2ea0b1ba93149aa00800000000000000
+      internalID: 768216927382997730
       vertices: []
       indices: 
       edges: []

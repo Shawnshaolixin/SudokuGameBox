@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 2f63d68ab6335404ca046e8bd87d099b
+guid: 5856cbfb0f573b542871919f29090e6c
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -1589776889300200893
-    second: pencil-line_0
+      213: -3643760154290002694
+    second: circle_02_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 0
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: pencil-line_0
+      name: circle_02_0
       rect:
         serializedVersion: 2
-        x: 1
-        y: 1
-        width: 46
-        height: 46
+        x: 63
+        y: 62
+        width: 387
+        height: 450
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 342d229975affe9e0800000000000000
-      internalID: -1589776889300200893
+      spriteID: af462d4f173ce6dc0800000000000000
+      internalID: -3643760154290002694
       vertices: []
       indices: 
       edges: []

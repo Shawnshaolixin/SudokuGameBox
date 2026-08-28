@@ -13,7 +13,7 @@ namespace Box.UI
     {
         // ---- 贴图地址(Editor 换肤脚本/运行时共用,Art/ 前缀去扩展名) ----
         public const string ButtonTex = "Art/UI/Buttons/button_rectangle_depth_flat"; // 主按钮(圆角矩形)
-        public const string PanelTex = "Art/UI/Panels/button_rectangle_depth_border"; // 弹窗面板(描边圆角)
+        public const string PanelTex = "Art/UI/Panels/button_rectangle_depth_border_panel"; // 弹窗面板(描边圆角;2026-08-29 命名契约加 _panel 后缀同步)
 
         // ---- 浅色主题(默认,对齐 docs/UIDesignSystem 设计 token) ----
         public static readonly Color Button = new Color(0.35f, 0.60f, 0.95f); // 主按钮 tint:品牌蓝(贴图灰白纹理乘色)

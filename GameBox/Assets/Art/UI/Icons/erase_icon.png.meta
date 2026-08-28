@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 84c37479fc416704485680f381739776
+guid: 458a19be8fd75ce4590b1083a6f2be8a
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5335760886059047966
-    second: flare_01_0
+      213: -4026278937243219997
+    second: "\u5220\u9664_0"
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 2
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: flare_01_0
+      name: "\u5220\u9664_0"
       rect:
         serializedVersion: 2
-        x: 72
-        y: 72
-        width: 436
-        height: 440
+        x: 3
+        y: 1
+        width: 42
+        height: 46
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 2e3e6048eb193f5b0800000000000000
-      internalID: -5335760886059047966
+      spriteID: 3e70bf283a8cf18c0800000000000000
+      internalID: -4026278937243219997
       vertices: []
       indices: 
       edges: []

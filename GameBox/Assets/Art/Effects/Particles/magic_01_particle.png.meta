@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 458a19be8fd75ce4590b1083a6f2be8a
+guid: ddab7ab427b7fb341a35c719543fc64b
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4026278937243219997
-    second: "\u5220\u9664_0"
+      213: 3329647025430923676
+    second: magic_01_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 0
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: "\u5220\u9664_0"
+      name: magic_01_0
       rect:
         serializedVersion: 2
-        x: 3
-        y: 1
-        width: 42
-        height: 46
+        x: 36
+        y: 32
+        width: 443
+        height: 480
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 3e70bf283a8cf18c0800000000000000
-      internalID: -4026278937243219997
+      spriteID: c990f321458453e20800000000000000
+      internalID: 3329647025430923676
       vertices: []
       indices: 
       edges: []

@@ -21,7 +21,7 @@ public static class Phase8UiSkin
 {
     const string PrefabRoot = "Assets/UI/Prefabs";
     const string ButtonTexPath = "Assets/Art/UI/Buttons/button_rectangle_depth_flat.png";
-    const string PanelTexPath = "Assets/Art/UI/Panels/button_rectangle_depth_border.png";
+    const string PanelTexPath = "Assets/Art/UI/Panels/button_rectangle_depth_border_panel.png";
 
     // 9-slice 边框:Kenney 按钮 192x64 圆角半径≈16px;面板 192x64 描边圆角≈20px
     static readonly Vector4 BtnBorder = new Vector4(16, 16, 16, 16);

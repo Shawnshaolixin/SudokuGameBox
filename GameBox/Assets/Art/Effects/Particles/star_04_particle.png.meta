@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: a6ba6c3f38a0b76449d90af3f58c4785
+guid: dbf77b57c171c0b4cbb4ff839fbd9038
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 7955659418267224758
-    second: chevron-left_0
+      213: -4300146139651163697
+    second: star_04_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 0
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: chevron-left_0
+      name: star_04_0
       rect:
         serializedVersion: 2
-        x: 15
-        y: 9
-        width: 18
-        height: 30
+        x: 63
+        y: 62
+        width: 387
+        height: 450
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 6ba0fcb071e286e60800000000000000
-      internalID: 7955659418267224758
+      spriteID: fc933df7edfc254c0800000000000000
+      internalID: -4300146139651163697
       vertices: []
       indices: 
       edges: []

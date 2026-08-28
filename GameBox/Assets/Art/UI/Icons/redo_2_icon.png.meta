@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 9af46a7b6340faa4fa5e54d2185357fd
+guid: 7bf267c8063207349839100007188b34
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -2462222872744406813
-    second: "\u64A4\u9500\u6309\u94AE_0"
+      213: -7471229218347409849
+    second: redo-2_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -75,7 +75,7 @@ TextureImporter:
     maxTextureSize: 2048
     resizeAlgorithm: 0
     textureFormat: -1
-    textureCompression: 1
+    textureCompression: 2
     compressionQuality: 50
     crunchedCompression: 0
     allowsAlphaSplitting: 0
@@ -113,7 +113,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: "\u64A4\u9500\u6309\u94AE_0"
+      name: redo-2_0
       rect:
         serializedVersion: 2
         x: 5
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 3e05a38b75d64ddd0800000000000000
-      internalID: -2462222872744406813
+      spriteID: 74e12e43c9cd05890800000000000000
+      internalID: -7471229218347409849
       vertices: []
       indices: 
       edges: []
