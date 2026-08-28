@@ -9,10 +9,20 @@ namespace Box.UI.Tests
     {
         static RectTransform NewRect() => new GameObject().AddComponent<RectTransform>();
 
+        // 守卫逻辑:中心锚元素(anchorMin==anchorMax)跳过改写(弹窗卡片改造 2026-08)。
+        // 现有拉伸用例需预置非中心锚,否则会被守卫误伤(默认锚点即 (0.5,0.5))。
+        static RectTransform NewStretchableRect()
+        {
+            var rt = NewRect();
+            rt.anchorMin = new Vector2(0.2f, 0.2f);
+            rt.anchorMax = new Vector2(0.8f, 0.8f);
+            return rt;
+        }
+
         [Test]
         public void No_Notch_Stretches_Full()
         {
-            var rt = NewRect();
+            var rt = NewStretchableRect();
             SafeAreaFitter.SetInsets(rt, new Rect(0, 0, 1080, 1920), new Vector2(1080, 1920));
             Assert.AreEqual(Vector2.zero, rt.anchorMin);
             Assert.AreEqual(Vector2.one, rt.anchorMax);
@@ -21,12 +31,22 @@ namespace Box.UI.Tests
         [Test]
         public void Top_Notch_Shrinks_Anchors()
         {
-            var rt = NewRect();
+            var rt = NewStretchableRect();
             SafeAreaFitter.SetInsets(rt, new Rect(0, 100, 1080, 1720), new Vector2(1080, 1920));
             Assert.AreEqual(0f, rt.anchorMin.x);
             Assert.AreEqual(100f / 1920f, rt.anchorMin.y, 0.0001f);
             Assert.AreEqual(1f, rt.anchorMax.x);
             Assert.AreEqual(1f - 100f / 1920f, rt.anchorMax.y, 0.0001f);
+        }
+
+        [Test]
+        public void Center_Anchor_Is_Skipped()
+        {
+            // 中心锚元素(弹窗卡片)不参与安全区内缩:锚点保持不动(防弹窗根被改写成全屏拉伸)
+            var rt = NewRect(); // 默认锚点 (0.5,0.5) == 中心锚
+            SafeAreaFitter.SetInsets(rt, new Rect(0, 100, 1080, 1720), new Vector2(1080, 1920));
+            Assert.AreEqual(new Vector2(0.5f, 0.5f), rt.anchorMin);
+            Assert.AreEqual(new Vector2(0.5f, 0.5f), rt.anchorMax, "中心锚元素不应被安全区改写");
         }
 
         [Test]

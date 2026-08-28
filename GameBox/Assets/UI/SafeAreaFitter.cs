@@ -38,6 +38,9 @@ namespace Box.UI
         public static void SetInsets(RectTransform rect, Rect safe, Vector2 screen)
         {
             if (screen.x <= 0f || screen.y <= 0f) return;
+            // 中心锚元素(anchorMin==anchorMax,如弹窗卡片)不参与安全区内缩:
+            // 此前会把中心锚改写成全屏拉伸锚,导致弹窗根超屏盖满屏幕(弹窗改造 2026-08)。
+            if (rect.anchorMin == rect.anchorMax) return;
             rect.anchorMin = new Vector2(safe.xMin / screen.x, safe.yMin / screen.y);
             rect.anchorMax = new Vector2(1f - (screen.x - safe.xMax) / screen.x, 1f - (screen.y - safe.yMax) / screen.y);
         }

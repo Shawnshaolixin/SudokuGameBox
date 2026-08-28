@@ -42,7 +42,11 @@ public static class MoreGamesPopupSetup
     static void CreateMoreGamesPopup()
     {
         var path = PopupsDir + "/MoreGamesPopup.prefab";
-        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+        {
+            PopupCardMigration.MigrateExistingIfNeeded(path); // 旧版弹窗补迁(2026-08 弹窗改造)
+            return;
+        }
 
         var root = new GameObject("MoreGamesPopup", typeof(RectTransform), typeof(MoreGamesView), typeof(CanvasGroup));
         var rt = root.GetComponent<RectTransform>();
@@ -69,6 +73,7 @@ public static class MoreGamesPopupSetup
 
         CreateButton(root.transform, "CloseButton", "完成", new Vector2(0, -380), new Vector2(420, 96), true);
 
+        PopupCardMigration.MigrateInstance(root); // 弹窗改造(2026-08):全屏遮罩根 + Card 浅色卡片
         PrefabUtility.SaveAsPrefabAsset(root, path);
         Object.DestroyImmediate(root);
     }

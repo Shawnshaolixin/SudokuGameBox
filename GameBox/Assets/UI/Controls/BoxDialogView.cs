@@ -19,10 +19,11 @@ namespace Box.UI
         {
             Layer = UILayer.Popup; // 模态弹窗,受 PopupArbiter 互斥管辖
             base.Awake();
-            _title = transform.Find("Title")?.GetComponent<BoxText>();
-            _message = transform.Find("Message")?.GetComponent<BoxText>();
-            _confirm = transform.Find("Confirm")?.GetComponent<BoxButton>();
-            _cancel = transform.Find("Cancel")?.GetComponent<BoxButton>();
+            // 弹窗改造(2026-08)后内容在 Card 子节点下,走容错查找(未迁移 prefab 回退根直查)
+            _title = FindInCard("Title")?.GetComponent<BoxText>();
+            _message = FindInCard("Message")?.GetComponent<BoxText>();
+            _confirm = FindInCard("Confirm")?.GetComponent<BoxButton>();
+            _cancel = FindInCard("Cancel")?.GetComponent<BoxButton>();
         }
 
         public void SetTitle(string text) { if (_title != null) _title.Text = text; }

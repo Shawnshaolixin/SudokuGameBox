@@ -141,17 +141,29 @@ public static class Phase4SceneSetup
     static void UpgradeSettlement()
     {
         var path = PopupDir + "/SettlementPopup.prefab";
-        var go = LoadInstance(path);
-        if (go == null) { Debug.LogError("[Phase4] SettlementPopup.prefab 缺失,先执行 Phase3"); return; }
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null)
+        {
+            Debug.LogError("[Phase4] SettlementPopup.prefab 缺失,先执行 Phase3");
+            return;
+        }
+
+        // 弹窗改造(2026-08):迁移结构(内容移入 Card)+ 升级文案/布局,统一走 Contents 原地编辑
+        // (实例化→SaveAsPrefabAsset 会丢弃重挂载,见 PopupCardMigration.MigratePath 注释)
+        var go = PrefabUtility.LoadPrefabContents(path);
+        if (!PopupCardMigration.IsMigrated(go))
+            PopupCardMigration.MigrateInstance(go);
 
         SetText(go, "Title", "对局完成"); // 运行时按结果覆盖
         SetText(go, "Message", "用时 00:00 / 错误 0");
-        EnsureText(go.transform, "StarsText", "星级 3/3", new Vector2(0, 140), new Vector2(400, 60), 40, true);
-        EnsureText(go.transform, "TimeText", "用时 00:00", new Vector2(0, 75), new Vector2(400, 50), 32);
+        // 挂载目标取 Card(迁移后内容统一进卡片;未迁移回退根),防重复创建于根
+        var card = PopupCardMigration.FindCardOrRoot(go);
+        EnsureText(card, "StarsText", "星级 3/3", new Vector2(0, 140), new Vector2(400, 60), 40, true);
+        EnsureText(card, "TimeText", "用时 00:00", new Vector2(0, 75), new Vector2(400, 50), 32);
         SetText(go, "Confirm/Label", "再来一局");
         SetText(go, "Cancel/Label", "返回菜单");
 
-        SaveInstance(go, path);
+        PrefabUtility.SaveAsPrefabAsset(go, path);
+        PrefabUtility.UnloadPrefabContents(go);
     }
 
     // ---- 难度选择弹窗(新建,中文文案) ----
@@ -159,7 +171,11 @@ public static class Phase4SceneSetup
     static void CreateDifficultySelect()
     {
         var path = PopupDir + "/DifficultySelect.prefab";
-        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+        {
+            PopupCardMigration.MigrateExistingIfNeeded(path); // 旧版弹窗补迁(2026-08 弹窗改造)
+            return;
+        }
 
         var root = new GameObject("DifficultySelect", typeof(RectTransform), typeof(DifficultySelectView), typeof(CanvasGroup));
         var rt = root.GetComponent<RectTransform>();
@@ -174,6 +190,7 @@ public static class Phase4SceneSetup
         CreateButton(root.transform, "MediumButton", "中等", new Vector2(0, -80), new Vector2(420, 100));
         CreateButton(root.transform, "HardButton", "困难", new Vector2(0, -210), new Vector2(420, 100));
 
+        PopupCardMigration.MigrateInstance(root); // 弹窗改造(2026-08):全屏遮罩根 + Card 浅色卡片
         SavePrefab(root, path);
     }
 
@@ -182,7 +199,11 @@ public static class Phase4SceneSetup
     static void CreateExitConfirm()
     {
         var path = PopupDir + "/ExitConfirm.prefab";
-        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+        {
+            PopupCardMigration.MigrateExistingIfNeeded(path); // 旧版弹窗补迁(2026-08 弹窗改造)
+            return;
+        }
 
         var root = new GameObject("ExitConfirm", typeof(RectTransform), typeof(BoxDialogView), typeof(CanvasGroup));
         var rt = root.GetComponent<RectTransform>();
@@ -199,6 +220,7 @@ public static class Phase4SceneSetup
         confirm.GetComponent<Image>().color = new Color(0.75f, 0.30f, 0.28f);
         CreateButton(root.transform, "Cancel", "取消", new Vector2(90, -120), new Vector2(240, 90));
 
+        PopupCardMigration.MigrateInstance(root); // 弹窗改造(2026-08):全屏遮罩根 + Card 浅色卡片
         SavePrefab(root, path);
     }
 
@@ -207,7 +229,11 @@ public static class Phase4SceneSetup
     static void CreateAdHintConfirm()
     {
         var path = PopupDir + "/AdHintConfirm.prefab";
-        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null) return;
+        if (AssetDatabase.LoadAssetAtPath<GameObject>(path) != null)
+        {
+            PopupCardMigration.MigrateExistingIfNeeded(path); // 旧版弹窗补迁(2026-08 弹窗改造)
+            return;
+        }
 
         var root = new GameObject("AdHintConfirm", typeof(RectTransform), typeof(BoxDialogView), typeof(CanvasGroup));
         var rt = root.GetComponent<RectTransform>();
@@ -225,6 +251,7 @@ public static class Phase4SceneSetup
         confirm.GetComponent<Image>().color = new Color(0.92f, 0.68f, 0.22f);
         CreateButton(root.transform, "Cancel", "取消", new Vector2(90, -120), new Vector2(240, 90));
 
+        PopupCardMigration.MigrateInstance(root); // 弹窗改造(2026-08):全屏遮罩根 + Card 浅色卡片
         SavePrefab(root, path);
     }
 
@@ -250,7 +277,8 @@ public static class Phase4SceneSetup
 
     static void SetText(GameObject root, string childName, string text)
     {
-        var t = root.transform.Find(childName)?.GetComponent<TextMeshProUGUI>();
+        // 弹窗改造(2026-08):内容移入 Card,容错直查(未迁移 prefab 回退根直查)
+        var t = PopupCardMigration.FindInCard(root, childName)?.GetComponent<TextMeshProUGUI>();
         if (t != null) t.text = text;
     }
 

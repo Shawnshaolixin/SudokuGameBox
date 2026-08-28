@@ -38,7 +38,12 @@ public static class Phase5SceneSetup
         GameObject root;
         if (existing != null)
         {
-            if (existing.transform.Find("RemoveAdsButton") != null) return; // 已升级,幂等跳过
+            // 已升级(含弹窗改造后:按钮在 Card 内,FindInCard 容错直查):幂等跳过,旧版补迁结构
+            if (PopupCardMigration.FindInCard(existing, "RemoveAdsButton") != null)
+            {
+                PopupCardMigration.MigrateExistingIfNeeded(path);
+                return;
+            }
             root = (GameObject)PrefabUtility.InstantiatePrefab(existing);   // 旧版:实例化原地升级
         }
         else
@@ -60,24 +65,26 @@ public static class Phase5SceneSetup
         SetPosition(root, "MusicButton", new Vector2(0, 40));
         SetPosition(root, "ThemeButton", new Vector2(0, -70));
         SetPosition(root, "LangButton", new Vector2(0, -180));
-        if (root.transform.Find("RemoveAdsButton") == null)
+        if (PopupCardMigration.FindInCard(root, "RemoveAdsButton") == null)
         {
-            // 商业化(7-1):去广告购买(橙色强调) + 隐私政策(灰色次级)
-            var removeAds = CreateButton(root.transform, "RemoveAdsButton", "去广告", new Vector2(0, -290), new Vector2(500, 90));
+            // 商业化(7-1):去广告购买(橙色强调) + 隐私政策(灰色次级);挂载目标取 Card(防误挂根)
+            var card = PopupCardMigration.FindCardOrRoot(root);
+            var removeAds = CreateButton(card, "RemoveAdsButton", "去广告", new Vector2(0, -290), new Vector2(500, 90));
             removeAds.GetComponent<Image>().color = new Color(0.90f, 0.62f, 0.18f);
-            var privacy = CreateButton(root.transform, "PrivacyButton", "隐私政策", new Vector2(0, -400), new Vector2(500, 90));
+            var privacy = CreateButton(card, "PrivacyButton", "隐私政策", new Vector2(0, -400), new Vector2(500, 90));
             privacy.GetComponent<Image>().color = new Color(0.30f, 0.30f, 0.34f);
         }
         SetPosition(root, "CloseButton", new Vector2(0, -510));
 
+        PopupCardMigration.MigrateInstance(root); // 弹窗改造(2026-08):全屏遮罩根 + Card 浅色卡片
         PrefabUtility.SaveAsPrefabAsset(root, path); // 覆盖保存:同路径同 GUID,Addressables 引用不断
         Object.DestroyImmediate(root);
     }
 
-    /// <summary>设置节点 anchoredPosition(升级时移动既有按钮)。</summary>
+    /// <summary>设置节点 anchoredPosition(升级时移动既有按钮;内容在 Card 下,容错直查)。</summary>
     static void SetPosition(GameObject root, string childName, Vector2 pos)
     {
-        var t = root.transform.Find(childName);
+        var t = PopupCardMigration.FindInCard(root, childName);
         if (t == null) return;
         t.GetComponent<RectTransform>().anchoredPosition = pos;
     }

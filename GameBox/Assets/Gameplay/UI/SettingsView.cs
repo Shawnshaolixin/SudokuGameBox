@@ -18,7 +18,8 @@ namespace Box.Gameplay
     /// </summary>
     public sealed class SettingsView : UIView
     {
-        static readonly Color ThemeLightBg = new Color(0.94f, 0.94f, 0.92f, 0.98f);
+        // 主题预览色:浅色取设计 token Surface/Primary(弹窗改造 2026-08 后卡片底色);深色保留原值
+        static readonly Color ThemeLightBg = UITheme.Panel; // #FFF9E9(与 UITheme 同源,防漂移)
         static readonly Color ThemeDarkBg = new Color(0.08f, 0.08f, 0.10f, 0.97f);
 
         /// <summary>隐私政策 URL 占位(A6:账号 + GitHub Pages 就绪后替换为真实地址)。</summary>
@@ -38,8 +39,10 @@ namespace Box.Gameplay
         protected override UniTask OnCreate()
         {
             _svc = UIService.Instance;
-            _bg = GetComponent<Image>();
-            _title = transform.Find("Title")?.GetComponent<TextMeshProUGUI>();
+            // 弹窗改造(2026-08):卡片背景在 Card 子节点(根为全屏遮罩),未迁移 prefab 回退根 Image
+            var card = transform.Find("Card");
+            _bg = card != null ? card.GetComponent<Image>() : GetComponent<Image>();
+            _title = FindInCard("Title")?.GetComponent<TextMeshProUGUI>();
             Bind("SoundButton", ToggleSound);
             Bind("MusicButton", ToggleMusic);
             Bind("ThemeButton", ToggleTheme);
@@ -84,12 +87,14 @@ namespace Box.Gameplay
         protected override async UniTask OnShow(object args)
         {
             Refresh(); // 显示时同步一次当前偏好
-            await BoxTween.ScalePulse(transform, 0.8f, 1f, 0.22f); // 弹入(D-15)
+            // 弹入(D-15):缩放卡片,不缩全屏遮罩(防脉冲期间遮罩露出屏幕边缘接缝)
+            var card = transform.Find("Card");
+            await BoxTween.ScalePulse(card != null ? card : transform, 0.8f, 1f, 0.22f);
         }
 
         void Bind(string path, Action onClick)
         {
-            var btn = transform.Find(path)?.GetComponent<BoxButton>();
+            var btn = FindInCard(path)?.GetComponent<BoxButton>();
             if (btn != null) btn.OnClick(onClick);
         }
 
@@ -155,17 +160,17 @@ namespace Box.Gameplay
             SetLabel("RemoveAdsButton", L10n.Get(purchased ? "settings.removeAdsPurchased" : "settings.removeAds"));
             SetLabel("PrivacyButton", L10n.Get("settings.privacy"));
 
-            // 主题即时预览:弹窗背景色切换(玩法场景换肤属于全 UI 主题系统,v1.0 后置)
+            // 主题即时预览:卡片背景色切换(玩法场景换肤属于全 UI 主题系统,v1.0 后置)
             if (_bg != null) _bg.color = theme == 0 ? ThemeLightBg : ThemeDarkBg;
-            if (_title != null) _title.color = theme == 0 ? new Color(0.12f, 0.12f, 0.14f) : Color.white;
+            if (_title != null) _title.color = theme == 0 ? UITheme.TextPrimary : Color.white; // 浅色=token #3A2A1A
             foreach (var label in transform.GetComponentsInChildren<TextMeshProUGUI>(true))
                 if (label != _title)
-                    label.color = theme == 0 ? new Color(0.12f, 0.12f, 0.14f) : Color.white;
+                    label.color = theme == 0 ? UITheme.TextPrimary : Color.white;
         }
 
         void SetLabel(string path, string text)
         {
-            var t = transform.Find(path + "/Label")?.GetComponent<TextMeshProUGUI>();
+            var t = FindInCard(path + "/Label")?.GetComponent<TextMeshProUGUI>();
             if (t != null) t.text = text;
         }
     }

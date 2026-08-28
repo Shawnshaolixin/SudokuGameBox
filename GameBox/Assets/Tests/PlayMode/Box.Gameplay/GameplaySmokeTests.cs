@@ -54,13 +54,16 @@ namespace Box.Gameplay.Tests
                 var box = board.Find("Box" + b);
                 if (box == null) continue;
                 boxes++;
+                // 格命名是全局行优先 index("C"+0..80,宫 0 含 C0/C1/C2 等,见 GameplayView
+                // BuildBoardCells 索引换算),旧 box.Find("C"+b*9+k) 映射已错位 → 按结构数
                 for (int k = 0; k < 9; k++)
-                    if (box.Find("C" + (b * 9 + k)) != null) cells++;
+                    if (box.GetChild(k) != null) cells++;
             }
             Assert.AreEqual(9, boxes, "9 个宫生成");
             Assert.AreEqual(81, cells, "81 格生成");
+            // 数字盘在 NumberPanel 容器内(与 GameplayView 绑定路径一致,见 ClickNum 注释)
             for (int i = 1; i <= 9; i++)
-                Assert.NotNull(view.transform.Find("Num" + i), $"数字盘 Num{i}");
+                Assert.NotNull(view.transform.Find("NumberPanel/Num" + i), $"数字盘 Num{i}");
             foreach (var name in new[] { "ModeButton", "UndoButton", "RedoButton", "EraseButton", "HintButton" })
                 Assert.NotNull(view.transform.Find(name), $"工具按钮 {name}");
 
@@ -139,7 +142,8 @@ namespace Box.Gameplay.Tests
 
         static void Click(Transform root, string path)
         {
-            var go = root.Find(path);
+            // 弹窗改造(2026-08):内容在 Card 子节点,先查 Card/路径,未迁移 prefab 回退根直查
+            var go = root.Find("Card/" + path) ?? root.Find(path);
             Assert.NotNull(go, $"节点 {path} 存在");
             var btn = go.GetComponent<Button>();
             Assert.NotNull(btn, $"{path} 有 Button");

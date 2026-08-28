@@ -39,7 +39,9 @@ namespace Box.HotUpdate.Sudoku
         protected override async UniTask OnShow(object args)
         {
             ApplyLanguage(); // 弹窗打开即按当前语言刷新(prefab 初始英文文案)
-            await BoxTween.ScalePulse(transform, 0.8f, 1f, 0.22f); // 弹入(D-15)
+            // 弹入(D-15):缩放卡片,不缩全屏遮罩(防脉冲期间遮罩露出屏幕边缘接缝)
+            var card = transform.Find("Card");
+            await BoxTween.ScalePulse(card != null ? card : transform, 0.8f, 1f, 0.22f);
         }
 
         void ApplyLanguage()
@@ -52,13 +54,13 @@ namespace Box.HotUpdate.Sudoku
 
         void SetLabel(string buttonPath, string text)
         {
-            var t = transform.Find(buttonPath + "/Label")?.GetComponent<TextMeshProUGUI>();
+            var t = FindInCard(buttonPath + "/Label")?.GetComponent<TextMeshProUGUI>();
             if (t != null) t.text = text;
         }
 
         void SetText(string path, string text)
         {
-            var t = transform.Find(path)?.GetComponent<TextMeshProUGUI>();
+            var t = FindInCard(path)?.GetComponent<TextMeshProUGUI>();
             if (t != null) t.text = text;
         }
 
@@ -75,7 +77,7 @@ namespace Box.HotUpdate.Sudoku
 
         void Bind(string path, Difficulty difficulty)
         {
-            var btn = transform.Find(path)?.GetComponent<BoxButton>();
+            var btn = FindInCard(path)?.GetComponent<BoxButton>();
             if (btn != null) btn.OnClick(() => Choose(difficulty));
         }
 

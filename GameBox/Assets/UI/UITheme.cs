@@ -15,10 +15,14 @@ namespace Box.UI
         public const string ButtonTex = "Art/UI/Buttons/button_rectangle_depth_flat"; // 主按钮(圆角矩形)
         public const string PanelTex = "Art/UI/Panels/button_rectangle_depth_border"; // 弹窗面板(描边圆角)
 
-        // ---- 浅色主题(默认) ----
+        // ---- 浅色主题(默认,对齐 docs/UIDesignSystem 设计 token) ----
         public static readonly Color Button = new Color(0.35f, 0.60f, 0.95f); // 主按钮 tint:品牌蓝(贴图灰白纹理乘色)
-        public static readonly Color Panel = new Color(0.96f, 0.96f, 0.98f);  // 弹窗面板背景(近白)
+        public static readonly Color Panel = new Color(1.00f, 0.9765f, 0.9137f); // 弹窗面板背景:Surface/Primary #FFF9E9
         public static readonly Color Text = new Color(0.12f, 0.12f, 0.14f);   // 正文(与 SettingsView 预览一致)
+
+        // ---- 设计系统 token(docs/UIDesignSystem;卡片已放置 UI 图,仅保留被引用的) ----
+        public static readonly Color TextPrimary = new Color(0.2275f, 0.1647f, 0.1020f); // 主文字 #3A2A1A(SettingsView 浅色预览用)
+        public static readonly Color MaskColor = new Color(0f, 0f, 0f, 0.5f); // 弹窗遮罩:黑 50% 压暗背景
 
         // ---- 深色主题(v1.0 后置;与 SettingsView 预览色一致,方便未来切换) ----
         public static readonly Color DarkButton = new Color(0.22f, 0.42f, 0.72f);

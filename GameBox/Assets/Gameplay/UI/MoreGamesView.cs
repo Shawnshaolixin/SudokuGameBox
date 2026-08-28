@@ -34,7 +34,7 @@ namespace Box.Gameplay
         {
             Rebuild();
 
-            var close = transform.Find("CloseButton")?.GetComponent<BoxButton>();
+            var close = FindInCard("CloseButton")?.GetComponent<BoxButton>();
             if (close != null)
                 close.OnClick(() => Close().Forget());
 
@@ -50,7 +50,9 @@ namespace Box.Gameplay
 
         protected override async UniTask OnShow(object args)
         {
-            await BoxTween.ScalePulse(transform, 0.8f, 1f, 0.22f); // 弹入(D-15)
+            // 弹入(D-15):缩放卡片,不缩全屏遮罩(防脉冲期间遮罩露出屏幕边缘接缝)
+            var card = transform.Find("Card");
+            await BoxTween.ScalePulse(card != null ? card : transform, 0.8f, 1f, 0.22f);
         }
 
         // MonoBehaviour 销毁:退订语言事件,防静态事件泄漏到已销毁对象
@@ -72,9 +74,9 @@ namespace Box.Gameplay
         /// <summary>按当前语言刷新标题/关闭按钮(列表由 Rebuild 重建)。</summary>
         void ApplyLanguage()
         {
-            var title = transform.Find("Title")?.GetComponent<TextMeshProUGUI>();
+            var title = FindInCard("Title")?.GetComponent<TextMeshProUGUI>();
             if (title != null) title.text = L10n.Get("moreGames.title");
-            var close = transform.Find("CloseButton/Label")?.GetComponent<TextMeshProUGUI>();
+            var close = FindInCard("CloseButton/Label")?.GetComponent<TextMeshProUGUI>();
             if (close != null) close.text = L10n.Get("moreGames.close");
         }
 
@@ -98,7 +100,7 @@ namespace Box.Gameplay
         /// <summary>克隆 ItemTemplate 渲染列表(先清旧项,缓存复用/语言刷新安全)。</summary>
         void RenderItems(List<ModuleEntry> entries)
         {
-            var content = transform.Find("Content");
+            var content = FindInCard("Content");
             var template = content?.Find("ItemTemplate");
             if (content == null || template == null) return;
 

@@ -79,7 +79,10 @@ namespace Box.UI
         {
             if (UnityEngine.Object.FindFirstObjectByType<EventSystem>() != null) return;
             var go = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-            UnityEngine.Object.DontDestroyOnLoad(go); // 跨场景常驻:热更场景切换不重建
+            // EditMode 测试禁止调用(与 BackKeyRunner 同款守卫):无守卫时任意构造 UIService
+            // 的 EditMode 测试在无 EventSystem 残留场景下必然抛 InvalidOperationException,
+            // 且是否触发取决于测试执行随机顺序(2026-08-28 EditMode 155 测试 16 失败即此因)
+            if (Application.isPlaying) UnityEngine.Object.DontDestroyOnLoad(go); // 跨场景常驻:热更场景切换不重建
         }
 
         /// <summary>逐帧监听 Android 返回键(Escape,新输入系统,无 InputAction 资产零配置)。</summary>

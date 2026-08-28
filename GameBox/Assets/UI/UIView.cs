@@ -31,6 +31,13 @@ namespace Box.UI
         }
 
         /// <summary>
+        /// 容错子节点查找:弹窗改造(2026-08)后内容移入 Card 子节点;
+        /// 先查 "Card/路径",未迁移 prefab 回退根直查——迁移过渡期/新老 prefab 均可运行。
+        /// </summary>
+        protected Transform FindInCard(string path)
+            => transform.Find("Card/" + path) ?? transform.Find(path);
+
+        /// <summary>
         /// 场景根视图初始化(Scene 直挂、不进 Router 栈的常驻视图,如 MainMenu/Gameplay):
         /// Create+Show 一次,使 OnCreate 接线与 OnShow 启动逻辑与 Router 推入视图一致。
         /// 子类在 Awake 中调用;Router 管理的视图禁止调用(生命周期由路由驱动)。

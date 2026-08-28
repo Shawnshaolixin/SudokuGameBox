@@ -93,6 +93,7 @@ public static class Phase3SceneSetup
         CreateText("Message", root.transform, "用时 00:00 / 错误 0", new Vector2(0, 60), new Vector2(600, 60), 36);
         CreateButton("Confirm", root.transform, "确定", new Vector2(0, -110), new Vector2(300, 90));
         CreateButton("Cancel", root.transform, "取消", new Vector2(0, -230), new Vector2(300, 80));
+        PopupCardMigration.MigrateInstance(root); // 弹窗改造(2026-08):全屏遮罩根 + Card 浅色卡片
         SavePrefab(root, path);
     }
 

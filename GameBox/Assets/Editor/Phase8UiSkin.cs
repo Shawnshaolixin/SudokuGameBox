@@ -10,7 +10,9 @@ using UnityEngine.UI;
 /// 幂等:重复执行覆盖式写入相同结果,可反复跑。
 /// 规则(精确匹配,防止误伤纯色组件):
 ///   1. 含 BoxButton 组件的节点 → 主按钮图(Sliced)+ 主题主色;
-///   2. Popups 目录下 prefab 的根 Image → 弹窗面板图(Sliced)+ 面板底色;
+///      (弹窗按钮除外:弹窗改造后按钮语义色由 PopupCardMigration 统一管,防换肤刷回品牌蓝)
+///   2. Popups 目录下 prefab 的 Card 子节点 Image → 弹窗面板图(Sliced)+ 面板底色;
+///      (弹窗改造 2026-08 后根 Image 为全屏遮罩,面板图只刷卡片)
 ///   3. 其余 Image(棋盘格/分隔线/高亮等纯色组件)一律不动。
 /// 棋盘格是 GameplayView 运行时生成(BuildBoardCells),不在 prefab 资产内,天然无冲突。
 /// 颜色收敛于 UITheme(Box.UI),换肤即写主题色入 prefab 序列化。
@@ -57,15 +59,18 @@ public static class Phase8UiSkin
 
         foreach (var img in root.GetComponentsInChildren<Image>(true))
         {
-            // 规则①:含 BoxButton 的节点 = 交互按钮 → 按钮图
+            // 规则①:含 BoxButton 的节点 = 交互按钮 → 按钮图(弹窗按钮除外,语义色归迁移管)
             if (img.GetComponent<BoxButton>() != null)
             {
-                Apply(img, btnSprite, Image.Type.Sliced, UITheme.Button);
-                count++;
+                if (!isPopup)
+                {
+                    Apply(img, btnSprite, Image.Type.Sliced, UITheme.Button);
+                    count++;
+                }
                 continue;
             }
-            // 规则②:弹窗根节点 Image = 面板背景 → 面板图(仅 Popups 目录)
-            if (isPopup && img.gameObject == root)
+            // 规则②:弹窗 Card 子节点 Image = 面板背景 → 面板图(仅 Popups 目录;根 Image 是遮罩,不刷)
+            if (isPopup && img.gameObject.name == "Card" && img.transform.parent == root.transform)
             {
                 Apply(img, panelSprite, Image.Type.Sliced, UITheme.Panel);
                 count++;
