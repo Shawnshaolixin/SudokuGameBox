@@ -152,9 +152,10 @@ pipeline {
                             # Unity 工程在 GameBox/ 子目录（仓库根不是工程）
                             $proj  = "$ws\\GameBox"
                             # keystore 被 .gitignore 忽略,CI 检出不含 → 从受控目录(D:/JenkinsWS/keystore)
-                            # 拷入工作区(BuildScript 从仓库根 Build/keystore 推导,见 17 号文档 §5)
-                            New-Item -ItemType Directory -Force "$proj\\Build\\keystore" | Out-Null
-                            Copy-Item "D:/JenkinsWS/keystore/upload.keystore" "$proj\\Build\\keystore\\upload.keystore" -Force
+                            # 拷入工作区仓库根 Build/keystore(BuildScript 从 Application.dataPath 上推两级
+                            # 求仓库根再拼 Build/keystore,见 17 号文档 §5;勿拷进 GameBox 工程内)
+                            New-Item -ItemType Directory -Force "$ws\\Build\\keystore" | Out-Null
+                            Copy-Item "D:/JenkinsWS/keystore/upload.keystore" "$ws\\Build\\keystore\\upload.keystore" -Force
                             # withCredentials 注入的变量在 PS 脚本里即 $env:BOX_KEYSTORE_PASS
                             Remove-Item "$proj\\Temp\\UnityLockfile" -Force -ErrorAction SilentlyContinue
                             New-Item -ItemType Directory -Force "$ws\\Build\\Logs", "$env:LOCALAPPDATA\\Unity\\Caches" | Out-Null
