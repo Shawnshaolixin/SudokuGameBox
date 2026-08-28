@@ -120,6 +120,8 @@ python sprite_pipeline.py single ai_input/start_button.png --type button --name 
 
 > 💡 **捷径**：在 Unity 菜单栏点 `Tools → Sprite Pipeline → Run Python Pipeline`，可以在 Unity 里一键启动，不用切窗口。
 
+> 🖼️ **任意 AI 工具图片一键导入**：`Tools → AIGC → ComfyUI Generator` 窗口里的「📥 外部图片导入」区——选择其他 AI 工具（即梦 / MJ / Liblib 等）生成的任意图片，自动按文件名后缀推断类型，一键去背景并导入 Unity Art 目录；图片已是透明背景时勾选「已透明(跳过抠图)」即可。尺寸默认「保持原始」（不强制缩放，尊重外部 AI 定稿尺寸），也可选「按类型预设」或自定义 WxH。
+
 ---
 
 ## 5. 命名约定（重要！）

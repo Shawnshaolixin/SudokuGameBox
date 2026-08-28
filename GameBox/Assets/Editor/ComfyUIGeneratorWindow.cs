@@ -62,6 +62,12 @@ public class ComfyUIGeneratorWindow : EditorWindow
     private const string PControlSketch = "AIGC.ControlSketch";
     private const string PControlStrength = "AIGC.ControlStrength";
     private const string PLastOutput = "AIGC.LastOutput";
+    private const string PExternalImage = "AIGC.ExternalImage";
+    private const string PExternalSkipBg = "AIGC.ExternalSkipBg";
+    private const string PExternalType = "AIGC.ExternalType";
+    private const string PExternalSizeMode = "AIGC.ExternalSizeMode";
+    private const string PExternalSizeW = "AIGC.ExternalSizeW";
+    private const string PExternalSizeH = "AIGC.ExternalSizeH";
 
     // ============================================================
     // 字段
@@ -93,6 +99,15 @@ public class ComfyUIGeneratorWindow : EditorWindow
     private Texture2D _preview;
     private string _lastOutput;
     private string _lastOutputName;
+
+    // 外部图片导入（其他 AI 工具生成的图，不经本窗口生成）
+    private string _externalImagePath = "";
+    private bool _externalSkipBg;
+    private int _externalTypeIndex = -1; // -1 = 未选过图；选图时按文件名后缀自动推断
+    // 外部导入尺寸模式: 0=保持原始(不缩放,默认) 1=按类型预设 2=自定义 WxH
+    private int _externalSizeMode;
+    private int _externalSizeW = 256;
+    private int _externalSizeH = 96;
 
     // 生成状态机（EditorApplication.update 驱动，全部主线程）
     private enum Stage { Idle, Submitting, Polling, Downloading }
@@ -430,6 +445,17 @@ public class ComfyUIGeneratorWindow : EditorWindow
             "}";
     }
 
+    /// <summary>按文件名后缀推断资源类型索引(与 SpritePipelineImporter 命名约定一致),推断不到返回当前生成区类型</summary>
+    private int GuessTypeFromFileName(string path)
+    {
+        string n = Path.GetFileNameWithoutExtension(path).ToLowerInvariant();
+        if (n.Contains("_btn") || n.Contains("_button")) return 0;
+        if (n.Contains("_panel")) return 1;
+        if (n.Contains("_icon")) return 2;
+        if (n.Contains("_bg") || n.Contains("_background")) return 3;
+        return _typeIndex;
+    }
+
     private static string EscapeJson(string s)
     {
         return s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "");
@@ -439,14 +465,24 @@ public class ComfyUIGeneratorWindow : EditorWindow
     // 后处理:调 Python sprite_pipeline 去背景并导入
     // ============================================================
 
-    private void RunPostProcess()
+    /// <summary>
+    /// 调 Python sprite_pipeline 去背景并导入 Art 目录。
+    /// 参数：inputPath 源图路径；outputName 输出文件名(不含扩展名,保留类型后缀以触发 9-slice 等导入设置)；
+    ///       typeIndex 资源类型索引；skipBg 已透明则跳过 rembg 抠图；
+    ///       sizeMode 0=保持原始(跳过缩放) 1=按类型预设 2=自定义；customW/customH 自定义尺寸(sizeMode=2 时生效)。
+    /// </summary>
+    private void RunPostProcess(string inputPath, string outputName, int typeIndex, bool skipBg, int sizeMode, int customW, int customH)
     {
-        if (string.IsNullOrEmpty(_lastOutput)) return;
+        if (string.IsNullOrEmpty(inputPath)) return;
 
         string script = Path.Combine(ToolsDir, "sprite_pipeline.py");
         string venvPython = Path.Combine(Application.dataPath, "..", "..", ".venv", "Scripts", "python.exe");
         string python = File.Exists(venvPython) ? venvPython : "python";
-        string args = $"\"{script}\" single \"{_lastOutput}\" --type {PipelineTypes[_typeIndex]} --name {_assetName}";
+        string args = $"\"{script}\" single \"{inputPath}\" --type {PipelineTypes[typeIndex]} --name {outputName}";
+        if (skipBg) args += " --skip-bg";
+        // 尺寸控制: 保持原始 → 跳过缩放; 自定义 → 覆盖类型预设(--size)
+        if (sizeMode == 0) args += " --skip-resize";
+        else if (sizeMode == 2) args += $" --size {customW}x{customH}";
 
         var psi = new System.Diagnostics.ProcessStartInfo
         {
@@ -531,6 +567,54 @@ public class ComfyUIGeneratorWindow : EditorWindow
         else
         {
             EditorGUILayout.HelpBox("未找到模型,请确认 ComfyUI 目录正确且有 .safetensors 文件", MessageType.Warning);
+        }
+        EditorGUILayout.EndVertical();
+
+        // ---- 外部图片导入（其他 AI 工具生成的图）----
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.LabelField("📥 外部图片导入", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("选择图片", GUILayout.Width(96)))
+        {
+            string picked = EditorUtility.OpenFilePanel("选择 AI 生成的图片", "", "png,jpg,jpeg,webp,bmp");
+            if (!string.IsNullOrEmpty(picked))
+            {
+                _externalImagePath = picked;
+                // 按文件名后缀自动推断资源类型,推断不到用生成区当前类型
+                _externalTypeIndex = GuessTypeFromFileName(picked);
+            }
+        }
+        if (!string.IsNullOrEmpty(_externalImagePath))
+            GUILayout.Label(Path.GetFileName(_externalImagePath), EditorStyles.miniLabel);
+        EditorGUILayout.EndHorizontal();
+        if (!string.IsNullOrEmpty(_externalImagePath))
+        {
+            EditorGUILayout.BeginHorizontal();
+            _externalTypeIndex = EditorGUILayout.Popup("类型", _externalTypeIndex, new[] { "_btn 按钮", "_panel 面板", "_icon 图标", "_bg 背景" });
+            _externalSkipBg = EditorGUILayout.Toggle("已透明(跳过抠图)", _externalSkipBg);
+            EditorGUILayout.EndHorizontal();
+            // 尺寸模式: 默认保持原图尺寸(外部 AI 已定稿,不再强制缩放)
+            _externalSizeMode = EditorGUILayout.Popup("尺寸", _externalSizeMode, new[] { "保持原始", "按类型预设", "自定义" });
+            if (_externalSizeMode == 2)
+            {
+                EditorGUILayout.BeginHorizontal();
+                _externalSizeW = EditorGUILayout.IntField("宽度", _externalSizeW);
+                _externalSizeH = EditorGUILayout.IntField("高度", _externalSizeH);
+                EditorGUILayout.EndHorizontal();
+            }
+            if (GUILayout.Button("🔄 去背景并导入 Unity Art", GUILayout.Height(32)))
+            {
+                SavePrefs();
+                RunPostProcess(_externalImagePath, Path.GetFileNameWithoutExtension(_externalImagePath),
+                    _externalTypeIndex, _externalSkipBg, _externalSizeMode, _externalSizeW, _externalSizeH);
+            }
+        }
+        else
+        {
+            EditorGUILayout.HelpBox(
+                "选择其他 AI 工具(即梦 / MJ / Liblib 等)生成的图片,一键去背景并导入 Unity Art 目录。\n" +
+                "文件名带 _btn / _panel / _icon / _bg 后缀会自动配置 9-slice 等导入设置。",
+                MessageType.Info);
         }
         EditorGUILayout.EndVertical();
 
@@ -641,7 +725,7 @@ public class ComfyUIGeneratorWindow : EditorWindow
             GUILayout.Space(4);
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("🔄 去背景并导入 Unity Art", GUILayout.Height(32)))
-                RunPostProcess();
+                RunPostProcess(_lastOutput, _assetName, _typeIndex, false, 1, 0, 0); // 生成区保持按类型预设缩放(原行为)
             if (GUILayout.Button("打开输出文件夹", GUILayout.Height(32)))
             {
                 Directory.CreateDirectory(AiOutputDir);
@@ -683,6 +767,15 @@ public class ComfyUIGeneratorWindow : EditorWindow
         _lastOutput = EditorPrefs.GetString(PLastOutput, "");
         if (!string.IsNullOrEmpty(_lastOutput) && !System.IO.File.Exists(_lastOutput))
             _lastOutput = "";
+        // 外部图片路径同理:文件没了就清掉
+        _externalImagePath = EditorPrefs.GetString(PExternalImage, "");
+        if (!string.IsNullOrEmpty(_externalImagePath) && !System.IO.File.Exists(_externalImagePath))
+            _externalImagePath = "";
+        _externalSkipBg = EditorPrefs.GetBool(PExternalSkipBg, false);
+        _externalTypeIndex = EditorPrefs.GetInt(PExternalType, -1);
+        _externalSizeMode = EditorPrefs.GetInt(PExternalSizeMode, 0);
+        _externalSizeW = EditorPrefs.GetInt(PExternalSizeW, 256);
+        _externalSizeH = EditorPrefs.GetInt(PExternalSizeH, 96);
     }
 
     private void SavePrefs()
@@ -702,5 +795,12 @@ public class ComfyUIGeneratorWindow : EditorWindow
         EditorPrefs.SetFloat(PControlStrength, _controlStrength);
         if (!string.IsNullOrEmpty(_lastOutput))
             EditorPrefs.SetString(PLastOutput, _lastOutput);
+        if (!string.IsNullOrEmpty(_externalImagePath))
+            EditorPrefs.SetString(PExternalImage, _externalImagePath);
+        EditorPrefs.SetBool(PExternalSkipBg, _externalSkipBg);
+        EditorPrefs.SetInt(PExternalType, _externalTypeIndex);
+        EditorPrefs.SetInt(PExternalSizeMode, _externalSizeMode);
+        EditorPrefs.SetInt(PExternalSizeW, _externalSizeW);
+        EditorPrefs.SetInt(PExternalSizeH, _externalSizeH);
     }
 }

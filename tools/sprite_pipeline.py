@@ -141,6 +141,7 @@ def process_single(
     skip_bg_removal: bool = False,
     skip_crop: bool = False,
     skip_resize: bool = False,
+    target_size: tuple = None,
 ):
     """
     处理单张图片的完整管线
@@ -150,6 +151,7 @@ def process_single(
         asset_type:   资源类型 (button/panel/icon/particle/bg)
         output_name:  输出文件名（不含扩展名，会自动加 .png）
         skip_*:       跳过某些步骤（比如已经是透明 PNG 就不需要去背景）
+        target_size:  显式指定目标尺寸 (w, h)，覆盖类型预设；None 用类型预设
     """
     input_path = Path(input_path)
     if not input_path.exists():
@@ -185,9 +187,10 @@ def process_single(
 
     # 步骤 3: 缩放
     if not skip_resize:
-        target_size = TYPE_SIZE_MAP.get(asset_type, (256, 256))
+        # 目标尺寸优先级: 调用方显式指定(--size) > 类型预设
+        size = target_size or TYPE_SIZE_MAP.get(asset_type, (256, 256))
         print(f"🔹 步骤 3/3: 缩放到目标尺寸 [{output_name}]")
-        resize_to_target(output_path, target_size)
+        resize_to_target(output_path, size)
     else:
         print(f"🔹 步骤 3/3: 跳过缩放 [{output_name}]")
 
@@ -295,6 +298,7 @@ def main():
     single_parser.add_argument("--skip-bg", action="store_true", help="已是透明 PNG，跳过去背景")
     single_parser.add_argument("--skip-crop", action="store_true", help="跳过裁切")
     single_parser.add_argument("--skip-resize", action="store_true", help="跳过缩放")
+    single_parser.add_argument("--size", default=None, help="显式目标尺寸 WxH(如 256x96)，覆盖类型预设；与 --skip-resize 互斥")
 
     # --- batch ---
     batch_parser = subparsers.add_parser("batch", help="批量处理文件夹")
@@ -307,6 +311,14 @@ def main():
     args = parser.parse_args()
 
     if args.command == "single":
+        # 解析 --size WxH → (w, h);格式错误直接报错退出
+        target_size = None
+        if args.size:
+            try:
+                w, h = args.size.lower().split("x")
+                target_size = (int(w), int(h))
+            except ValueError:
+                parser.error("--size 格式应为 WxH，如 256x96")
         process_single(
             args.input,
             args.type,
@@ -314,6 +326,7 @@ def main():
             skip_bg_removal=args.skip_bg,
             skip_crop=args.skip_crop,
             skip_resize=args.skip_resize,
+            target_size=target_size,
         )
     elif args.command == "batch":
         process_batch(args.input_dir, args.type)

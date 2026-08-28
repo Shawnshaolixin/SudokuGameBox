@@ -55,6 +55,8 @@ namespace Box.HotUpdate.Sudoku
             });
             BindButton("HintButton", out _hintBtn, OnHint);
             BindButton("BackButton", out _, OnExitButton); // 左上角返回=退出对局(确认框);实体返回键仍=Undo
+            // 2026-08-29:返回按钮只保留 icon,隐藏文字 Label(icon 已足够表达语义)
+            transform.Find("BackButton/Label")?.gameObject.SetActive(false);
 
             for (int i = 1; i <= 9; i++)
             {
@@ -107,7 +109,7 @@ namespace Box.HotUpdate.Sudoku
             SetButtonLabel("RedoButton", L10n.Get("game.redo"));
             SetButtonLabel("EraseButton", L10n.Get("game.erase"));
             SetButtonLabel("HintButton", L10n.Get("game.hint"));
-            SetButtonLabel("BackButton", L10n.Get("game.back"));
+            // BackButton 无文字(2026-08-29:只保留 icon,见 OnCreate 隐藏 Label)
             RefreshHintText();
         }
 
@@ -322,14 +324,18 @@ namespace Box.HotUpdate.Sudoku
 
         // ---- 棋盘配色:对齐 docs/UIDesignSystem 设计 Token(浅色奶油棕系,原深灰板废止) ----
         // 宫间 8px 缝隙=Border 描边,格间 2px 缝隙=Background/Secondary,格底=Surface 两级
-        static readonly Color s_BoardGapColor = new Color(0.910f, 0.835f, 0.608f); // Border #E8D59B(棋盘底/宫分隔)
-        static readonly Color s_CellGapColor = new Color(0.984f, 0.910f, 0.651f); // Background/Secondary #FBE8A6(宫底)
+        // 2026-08-29 视觉修正:① 选中/错误区分(选中改草绿,错误加深红——原橙/红同属暖系难辨);
+        // ② Peer 高亮独立(原与格缝隙 #FBE8A6 同值,选中后 9 格与边框同色);
+        // ③ 内外边框加深一档,格线更明显
+        static readonly Color s_BoardOuterColor = new Color(0.753f, 0.635f, 0.376f); // #C0A260 棋盘最外层边框(比宫分隔深一档)
+        static readonly Color s_BoardGapColor = new Color(0.839f, 0.722f, 0.451f); // #D6B873 棋盘底/宫分隔(外边框,加深)
+        static readonly Color s_CellGapColor = new Color(0.941f, 0.843f, 0.561f); // #F0D78F 宫底/格间缝隙(内边框,加深)
         static readonly Color s_CellBgDefault = new Color(1f, 0.976f, 0.914f); // Surface/Primary #FFF9E9(可编辑格)
         static readonly Color s_CellBgGiven = new Color(1f, 0.953f, 0.816f); // Surface/Secondary #FFF3D0(给定格)
-        static readonly Color s_HlSelected = new Color(0.914f, 0.471f, 0.196f); // Primary #E97832(选中格,橙系与暖色主题统一)
+        static readonly Color s_HlSelected = new Color(0.435f, 0.659f, 0.361f); // 柔和草绿(选中格,与错误红明确区分)
         static readonly Color s_HlSameNumber = new Color(0.965f, 0.847f, 0.459f); // Background/Primary #F6D875(同数高亮,黄橙)
-        static readonly Color s_HlPeer = new Color(0.984f, 0.910f, 0.651f); // Background/Secondary #FBE8A6(同行列宫)
-        static readonly Color s_HlMistake = new Color(0.910f, 0.459f, 0.380f); // 错误红,借 2048 #E87561
+        static readonly Color s_HlPeer = new Color(1f, 0.906f, 0.745f); // #FFE7BE(同行列宫弱高亮,浅杏橙,独立于边框色)
+        static readonly Color s_HlMistake = new Color(0.851f, 0.353f, 0.267f); // #D95A44 错误红(加深,与选中绿对比清晰)
         static readonly Color s_TextGiven = new Color(0.227f, 0.165f, 0.102f); // Text/Primary #3A2A1A(给定数字)
         static readonly Color s_TextInput = new Color(0.914f, 0.471f, 0.196f); // Primary #E97832(输入数字)
         static readonly Color s_TextNote = new Color(0.502f, 0.424f, 0.302f); // Text/Secondary #806C4D(笔记)
@@ -343,9 +349,12 @@ namespace Box.HotUpdate.Sudoku
             var outer = _board.GetComponent<GridLayoutGroup>();
             if (outer == null) outer = _board.AddComponent<GridLayoutGroup>();
             float boxGap = 8f, cellGap = 2f;
+            float outerPad = 14f; // 棋盘最外层边框厚度(2026-08-29:GridLayoutGroup padding 外露容器底色)
             var rect = boardRect.rect;
-            outer.cellSize = new Vector2((rect.width - 2 * boxGap) / 3f, (rect.height - 2 * boxGap) / 3f);
+            outer.padding = new RectOffset((int)outerPad, (int)outerPad, (int)outerPad, (int)outerPad);
+            outer.cellSize = new Vector2((rect.width - 2 * boxGap - 2 * outerPad) / 3f, (rect.height - 2 * boxGap - 2 * outerPad) / 3f);
             outer.spacing = new Vector2(boxGap, boxGap);
+            _board.GetComponent<Image>().color = s_BoardOuterColor; // 容器底色=外框色(宫缝用宫底色,见 Box 生成)
             outer.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             outer.constraintCount = 3;
 
@@ -413,7 +422,7 @@ namespace Box.HotUpdate.Sudoku
                 {
                     text.Text = value.ToString();
                     text.SetFontSize(40);
-                    // 选中(橙底)/错误(红底)实心高亮统一翻白字保对比;给定=深棕(Text/Primary),输入=主色橙(Primary)区分给定/自填
+                    // 选中(绿底)/错误(红底)实心高亮统一翻白字保对比;给定=深棕(Text/Primary),输入=主色橙(Primary)区分给定/自填
                     text.SetColor(_session.IsMistake(i) || i == _session.SelectedIndex ? Color.white : _session.IsGiven(i) ? s_TextGiven : s_TextInput);
                     text.SetVisible(true);
                 }
@@ -431,8 +440,8 @@ namespace Box.HotUpdate.Sudoku
                 }
 
                 // 高亮优先级:Mistake > Selected > SameNumber > Peer > 给定/默认
-                // 配色对齐 UIDesignSystem:选中=主色橙,同数=背景主黄橙,同行列宫=次级背景暖黄,
-                // 给定=次级 Surface,错误=2048 红(调色板唯一红系)
+                // 配色(2026-08-29):选中=草绿(与错误红明确区分),同数=背景主黄橙,
+                // 同行列宫=浅杏橙(独立色,不与边框混淆),给定=次级 Surface,错误=深红
                 Color bg;
                 if (_session.IsMistake(i)) bg = s_HlMistake;
                 else if (i == _session.SelectedIndex) bg = s_HlSelected;

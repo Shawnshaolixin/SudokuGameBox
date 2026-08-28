@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 7a6b234cca6a2e748b1e116ea6f7d84b
+guid: 9d9e8de2db4efde40aba3d38026d9ca8
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4426633665020541037
-    second: dailyChallenge_btn_0
+      213: 8999863512469678568
+    second: main_menu_bg_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -52,7 +52,7 @@ TextureImporter:
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 100
-  spriteBorder: {x: 28, y: 29, z: 32, w: 20}
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
@@ -113,23 +113,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: dailyChallenge_btn_0
+      name: main_menu_bg_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 189
-        height: 74
+        width: 1088
+        height: 1920
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 3974aad82207192c0800000000000000
-      internalID: -4426633665020541037
+      spriteID: 8e921c76e20f5ec70800000000000000
+      internalID: 8999863512469678568
       vertices: []
       indices: 
       edges: []
@@ -139,7 +139,7 @@ TextureImporter:
     physicsShape: []
     bones: []
     spriteID: 5e97eb03825dee720800000000000000
-    internalID: 1537655665
+    internalID: 0
     vertices: []
     indices: 
     edges: []
