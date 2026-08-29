@@ -34,7 +34,7 @@ public static class PopupButtonSkin
 
     /// <summary>奶白按钮节点名(取消/次级/列表项;设置行按钮同为次级操作)。</summary>
     static readonly string[] SurfaceNames =
-        { "Cancel", "ItemTemplate", "SoundButton", "MusicButton", "ThemeButton", "RemoveAdsButton", "PrivacyButton" };
+        { "Cancel", "ItemTemplate", "SoundButton", "MusicButton", "RemoveAdsButton", "PrivacyButton" };
 
     [MenuItem("Box/Phase8/2. Apply Popup Button Skin (UISprite)")]
     public static void ApplyAll()
@@ -175,7 +175,7 @@ public static class PopupButtonSkin
                 Set("Card/Title", "Settings");
                 Set("Card/SoundButton/Label", "Sound: On");
                 Set("Card/MusicButton/Label", "Music: On");
-                Set("Card/ThemeButton/Label", "Theme: Light");
+                // 主题按钮已移除(2026-08-29 Bug 清单),不再刷 ThemeButton
                 Set("Card/RemoveAdsButton/Label", "Remove Ads");
                 Set("Card/PrivacyButton/Label", "Privacy Policy");
                 break;

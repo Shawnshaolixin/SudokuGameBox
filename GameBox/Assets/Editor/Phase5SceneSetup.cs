@@ -63,8 +63,7 @@ public static class Phase5SceneSetup
         SetPosition(root, "Title", new Vector2(0, 280));
         SetPosition(root, "SoundButton", new Vector2(0, 150));
         SetPosition(root, "MusicButton", new Vector2(0, 40));
-        SetPosition(root, "ThemeButton", new Vector2(0, -70));
-        SetPosition(root, "LangButton", new Vector2(0, -180));
+        // 主题/语言切换按钮已移除(2026-08-29 Bug 清单:固定浅色 + 英文),不再布局
         if (PopupCardMigration.FindInCard(root, "RemoveAdsButton") == null)
         {
             // 商业化(7-1):去广告购买(橙色强调) + 隐私政策(灰色次级);挂载目标取 Card(防误挂根)
