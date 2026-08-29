@@ -3,6 +3,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Purchasing;
 using UnityEngine.Purchasing.Extension;
+using Unity.Services.Core;
 
 namespace Box.Services
 {
@@ -36,16 +37,26 @@ namespace Box.Services
 
         /// <summary>
         /// 初始化商店并按 Google Play 商店配置商品（主线程、启动时调用一次）。
-        /// TODO(A4 上架流程):Unity IAP 4.12 要求先初始化 Unity Gaming Services
-        /// (UnityServices.InitializeAsync + ProjectSettings.cloudProjectId 绑定 Unity Dashboard)。
-        /// 当前阶段(未上架/未配置 UGS)真机初始化会失败(NoProductsAvailable),属预期限制,
-        /// 由 UI 层 Toast「商店暂不可用」兜底;上架 Play 内部测试轨道后按 TODO 补齐即可真机购买。
+        /// Unity IAP 4.12 硬要求:必须先初始化 Unity Gaming Services(UGS)——UnityServices.InitializeAsync
+        /// 依赖 ProjectSettings.cloudProjectId 绑定 Unity Dashboard(2026-08-29 已绑定)。
+        /// UGS 初始化失败(未绑定/无网络)时商店不可用,由 UI 层 Toast「商店暂不可用」兜底。
         /// </summary>
-        public void Initialize()
+        public async void Initialize()
         {
             if (IsInitialized)
             {
                 Debug.Log("[IAP] 已初始化，跳过重复初始化");
+                return;
+            }
+
+            try
+            {
+                // UGS 初始化:商店连接的硬前置;失败即终止,游戏其余流程不受影响
+                await UnityServices.InitializeAsync();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[IAP] UGS 初始化失败:{e.Message},商店不可用");
                 return;
             }
 

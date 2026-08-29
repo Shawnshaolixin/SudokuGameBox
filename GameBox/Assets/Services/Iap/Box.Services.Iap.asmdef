@@ -4,7 +4,8 @@
     "references": [
         "Box.Services.Abstractions",
         "UnityEngine.Purchasing",
-        "UnityEngine.Purchasing.Stores"
+        "UnityEngine.Purchasing.Stores",
+        "Unity.Services.Core"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
