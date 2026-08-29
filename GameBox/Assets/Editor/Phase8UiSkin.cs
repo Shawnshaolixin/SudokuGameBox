@@ -20,7 +20,9 @@ using UnityEngine.UI;
 public static class Phase8UiSkin
 {
     const string PrefabRoot = "Assets/UI/Prefabs";
-    const string ButtonTexPath = "Assets/Art/UI/Buttons/button_rectangle_depth_flat.png";
+    // 按钮贴图 2026-08-29 切换:Unity 官方内置 UISprite(圆角矩形,PopupButtonSkin 生成),
+    // 弃用第三方 Kenney 按钮图(用户要求"官方可用 UI 元素实现圆角")
+    static string ButtonTexPath => PopupButtonSkin.UISpritePath;
     const string PanelTexPath = "Assets/Art/UI/Panels/button_rectangle_depth_border_panel.png";
 
     // 9-slice 边框:Kenney 按钮 192x64 圆角半径≈16px;面板 192x64 描边圆角≈20px
@@ -30,7 +32,9 @@ public static class Phase8UiSkin
     [MenuItem("Box/Phase8/1. Apply Kenney UI Skin")]
     public static void ApplyAll()
     {
-        // ① 贴图导入为 Sprite + 9-slice 边框(幂等:重复设置同值)
+        // ① 按钮贴图:官方 UISprite 不存在时先由 PopupButtonSkin 生成(幂等),再导入为 Sprite + 9-slice 边框
+        if (!File.Exists(PopupButtonSkin.UISpritePath))
+            PopupButtonSkin.EnsureUiSprite();
         var btnSprite = ConfigureSprite(ButtonTexPath, BtnBorder);
         var panelSprite = ConfigureSprite(PanelTexPath, PanelBorder);
         if (btnSprite == null || panelSprite == null)

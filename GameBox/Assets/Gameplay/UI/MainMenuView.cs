@@ -45,7 +45,7 @@ namespace Box.Gameplay
 
             var more = transform.Find("MoreGamesButton")?.GetComponent<BoxButton>();
             if (more != null)
-                more.OnClick(() => UIService.Instance?.Router.PushAsync<MoreGamesView>("UI/Popups/MoreGamesPopup").Forget());
+                more.OnClick(OnMoreGames);
 
             // 语言变更全 UI 刷新:订阅一次,OnDestroy 退订
             if (!_langSubscribed)
@@ -89,6 +89,20 @@ namespace Box.Gameplay
         {
             var t = transform.Find(path)?.GetComponent<TextMeshProUGUI>();
             if (t != null) t.text = text;
+        }
+
+        /// <summary>
+        /// More Games 按钮:有"其他玩法"(排除首页直达的 sudoku)才开弹窗;
+        /// 否则 toast"敬请期待"(2026-08-29 Bug 清单)。
+        /// </summary>
+        void OnMoreGames()
+        {
+            if (!MoreGamesView.HasOtherModules())
+            {
+                BoxToast.Show(L10n.Get("moreGames.comingSoon"));
+                return;
+            }
+            UIService.Instance?.Router.PushAsync<MoreGamesView>("UI/Popups/MoreGamesPopup").Forget();
         }
 
         /// <summary>进入玩法:壳先写 lastModuleId(仅 Shell 可写 box.*),再交模块加载器。</summary>

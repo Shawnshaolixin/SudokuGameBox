@@ -10,11 +10,12 @@ namespace Box.Services
     /// 缺键回退:en 缺 → zh → 原始 key(测试/新键不炸)。
     /// 文本含 {0}/{1} 占位符,用 Format(key, args) 取。
     /// 热更侧(Box.HotUpdate.Sudoku)可引本类(纯 C#,无 UnityEngine 依赖)。
+    /// v1.0 语言固定英文(设置页无切换入口,Bug 清单 2026-08-29);zh 表保留备未来多语言扩展。
     /// </summary>
     public static class L10n
     {
-        /// <summary>当前语言代码(zh/en)。</summary>
-        public static string Current { get; private set; } = "zh";
+        /// <summary>当前语言代码(zh/en);v1.0 默认 en(英语市场)。</summary>
+        public static string Current { get; private set; } = "en";
 
         /// <summary>语言切换事件(所有打开的视图订阅后即时刷新)。</summary>
         public static event Action LanguageChanged;
@@ -22,16 +23,17 @@ namespace Box.Services
         /// <summary>启动同步(静默设置,不广播;AppBootstrap 在视图创建前调用)。</summary>
         public static void Init(string language)
         {
-            Current = string.IsNullOrEmpty(language) ? "zh" : language;
+            Current = string.IsNullOrEmpty(language) ? "en" : language;
         }
 
         /// <summary>
         /// 切换语言:写入偏好(PlayerPrefs 持久化)+ 广播事件。
         /// 设置弹窗/任何代码调用本方法后,所有订阅视图立即刷新。
+        /// (v1.0 设置页已移除语言切换入口,方法保留备未来多语言扩展)
         /// </summary>
         public static void SetLanguage(string language)
         {
-            var code = string.IsNullOrEmpty(language) ? "zh" : language;
+            var code = string.IsNullOrEmpty(language) ? "en" : language;
             if (code == Current) return; // 无变化不广播
             Current = code;
             if (ServiceLocator.Settings != null) ServiceLocator.Settings.Language = code; // 持久化
@@ -67,6 +69,7 @@ namespace Box.Services
             // More Games 弹窗
             { "moreGames.title", "更多游戏" },
             { "moreGames.close", "完成" },
+            { "moreGames.comingSoon", "敬请期待" }, // 无更多游戏时按钮点击提示(2026-08-29 Bug 清单)
 
             // 设置弹窗
             { "settings.title", "设置" },
@@ -110,12 +113,18 @@ namespace Box.Services
             { "game.time", "用时 {0}" },
             { "game.exit.title", "退出对局" },
             { "game.exit.message", "当前进度将丢失,确定退出?" },
+            { "game.exit.confirm", "退出" }, // 退出确认框按钮(2026-08-29 Bug 清单:按钮文案英语化)
+            { "game.exit.cancel", "取消" },
+            { "hint.ad.confirm", "看广告" }, // 广告提示确认框按钮
+            { "hint.ad.cancel", "取消" },
 
             // 结算弹窗
             { "settlement.title.daily", "每日挑战完成" },
             { "settlement.title.normal", "对局完成" },
             { "settlement.message", "星级 {0}/3   用时 {1}   错误 {2}{3}" },
             { "settlement.hints", "  提示 {0}" },
+            { "settlement.next", "再来一局" }, // 结算按钮(2026-08-29 Bug 清单:按钮文案英语化)
+            { "settlement.home", "返回菜单" },
         };
 
         static readonly Dictionary<string, string> _en = new Dictionary<string, string>
@@ -130,6 +139,7 @@ namespace Box.Services
             // More Games 弹窗
             { "moreGames.title", "More Games" },
             { "moreGames.close", "Done" },
+            { "moreGames.comingSoon", "Coming Soon" },
 
             // 设置弹窗
             { "settings.title", "Settings" },
@@ -173,12 +183,18 @@ namespace Box.Services
             { "game.time", "Time {0}" },
             { "game.exit.title", "Quit Game" },
             { "game.exit.message", "Progress will be lost. Quit?" },
+            { "game.exit.confirm", "Quit" },
+            { "game.exit.cancel", "Cancel" },
+            { "hint.ad.confirm", "Watch" },
+            { "hint.ad.cancel", "Cancel" },
 
             // 结算弹窗
             { "settlement.title.daily", "Daily Challenge Complete" },
             { "settlement.title.normal", "Level Complete" },
             { "settlement.message", "Stars {0}/3   Time {1}   Mistakes {2}{3}" },
             { "settlement.hints", "   Hints {0}" },
+            { "settlement.next", "Next" },
+            { "settlement.home", "Menu" },
         };
     }
 }

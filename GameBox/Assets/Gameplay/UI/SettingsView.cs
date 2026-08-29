@@ -9,11 +9,11 @@ using UnityEngine.UI;
 namespace Box.Gameplay
 {
     /// <summary>
-    /// 设置弹窗(Phase 5 5-2):音效/音乐/主题/语言 基础设置。
+    /// 设置弹窗(Phase 5 5-2):音效/音乐/主题 基础设置。
     /// 值走 ISettingsService(PlayerPrefs 偏好,§8.1「PlayerPrefs 只留音量/语言等偏好」);切换即生效并落盘。
     /// 主题:0=浅色 1=深色,弹窗背景色即时预览(玩法场景换肤 v1.0 后置,注释见 §10.2);
-    /// 语言:zh 中文 / en English —— L10n.SetLanguage 广播 LanguageChanged,其余视图订阅后即时刷新(FR-17)。
-    /// prefab: Resources/UI/Popups/SettingsPopup(Phase5SceneSetup 生成):Title + 4 个切换按钮 + CloseButton,
+    /// 语言按钮已移除(2026-08-29 Bug 清单:v1.0 固定英文,无切换入口;L10n 机制保留备未来)。
+    /// prefab: Resources/UI/Popups/SettingsPopup(Phase5SceneSetup 生成):Title + 3 个切换按钮 + 去广告/隐私 + CloseButton,
     /// 按钮文案子节点约定 "Label"(与 Phase4 弹窗一致)。
     /// </summary>
     public sealed class SettingsView : UIView
@@ -46,7 +46,7 @@ namespace Box.Gameplay
             Bind("SoundButton", ToggleSound);
             Bind("MusicButton", ToggleMusic);
             Bind("ThemeButton", ToggleTheme);
-            Bind("LangButton", ToggleLanguage);
+            // 语言切换按钮已移除(2026-08-29 Bug 清单:v1.0 固定英文)
             Bind("CloseButton", () => Close().Forget());
 
             // Phase 7 7-1:去广告购买 + 隐私政策按钮
@@ -128,14 +128,6 @@ namespace Box.Gameplay
             Refresh();
         }
 
-        void ToggleLanguage()
-        {
-            var s = ServiceLocator.Settings;
-            string next = s != null && s.Language == "en" ? "zh" : "en";
-            L10n.SetLanguage(next); // 写偏好 + 广播 LanguageChanged → 全 UI 即时刷新
-            Refresh();
-        }
-
         async UniTask Close()
         {
             if (_svc != null) await _svc.Router.PopAsync(); // 返回键/完成按钮同路径
@@ -149,12 +141,11 @@ namespace Box.Gameplay
             bool sound = s == null || s.SoundEnabled;
             bool music = s == null || s.MusicEnabled;
             int theme = s == null ? 0 : s.ThemeIndex;
-            string lang = s == null ? "zh" : s.Language;
 
             SetLabel("SoundButton", L10n.Get(sound ? "settings.soundOn" : "settings.soundOff"));
             SetLabel("MusicButton", L10n.Get(music ? "settings.musicOn" : "settings.musicOff"));
             SetLabel("ThemeButton", L10n.Get(theme == 0 ? "settings.themeLight" : "settings.themeDark"));
-            SetLabel("LangButton", L10n.Get(lang == "en" ? "settings.langEn" : "settings.langZh"));
+            // 语言按钮已移除(2026-08-29 Bug 清单),不再刷新 LangButton
             SetLabel("CloseButton", L10n.Get("settings.done"));
             bool purchased = _iap != null && _iap.IsRemoveAdsPurchased;
             SetLabel("RemoveAdsButton", L10n.Get(purchased ? "settings.removeAdsPurchased" : "settings.removeAds"));

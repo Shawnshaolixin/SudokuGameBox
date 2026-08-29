@@ -15,12 +15,17 @@ namespace Box.Gameplay
     /// 大厅与弹窗零改动,组件化闭环(§5 目标)。
     /// 入口列表每次 OnCreate/语言刷新按清单重建,不做静态硬编码(与 MainMenuView 的 sudoku 按钮互补:
     /// 弹窗覆盖"更多玩法",主菜单保留两个直达按钮,后期由配置决定展示)。
+    /// ⚠️ sudoku 不渲染(2026-08-29 Bug 清单:首页已有直达入口,更多游戏里不应重复);
+    /// 无其他游戏时 MainMenuView 点按钮直接 toast"敬请期待"(HasOtherModules 判定,不打开空弹窗)。
     /// prefab: UI/Prefabs/Popups/MoreGamesPopup(MoreGamesPopupSetup 生成):Title + Content 容器
     /// + ItemTemplate(隐藏模板,运行时克隆)+ CloseButton,按钮文案子节点约定 "Label"。
     /// 只依赖 ModuleFramework/Services/UI(AOT 壳),不引用任何玩法类型。
     /// </summary>
     public sealed class MoreGamesView : UIView
     {
+        /// <summary>主玩法模块 id:首页已有直达入口,More Games 列表排除不重复展示。</summary>
+        public const string MainModuleId = "sudoku";
+
         /// <summary>语言切换订阅标记(防重复订阅;OnDestroy 退订防泄漏,照 MainMenuView)。</summary>
         bool _langSubscribed;
 
@@ -85,16 +90,28 @@ namespace Box.Gameplay
             RenderItems(CollectEntries(ModuleLoader.Instance?.Entries));
         }
 
-        /// <summary>过滤启用 + 非空 id + sortOrder 升序(纯静态,EditMode 单测直接测)。</summary>
+        /// <summary>
+        /// 过滤启用 + 非空 id + 排除主玩法(sudoku)+ sortOrder 升序(纯静态,EditMode 单测直接测)。
+        /// 主玩法首页已有直达入口,More Games 只放"其他玩法"(2026-08-29 Bug 清单)。
+        /// </summary>
         public static List<ModuleEntry> CollectEntries(IReadOnlyList<ModuleEntry> entries)
         {
             var list = new List<ModuleEntry>();
             if (entries == null) return list;
             foreach (var e in entries)
-                if (e != null && e.enabled && !string.IsNullOrEmpty(e.id))
+                if (e != null && e.enabled && !string.IsNullOrEmpty(e.id) && e.id != MainModuleId)
                     list.Add(e);
             list.Sort((a, b) => a.sortOrder.CompareTo(b.sortOrder));
             return list;
+        }
+
+        /// <summary>
+        /// 是否存在"其他玩法"(排除主玩法):MainMenuView 判定 More Games 按钮行为——
+        /// 无其他游戏时直接 toast"敬请期待",不打开空弹窗。
+        /// </summary>
+        public static bool HasOtherModules()
+        {
+            return CollectEntries(ModuleLoader.Instance?.Entries).Count > 0;
         }
 
         /// <summary>克隆 ItemTemplate 渲染列表(先清旧项,缓存复用/语言刷新安全)。</summary>

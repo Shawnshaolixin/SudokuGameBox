@@ -230,6 +230,8 @@ namespace Box.HotUpdate.Sudoku
             if (dialog == null) return; // 资源缺失:放弃
             dialog.SetTitle(L10n.Get("game.exit.title"));
             dialog.SetMessage(L10n.Get("game.exit.message"));
+            dialog.SetConfirmText(L10n.Get("game.exit.confirm")); // 按钮文案走 L10n(2026-08-29 Bug 清单)
+            dialog.SetCancelText(L10n.Get("game.exit.cancel"));
             dialog.OnCancel(() => _svc.Router.PopAsync().Forget()); // 取消:只关弹窗
             dialog.OnConfirm(async () => // 确认:先关弹窗再退模块(复位状态),防竞态(同 DifficultySelect)
             {
@@ -289,6 +291,8 @@ namespace Box.HotUpdate.Sudoku
             if (dialog == null) return; // 资源缺失:放弃(提示按钮保持不可点)
             dialog.SetTitle(L10n.Get("hint.ad.title"));
             dialog.SetMessage(L10n.Format("hint.ad.message", GameSession.MaxAdsBonusHints));
+            dialog.SetConfirmText(L10n.Get("hint.ad.confirm")); // 按钮文案走 L10n(2026-08-29 Bug 清单)
+            dialog.SetCancelText(L10n.Get("hint.ad.cancel"));
             dialog.OnCancel(() => _svc.Router.PopAsync().Forget());
             dialog.OnConfirm(async () =>
             {

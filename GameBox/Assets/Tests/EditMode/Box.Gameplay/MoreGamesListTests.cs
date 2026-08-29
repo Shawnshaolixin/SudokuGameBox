@@ -6,9 +6,9 @@ namespace Box.Gameplay.Tests
 {
     /// <summary>
     /// More Games 弹窗列表测试(13 文档 §5 落地,大厅动态化):
-    /// CollectEntries 是弹窗列表的唯一数据来源 —— 过滤 enabled、忽略空 id、sortOrder 升序,
-    /// 确保「新增玩法只需清单加 1 条」的闭环在数据层先立住;
-    /// 顺带断言 MoreGames 相关 L10n key 已就位(菜单按钮/弹窗标题/关闭按钮)。
+    /// CollectEntries 是弹窗列表的唯一数据来源 —— 过滤 enabled、忽略空 id、排除主玩法 sudoku、
+    /// sortOrder 升序,确保「新增玩法只需清单加 1 条」的闭环在数据层先立住;
+    /// 顺带断言 MoreGames 相关 L10n key 已就位(菜单按钮/弹窗标题/关闭按钮/敬请期待)。
     /// 纯静态方法,无实例化,EditMode 直接测(不引第三方库)。
     /// </summary>
     public class MoreGamesListTests
@@ -75,17 +75,42 @@ namespace Box.Gameplay.Tests
         }
 
         [Test]
+        public void CollectEntries_ExcludesMainModule()
+        {
+            // 主玩法 sudoku 首页已有直达入口,More Games 列表必须排除(2026-08-29 Bug 清单)
+            var entries = new[]
+            {
+                Entry("sudoku", true, 0),
+                Entry("tetris", true, 1),
+            };
+            var result = MoreGamesView.CollectEntries(entries);
+            Assert.AreEqual(1, result.Count);
+            Assert.AreEqual("tetris", result[0].id);
+        }
+
+        [Test]
+        public void CollectEntries_SudokuOnly_ReturnsEmpty()
+        {
+            // 清单只有 sudoku(当前状态):列表为空,MainMenuView 将 toast"敬请期待"
+            var entries = new[] { Entry("sudoku", true, 0) };
+            var result = MoreGamesView.CollectEntries(entries);
+            Assert.AreEqual(0, result.Count);
+        }
+
+        [Test]
         public void MoreGames_L10nKeys_Registered()
         {
             L10n.Init("zh");
             Assert.AreEqual("更多游戏", L10n.Get("menu.moreGames"));
             Assert.AreEqual("更多游戏", L10n.Get("moreGames.title"));
             Assert.AreEqual("完成", L10n.Get("moreGames.close"));
+            Assert.AreEqual("敬请期待", L10n.Get("moreGames.comingSoon"));
 
             L10n.Init("en");
             Assert.AreEqual("More Games", L10n.Get("menu.moreGames"));
             Assert.AreEqual("More Games", L10n.Get("moreGames.title"));
             Assert.AreEqual("Done", L10n.Get("moreGames.close"));
+            Assert.AreEqual("Coming Soon", L10n.Get("moreGames.comingSoon"));
         }
     }
 }

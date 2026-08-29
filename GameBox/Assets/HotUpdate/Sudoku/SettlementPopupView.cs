@@ -34,6 +34,8 @@ namespace Box.HotUpdate.Sudoku
                 string hints = _result.HintsUsed > 0 ? L10n.Format("settlement.hints", _result.HintsUsed) : "";
                 SetMessage(L10n.Format("settlement.message", _result.StarRating, time, _result.MistakeCount, hints));
             }
+            SetConfirmText(L10n.Get("settlement.next")); // 按钮文案走 L10n(2026-08-29 Bug 清单)
+            SetCancelText(L10n.Get("settlement.home"));
             return UniTask.CompletedTask;
         }
 

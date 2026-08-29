@@ -9,6 +9,8 @@ namespace Box.Gameplay
     /// keyPrefix 可注入(测试用独立前缀,避免污染真实偏好);默认 "settings"。
     /// 属壳层(AOT):热更侧只依赖 Abstractions 的 ISettingsService。
     /// v1.1 起偏好同步/漫游(云)可在此扩展,接口不变。
+    /// 语言:v1.0 固定英文(设置页无切换入口,2026-08-29 Bug 清单),
+    /// 不读 PlayerPrefs 旧值(强制 en,防历史 zh 残留);L10n 机制保留备未来多语言。
     /// </summary>
     public sealed class SettingsService : ISettingsService
     {
@@ -59,7 +61,7 @@ namespace Box.Gameplay
             get => _language;
             set
             {
-                _language = string.IsNullOrEmpty(value) ? "zh" : value;
+                _language = string.IsNullOrEmpty(value) ? "en" : value;
                 PlayerPrefs.SetString(_prefix + KeyLanguage, _language);
                 PlayerPrefs.Save();
             }
@@ -75,7 +77,7 @@ namespace Box.Gameplay
             _sound = PlayerPrefs.GetInt(_prefix + KeySound, 1) == 1;   // 默认开
             _music = PlayerPrefs.GetInt(_prefix + KeyMusic, 1) == 1;   // 默认开
             _theme = PlayerPrefs.GetInt(_prefix + KeyTheme, 0);        // 0=浅色(默认)
-            _language = PlayerPrefs.GetString(_prefix + KeyLanguage, "zh"); // zh=中文
+            _language = "en"; // v1.0 固定英文:不读 PlayerPrefs(忽略历史 zh 残留),见类注释
         }
 
         public void Save() => PlayerPrefs.Save();

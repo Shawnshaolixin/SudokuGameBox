@@ -61,14 +61,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.35, g: 0.6, b: 0.95, a: 1}
+  m_Color: {r: 1, g: 0.9765, b: 0.9137, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 11c8485de958bbe408d8a128dadbcfbc, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 8bf4024ebf8f00c479ac314c87fc62d5, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -201,7 +201,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u73A9\u6CD5"
+  m_text: Game
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
   m_sharedMaterial: {fileID: 1966347448997178423, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
@@ -211,7 +211,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColor: {r: 0.2275, g: 0.1647, b: 0.102, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -346,14 +346,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0.9137, g: 0.4706, b: 0.1961, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 44ec897e2fb7d3a4491876e2b99e7512, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 8bf4024ebf8f00c479ac314c87fc62d5, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -564,7 +564,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u66F4\u591A\u6E38\u620F"
+  m_text: More Games
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
   m_sharedMaterial: {fileID: 1966347448997178423, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
@@ -852,7 +852,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u5B8C\u6210"
+  m_text: Done
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
   m_sharedMaterial: {fileID: 1966347448997178423, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
@@ -862,7 +862,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4279904826
-  m_fontColor: {r: 0.22745098, g: 0.16470589, b: 0.101960786, a: 1}
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:

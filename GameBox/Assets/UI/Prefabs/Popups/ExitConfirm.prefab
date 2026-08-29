@@ -145,7 +145,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u9000\u51FA"
+  m_text: Quit
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
   m_sharedMaterial: {fileID: 1966347448997178423, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
@@ -295,7 +295,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u53D6\u6D88"
+  m_text: Cancel
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
   m_sharedMaterial: {fileID: 1966347448997178423, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
@@ -305,7 +305,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColor: {r: 0.2275, g: 0.1647, b: 0.102, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -445,7 +445,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u9000\u51FA\u5BF9\u5C40"
+  m_text: Quit Game
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: e7ddac0221a63e84fa8c90d1da5127e7, type: 2}
   m_sharedMaterial: {fileID: 7916236894587030282, guid: e7ddac0221a63e84fa8c90d1da5127e7, type: 2}
@@ -590,14 +590,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.35, g: 0.6, b: 0.95, a: 1}
+  m_Color: {r: 0.9137, g: 0.4706, b: 0.1961, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 44ec897e2fb7d3a4491876e2b99e7512, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 8bf4024ebf8f00c479ac314c87fc62d5, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -832,7 +832,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u5F53\u524D\u8FDB\u5EA6\u5C06\u4E22\u5931,\u786E\u5B9A\u9000\u51FA?"
+  m_text: Progress will be lost. Quit?
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
   m_sharedMaterial: {fileID: 1966347448997178423, guid: 7ed10e0d8f177924daa0ddfdc93ba5dc, type: 2}
@@ -977,14 +977,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 0.9765, b: 0.9137, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 7a6b234cca6a2e748b1e116ea6f7d84b, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 8bf4024ebf8f00c479ac314c87fc62d5, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
