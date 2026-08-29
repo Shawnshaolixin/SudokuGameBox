@@ -9,21 +9,20 @@ using UnityEngine.UI;
 namespace Box.Gameplay
 {
     /// <summary>
-    /// 设置弹窗(Phase 5 5-2):音效/音乐/主题 基础设置。
+    /// 设置弹窗(Phase 5 5-2):音效/音乐 基础设置。
     /// 值走 ISettingsService(PlayerPrefs 偏好,§8.1「PlayerPrefs 只留音量/语言等偏好」);切换即生效并落盘。
-    /// 主题:0=浅色 1=深色,弹窗背景色即时预览(玩法场景换肤 v1.0 后置,注释见 §10.2);
+    /// 主题固定浅色(2026-08-29 Bug 清单:主题按钮已移除,卡片与文字恒为设计 token 浅色值;玩法场景换肤 v1.0 后置,注释见 §10.2);
     /// 语言按钮已移除(2026-08-29 Bug 清单:v1.0 固定英文,无切换入口;L10n 机制保留备未来)。
-    /// prefab: Resources/UI/Popups/SettingsPopup(Phase5SceneSetup 生成):Title + 3 个切换按钮 + 去广告/隐私 + CloseButton,
+    /// prefab: Assets/UI/Prefabs/Popups/SettingsPopup(Phase5SceneSetup 生成):Title + 2 个切换按钮 + 去广告/隐私 + CloseButton,
     /// 按钮文案子节点约定 "Label"(与 Phase4 弹窗一致)。
     /// </summary>
     public sealed class SettingsView : UIView
     {
-        // 主题预览色:浅色取设计 token Surface/Primary(弹窗改造 2026-08 后卡片底色);深色保留原值
-        static readonly Color ThemeLightBg = UITheme.Panel; // #FFF9E9(与 UITheme 同源,防漂移)
-        static readonly Color ThemeDarkBg = new Color(0.08f, 0.08f, 0.10f, 0.97f);
+        // 主题固定浅色:取设计 token Panel 作卡片底色(弹窗改造 2026-08 后卡片底色,与 UITheme 同源,防漂移)
+        static readonly Color ThemeLightBg = UITheme.Panel; // #FFF9E9
 
-        /// <summary>隐私政策 URL 占位(A6:账号 + GitHub Pages 就绪后替换为真实地址)。</summary>
-        const string PrivacyUrl = "https://shawnshaolixin.github.io/SudokuGameBox/privacy-policy.html"; // TODO(A6): 替换真实 URL
+        /// <summary>隐私政策 URL(合规 FR-17,文档见 docs/ 与 GitHub Pages 同源)。</summary>
+        const string PrivacyUrl = "https://shawnshaolixin.github.io/SudokuGameBox/privacy-policy.html";
 
         UIService _svc;
         IIapService _iap;
@@ -45,8 +44,7 @@ namespace Box.Gameplay
             _title = FindInCard("Title")?.GetComponent<TextMeshProUGUI>();
             Bind("SoundButton", ToggleSound);
             Bind("MusicButton", ToggleMusic);
-            Bind("ThemeButton", ToggleTheme);
-            // 语言切换按钮已移除(2026-08-29 Bug 清单:v1.0 固定英文)
+            // 主题/语言切换按钮已移除(2026-08-29 Bug 清单:固定浅色 + 英文)
             Bind("CloseButton", () => Close().Forget());
 
             // Phase 7 7-1:去广告购买 + 隐私政策按钮
@@ -121,13 +119,6 @@ namespace Box.Gameplay
             Refresh();
         }
 
-        void ToggleTheme()
-        {
-            var s = ServiceLocator.Settings;
-            if (s != null) s.ThemeIndex = s.ThemeIndex == 0 ? 1 : 0;
-            Refresh();
-        }
-
         async UniTask Close()
         {
             if (_svc != null) await _svc.Router.PopAsync(); // 返回键/完成按钮同路径
@@ -140,23 +131,21 @@ namespace Box.Gameplay
             var s = ServiceLocator.Settings;
             bool sound = s == null || s.SoundEnabled;
             bool music = s == null || s.MusicEnabled;
-            int theme = s == null ? 0 : s.ThemeIndex;
 
             SetLabel("SoundButton", L10n.Get(sound ? "settings.soundOn" : "settings.soundOff"));
             SetLabel("MusicButton", L10n.Get(music ? "settings.musicOn" : "settings.musicOff"));
-            SetLabel("ThemeButton", L10n.Get(theme == 0 ? "settings.themeLight" : "settings.themeDark"));
-            // 语言按钮已移除(2026-08-29 Bug 清单),不再刷新 LangButton
+            // 主题/语言按钮已移除(2026-08-29 Bug 清单),不再刷新
             SetLabel("CloseButton", L10n.Get("settings.done"));
             bool purchased = _iap != null && _iap.IsRemoveAdsPurchased;
             SetLabel("RemoveAdsButton", L10n.Get(purchased ? "settings.removeAdsPurchased" : "settings.removeAds"));
             SetLabel("PrivacyButton", L10n.Get("settings.privacy"));
 
-            // 主题即时预览:卡片背景色切换(玩法场景换肤属于全 UI 主题系统,v1.0 后置)
-            if (_bg != null) _bg.color = theme == 0 ? ThemeLightBg : ThemeDarkBg;
-            if (_title != null) _title.color = theme == 0 ? UITheme.TextPrimary : Color.white; // 浅色=token #3A2A1A
+            // 主题固定浅色(2026-08-29 移除主题切换按钮):卡片与文字恒为设计 token 浅色值
+            if (_bg != null) _bg.color = ThemeLightBg;
+            if (_title != null) _title.color = UITheme.TextPrimary; // #3A2A1A
             foreach (var label in transform.GetComponentsInChildren<TextMeshProUGUI>(true))
                 if (label != _title)
-                    label.color = theme == 0 ? UITheme.TextPrimary : Color.white;
+                    label.color = UITheme.TextPrimary;
         }
 
         void SetLabel(string path, string text)

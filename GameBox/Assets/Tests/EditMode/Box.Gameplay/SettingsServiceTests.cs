@@ -45,15 +45,23 @@ namespace Box.Gameplay.Tests
             var s = new SettingsService(_prefix);
             s.SoundEnabled = false;
             s.MusicEnabled = false;
-            s.ThemeIndex = 1;
             s.Language = "en";
 
             // 新实例(模拟重启)读回:setter 即时落盘无需显式 Save
             var s2 = new SettingsService(_prefix);
             Assert.IsFalse(s2.SoundEnabled);
             Assert.IsFalse(s2.MusicEnabled);
-            Assert.AreEqual(1, s2.ThemeIndex);
             Assert.AreEqual("en", s2.Language);
+        }
+
+        [Test]
+        public void Theme_Always_Light_Ignores_Persisted_Value()
+        {
+            // v1.0 固定浅色:设置页无主题切换入口,新实例忽略 PlayerPrefs 历史深色值(2026-08-29)
+            var s = new SettingsService(_prefix);
+            s.ThemeIndex = 1; // 模拟旧版本落盘过深色
+            var s2 = new SettingsService(_prefix);
+            Assert.AreEqual(0, s2.ThemeIndex, "构造不读旧值,恒为浅色");
         }
 
         [Test]
