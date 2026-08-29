@@ -18,11 +18,14 @@ namespace Box.Services
     /// </summary>
     public sealed class AdMobAdsService : IAdsService
     {
-        // 官方测试广告位 ID（15 号文档 §2 约定）；AdMob 账号（A2）与广告单元申请下来后替换。
-        // 注意:测试位 ID 在任何设备上都只返回测试广告(零收入,无违规风险),开发阶段无需注册测试设备;
-        // 换成真实广告位 ID 后,必须把真机注册为测试设备(见 TestDeviceIds),否则会被判定无效流量。
-        private const string RewardedAdUnitId = "ca-app-pub-6367116322180531/5022991846";
-        private const string InterstitialAdUnitId = "ca-app-pub-6367116322180531/4813896836";
+        // 广告位 ID 2026-08-29 起临时切回官方测试位(16 号文档备忘 #3):
+        // 封闭测试包分发给他人时,他人设备不在 TestDeviceIds 内会收到真实广告,点击有无效流量风险;
+        // 官方测试位在任何设备上都返回测试广告(零收入,无违规风险),开发阶段无需注册测试设备。
+        // 封闭测试结束、上生产轨道前恢复真实 ID(正式值,勿再切回测试位):
+        //   激励 ca-app-pub-6367116322180531/5022991846
+        //   插屏 ca-app-pub-6367116322180531/4813896836
+        private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
+        private const string InterstitialAdUnitId = "ca-app-pub-3940256099942544/1033173712";
 
         // 真机测试设备 ID 列表(换真实广告位后的必做项,Phase 9):
         // 真机首次请求广告后,logcat 会打印

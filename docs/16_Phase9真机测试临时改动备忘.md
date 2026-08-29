@@ -9,7 +9,7 @@
 |---|---|---|---|---|---|
 | 1 | `Assets/Services/Ads/AdMobAdsService.cs` | `TestDeviceIds` | 真机 ID `AAC1C00E2A99B28A43349D7BD59ADE49` | **临时** | 发布版移除（否则该设备永收测试广告） |
 | 2 | 同上 | `UmpEnabled` | `false`（UMP 禁用） | **临时** | 面向欧美市场时置 `true` 并配置后台表单 |
-| 3 | 同上 | 广告单元 ID（激励/插屏） | 用户真实广告位 | 正式 | 无 |
+| 3 | 同上 | 广告单元 ID（激励/插屏） | 官方测试位 `.../5224354917`、`.../1033173712` | **临时** | 封闭测试结束、上生产轨道前恢复真实 ID（见 §3&4） |
 | 4 | `Assets/GoogleMobileAds/Resources/GoogleMobileAdsSettings.asset` | `adMobAndroidAppId` | 用户真实 App ID | 正式 | 无 |
 | 5 | 同上 | `selectedGmaAndroidSdk` / `overrideDefaultGmaAndroidSdk` | `0` / `1`（Standard SDK） | **待定** | 账号获批后验证固化 |
 | 6 | `ProjectSettings/ProjectSettings.asset` | `applicationIdentifier.Android` | `com.lixingames.rovilo` | 正式 | 无（用户拍板） |
@@ -34,9 +34,13 @@
 - 保留项：`UmpFlowWithTimeout()`（15 秒超时兜底）与 `Initialize()` 的分支逻辑**保留**，
   开关恢复即生效，无需改代码结构。
 
-### 3 & 4. 真实广告位 ID / App ID（正式，勿改回）
+### 3 & 4. 真实广告位 ID / App ID（正式值，封闭测试期临时切回测试位）
 
-- 广告单元 ID：激励 `ca-app-pub-6367116322180531/5022991846`、插屏 `.../4813896836`
+- **2026-08-29 变更**：封闭测试包会分发给他人，他人设备不在 `TestDeviceIds` 内会收到真实广告，
+  点击有无效流量风险（账号审核期容忍度更低）。因此激励/插屏广告单元 ID **临时切回官方测试位**
+  （激励 `ca-app-pub-3940256099942544/5224354917`、插屏 `.../1033173712`，15 号文档 §2.4 约定值）。
+  **封闭测试结束、上生产轨道前恢复下方真实 ID。**
+- 广告单元 ID（真实值，恢复用）：激励 `ca-app-pub-6367116322180531/5022991846`、插屏 `.../4813896836`
 - App ID：`ca-app-pub-6367116322180531~1995277327`（manifest 由
   `GoogleMobileAdsSettings.asset` 构建时自动注入，勿手动改 manifest）
 - 若将来迁移广告位，只需替换常量与 Settings 字段，勿动其他代码。
@@ -73,6 +77,7 @@
 ## 恢复操作清单（上架前）
 
 ```text
+0. AdMobAdsService.cs: 广告单元 ID 恢复真实值（激励 5022991846 / 插屏 4813896836，16 号文档 §3&4）
 1. AdMobAdsService.cs: TestDeviceIds → 空列表（或确认无他人设备）
 2. AdMobAdsService.cs: UmpEnabled → true（且 AdMob 后台已配置同意消息）
 3. 账号获批后按第 5 项验证标准固化当前 SDK 架构（或换 Next-Gen 复测）
