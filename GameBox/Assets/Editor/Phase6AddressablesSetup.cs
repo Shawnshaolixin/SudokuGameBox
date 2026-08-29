@@ -197,12 +197,25 @@ EditorUtility.SetDirty(settings);
                 var assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 // Texture2D 会命中同目录 .meta?不会——FindAssets 只返回主资源;但 sprite 子资源不入库
                 if (!assetPath.StartsWith(artRoot)) continue;
-                if (settings.FindAssetEntry(guid) != null) continue; // 已入库
-                var entry = settings.CreateOrMoveEntry(guid, artGroup, false);
-                if (entry == null) continue;
-                // 地址去扩展名(ogg/wav/png),运行时按 "Art/..." 不带扩展名加载
-                entry.address = addressPrefix + assetPath.Substring(artRoot.Length + 1)
+                // 期望地址:去扩展名(ogg/wav/png),运行时按 "Art/..." 不带扩展名加载
+                var expected = addressPrefix + assetPath.Substring(artRoot.Length + 1)
                     .Replace(".ogg", "").Replace(".wav", "").Replace(".png", "").Replace('\\', '/');
+                var entry = settings.FindAssetEntry(guid);
+                if (entry != null)
+                {
+                    // 已入库但地址漂移(资源重命名后 GUID 不变,旧地址残留 → 运行时加载失败):
+                    // 校正为新文件名对应的地址,与 FxPool 等调用方契约保持一致
+                    if (entry.address != expected)
+                    {
+                        entry.address = expected;
+                        EditorUtility.SetDirty(settings);
+                        Debug.Log($"[Phase6] 地址校正: {assetPath} → {expected}");
+                    }
+                    continue;
+                }
+                entry = settings.CreateOrMoveEntry(guid, artGroup, false);
+                if (entry == null) continue;
+                entry.address = expected;
                 entry.labels.Add("Art");
                 added++;
                 Debug.Log("[Phase6] 新注册: " + assetPath + " → " + entry.address);

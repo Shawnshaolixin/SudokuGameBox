@@ -52,7 +52,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 143f9573cb2ba70468b6fb44cfb255d0
-    m_Address: Art/UI/Panels/button_square_depth_border
+    m_Address: Art/UI/Panels/button_square_depth_border_panel
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -88,7 +88,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 23acdb601e0b69449bcbfe5e01690a52
-    m_Address: Art/Effects/Particles/spark_01
+    m_Address: Art/Effects/Particles/spark_01_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -148,7 +148,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 3c5aebc9bbc9f1b4fa8bd36ea6e7b3f7
-    m_Address: Art/Effects/Particles/magic_02
+    m_Address: Art/Effects/Particles/magic_02_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -184,7 +184,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5856cbfb0f573b542871919f29090e6c
-    m_Address: Art/Effects/Particles/circle_02
+    m_Address: Art/Effects/Particles/circle_02_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -196,7 +196,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 5f7820f11d0b1db4ebf043387336070e
-    m_Address: Art/Effects/Particles/spark_04
+    m_Address: Art/Effects/Particles/spark_04_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -310,7 +310,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7f40f166f4c7d9845997a69803e83b59
-    m_Address: Art/Effects/Particles/light_01
+    m_Address: Art/Effects/Particles/light_01_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -322,7 +322,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 84c37479fc416704485680f381739776
-    m_Address: Art/Effects/Particles/flare_01
+    m_Address: Art/Effects/Particles/flare_01_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -400,13 +400,13 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a3c001a0c167f4b4d801f0b7cfe2cbe4
-    m_Address: Art/Effects/Particles/star_01
+    m_Address: Art/Effects/Particles/star_01_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a643d0d767d899e478f4ab24138bc886
-    m_Address: Art/Effects/Particles/circle_01
+    m_Address: Art/Effects/Particles/circle_01_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -466,7 +466,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c0a777c4c4802fe479dbd5f3aecf4b4c
-    m_Address: Art/UI/Panels/button_rectangle_depth_border
+    m_Address: Art/UI/Panels/button_rectangle_depth_border_panel
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -514,7 +514,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: dbf77b57c171c0b4cbb4ff839fbd9038
-    m_Address: Art/Effects/Particles/star_04
+    m_Address: Art/Effects/Particles/star_04_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -526,7 +526,7 @@ MonoBehaviour:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ddab7ab427b7fb341a35c719543fc64b
-    m_Address: Art/Effects/Particles/magic_01
+    m_Address: Art/Effects/Particles/magic_01_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
