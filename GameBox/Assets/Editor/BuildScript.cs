@@ -20,7 +20,20 @@ public static class BuildScript
     public static void BuildAndroidApk() => BuildAndroid(aab: false);
 
     [MenuItem("Box/Build/Android AAB (release)")]
-    public static void BuildAndroidAab() => BuildAndroid(aab: true);
+    public static void BuildAndroidAab()
+    {
+        // 编辑器 GUI:弹窗确认版本号 + 密码后构建(用户自己点,2026-08-29);
+        // batchmode(CLI/CI):环境变量已由调用方注入,直接走原逻辑不弹窗
+        if (!Application.isBatchMode)
+        {
+            BuildReleaseDialog.ShowDialog();
+            return;
+        }
+        BuildAndroidAabCore();
+    }
+
+    /// <summary>实际构建核心(弹窗与 CLI 共用;弹窗不直接调菜单入口防递归弹窗)。</summary>
+    internal static void BuildAndroidAabCore() => BuildAndroid(aab: true);
 
     /// <summary>
     /// 一次会话产出 APK + AAB 双产物(本地测试 + 上架,Phase 6.5 CI-3 用):
