@@ -29,13 +29,14 @@ namespace Box.Gameplay.Tests
         }
 
         [Test]
-        public void Defaults_SoundOn_MusicOn_Theme0_Chinese()
+        public void Defaults_SoundOn_MusicOn_Theme0_English()
         {
             var s = new SettingsService(_prefix);
             Assert.IsTrue(s.SoundEnabled, "音效默认开");
             Assert.IsTrue(s.MusicEnabled, "音乐默认开");
             Assert.AreEqual(0, s.ThemeIndex, "0=浅色(默认)");
-            Assert.AreEqual("zh", s.Language, "默认中文");
+            // v1.0 固定英文(2026-08-29 Bug 清单②:设置页无语言切换入口,忽略 PlayerPrefs 旧 zh)
+            Assert.AreEqual("en", s.Language, "默认英文");
         }
 
         [Test]
@@ -56,11 +57,12 @@ namespace Box.Gameplay.Tests
         }
 
         [Test]
-        public void Empty_Language_Falls_Back_To_Chinese()
+        public void Empty_Language_Falls_Back_To_English()
         {
             var s = new SettingsService(_prefix);
             s.Language = "";
-            Assert.AreEqual("zh", s.Language);
+            // 空值回退英文(与 v1.0 固定英文策略一致,见类注释)
+            Assert.AreEqual("en", s.Language);
         }
     }
 }
