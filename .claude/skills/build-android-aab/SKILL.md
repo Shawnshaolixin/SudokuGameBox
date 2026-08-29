@@ -21,7 +21,8 @@ description: 构建可上架的 Android AAB(上传签名 + 签名验证)。当�
 | 上传 keystore | 仓库根 `Build/keystore/upload.keystore`（alias `sudoku`；密码见 `Build/keystore/README.md`，当前为占位值 `SudokuGameBox_Upload_2026`） |
 | NDK | r27c，需环境变量 `ANDROID_NDK_ROOT=D:/Projects/AI/AndroidNDK/android-ndk-r27c` |
 | JDK | 内置 OpenJDK，本机已设 `JdkUseEmbedded=1`（注册表 `HKCU\Software\Unity Technologies\Unity Editor 5.x`，GUI 等价于 Preferences → External Tools 选 "JDK installed with Unity"） |
-| Gradle | `D:\Tools\gradle-9.1.0`（GUI 偏好已存，无需处理） |
+| Gradle | 内置（2026-08-29 改 `GradleUseEmbedded=1`；自定义 `D:\Tools\gradle-9.1.0` 曾致编辑器构建 Gradle daemon 挂死 20min+，勿再改回，编辑器与 CLI 均用内置） |
+| 网络代理 | **必须**：`maven.google.com` 国内直连被墙，Gradle 会静默无限重试（假挂死）。已配置 `~/.gradle/gradle.properties` 走本机代理 `127.0.0.1:7897`；构建前确认 Clash 类代理在跑 |
 | 产物 | `GameBox/Build/Android/Rovilo.aab`（约 57 MB） |
 | 耗时 | 10~20 分钟（IL2CPP 全量），建议后台运行 |
 
@@ -82,6 +83,7 @@ grep "已应用上传签名" "d:/Projects/AI/SudokuGameBox/Build/Logs/release-aa
 | `UnityException: JDK not found`（`JDK: ''`） | batchmode 不读 EditorPrefs 的 JdkPath，也不像 GUI 那样回退内置 JDK | 设 `JdkUseEmbedded=1`（见前置条件表）；新机器/CI 首次构建前必须设置 |
 | 构建失败 `error CS...` | 脚本编译错误 | 修代码重跑（构建本身即编译验证） |
 | Jenkins CI-3 产物 debug 签名 | CI 未注入 `BOX_KEYSTORE_PASS` 凭据、SYSTEM 账户无 GUI 偏好 | 见 docs/17 的 CI 注意事项，需 Jenkins 凭据注入 + 注册表/JDK 配置 |
+| 构建卡 Gradle 阶段 15min+（CPU 闲置、日志零增长、"假挂死"） | `maven.google.com:443 Connection reset` 无限重试（2026-08-29 实测：当天上午 5 次构建全卡此点，凌晨 1 次成功；内置/自定义 Gradle 都卡，与版本无关） | 先查 `~/.gradle/daemon/9.1.0/daemon-*.out.log` 是否有 `Retrying request to ...maven.google.com`；确认代理 7897 在跑即可，**不要**杀进程重试（白等）；构建命令加 `export HTTP_PROXY/HTTPS_PROXY=http://127.0.0.1:7897` |
 
 ## 参考
 
