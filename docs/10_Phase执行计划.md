@@ -1,6 +1,6 @@
 # 10 — Phase 执行计划（权威执行手册）
 
-> 版本:v1.2 | 状态:Approved(2026-08-21 用户拍板;2026-08-23 增补 Phase 6.5 CI 管线 + D-17;2026-08-23 CI 工具拍板 Jenkins+SCM 轮询) | 说明:**本文是项目执行的唯一权威计划**。
+> 版本:v1.3 | 状态:Approved(2026-08-21 用户拍板;2026-08-23 增补 Phase 6.5 CI 管线 + D-17;2026-08-23 CI 工具拍板 Jenkins+SCM 轮询;2026-08-31 Phase 9 详细执行计划落地 9-1 完成 + 9-2~9-4 计划) | 说明:**本文是项目执行的唯一权威计划**。
 > 与 [06_项目路线图.md](./06_项目路线图.md)、[07_Unity2022落地版最小开发路线图.md](./07_Unity2022落地版最小开发路线图.md) 冲突时**以本文为准**（06/07 为早期讨论稿，技术基线已被 [11_Unity游戏盒子架构方案.md](./11_Unity游戏盒子架构方案.md) v2.2 与本文覆盖）。
 > 架构决策见 D-1~D-17（11 文档 + 本文 §3）。
 
@@ -254,16 +254,126 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 ## 16. Phase 9 — v1.1 HybridCLR 热更接入（正式工程落地）
 
-| 任务 | 内容 |
-|---|---|
-| 9-1 | 将 Gate 1 结论落地正式工程（安装 hybridclr_unity v8.14.1 + GenerateAll 集成构建链） |
-| 9-2 | HotUpdate.Core + 热更程序集边界搭建（玩法 dll 禁止互引，只引 HotUpdate.Core + AOT 接口） |
-| 9-3 | 启动链路接入热更下载（无强制网络等待，D-10 细化） |
-| 9-4 | Addressables Remote Catalog 远程下发（D-1） |
+> 状态：**9-1 ✅ 完成（2026-08-31，dev/phase9 分支）**；9-2~9-4 待执行（详细计划见下）
+> 分支：`dev/phase9`（基于 main de5d2dc）；红线 6（v1.0 构建链不破坏）与红线 9（不 push）全程适用
+
+| 任务 | 内容 | 状态 |
+|---|---|---|
+| 9-1 | 将 Gate 1 结论落地正式工程（安装 hybridclr_unity v8.14.1 + GenerateAll 集成构建链） | ✅ 2026-08-31 |
+| 9-2 | HotUpdate.Core + 热更程序集边界搭建（玩法 dll 禁止互引，只引 HotUpdate.Core + AOT 接口） | 待执行 |
+| 9-3 | 启动链路接入热更下载（无强制网络等待，D-10 细化） | 待执行 |
+| 9-4 | Addressables Remote Catalog 远程下发（D-1） | 待执行 |
 
 **验收**：AOT 构建 + 热更 dll 加载运行闭环；首包体积增量符合预算。
 
-## 16.5 Phase 9.5 — 新手引导（v1.x 留存优化，FR-16 P0）
+### 16.1 关键机制结论（9-1 从 v8.14.1 包源码实证，后续任务直接引用）
+
+1. **D-2 构建开关 = `ProjectSettings/HybridCLRSettings.asset` 的 `enable` 字段**（包默认 `true`！）：
+   `FilterHotFixAssemblies`（IFilterBuildAssemblies）在 enable=true 时把名单内程序集从主包过滤，
+   `CheckSettings`（IPreprocessBuild）强制 IL2CPP 并指向 hybridclr 运行时。
+   → v1.0 = enable=false（Filter 不介入、原版 il2cpp）；**首次创建该资产必须显式置 false 并入库**（已做，97533e4）。
+2. **官方禁止 AOT 程序集引用热更程序集** → 热更 asmdef 应 `autoReferenced=false`。
+   当前 `Box.HotUpdate.Sudoku` 是 autoReferenced=true（v1.0 靠隐式引用进包），v1.1 模式必然悬垂引用。
+   **解法 = 模式条件桥（9-2）**：AOT 侧 `Box.ModuleBridge`（`defineConstraints:["!HYBRIDCLR_UNITY"]`）——
+   v1.0 无符号时桥编译、Sudoku 进主包；v1.1 构建临时加 `HYBRIDCLR_UNITY` 符号时桥被排除、过滤干净。
+3. **本地包内 + 远程覆盖的正确模型 = Addressables Content Update**（同一 GUID 从本地组迁远程组，
+   `UpdateCatalogs` 后同 key 自动解析到新 bundle），不是本地远程各放一份。
+
+### 16.2 9-1 安装 + GenerateAll 集成构建链（✅ 2026-08-31，验收证据）
+
+- **安装配方**（Phase9HybridCLRInstall.cs，可重跑）：gitee clone `hybridclr` **分支 `6000.3.x`**
+  （⚠️ v8.13.0 tag 装得上但 C++ 与 6000.3.20f1 不兼容）+ `il2cpp_plus` **tag `v6000.3.x-8.14.0`**
+  → Move 进 libil2cpp → `new InstallerController().InstallFromLocal()` → `HasInstalledHybridCLR()` 验证。
+- **GenerateAll 六步首跑成功**：HotUpdateDlls/Android（含 Box.HotUpdate.Sudoku.dll）、
+  AssembliesPostIl2CppStrip（110 个剥离 dll，无热更程序集 ✓）、generated/（MethodBridge/AssemblyManifest/UnityVersion）、
+  AOTGenericReferences.cs 审查通过（PatchedAOTAssemblyList = Box.UI/System.Core/UniTask/UnityEngine.CoreModule/mscorlib，泛型面以 UniTask 状态机 + Stack\<GameSession.Move\> 为主）。
+- **v1.1 中间态**（免签名 APK `Rovilo-debug-v12-20260831-0048.apk`，69,200,768 B）：`[FilterHotFixAssemblies]` 过滤日志出现；
+  libil2cpp.so 含 **38 处 "HybridCLR" 字符串** + LoadMetadataForAOTAssembly/RuntimeApi 符号（Gate1 标准 ~46 处，数量级一致）。
+- **v1.0 回归**（`Rovilo-debug-v12-20260831-0101.apk`，68,139,128 B）：原入口出包成功、
+  libil2cpp.so **0 处 HybridCLR 符号**、GameplayView 类型在 global-metadata.dat、classes.dex 与旧基线逐字节同大小。
+- **体积口径（重要）**：HybridCLR 真实成本 = v1.1 − v1.0（同日同代码）= **+1,061,640 B ≈ +1.01MB**；
+  v1.0 相对未安装 HybridCLR 的构建增量为 0（enable=false 走原版 il2cpp）。
+  旧 60.1MB 基线（Rovilo.apk，v11 时代）早于 main 玩法动画三连提交（8-30 22:00+），
+  新增的 20.5MB bin/Data 内容文件两包都有、与 HybridCLR 无关——**不要用旧基线比体积**。
+- **构建入口**（BuildScript.cs，双阶段 CLI）：
+  `PrepareV11`（切 Android + NDK r27c EditorPrefs + enable=true + 名单 + HYBRIDCLR_UNITY 符号）→
+  `BuildV11`（GenerateAll → 复位 exportAsGoogleAndroidProject=false → Addressables → 构建 → finally 恢复 enable=false + 移除符号）；
+  中间态验证用 `BuildV11Apk`（免签名）。AAB 完整构建需 BOX_KEYSTORE_PASS（尚未跑，见 16.6 阻塞项）。
+- **提交**：fc8aee3 / 97533e4 / 89d579a / 8eb65b9。
+
+### 16.3 9-2 边界 + 模式条件桥（待执行）
+
+**目标**：`Box.HotUpdate.Core` 成立、Sudoku 引用它；模式桥消除 v1.1 悬垂引用；v1.0 完整回归。
+
+| 文件 | 动作 |
+|---|---|
+| `GameBox/Assets/HotUpdate/Core/Box.HotUpdate.Core.asmdef`（新） | 热更公共基座，`autoReferenced=false` |
+| `GameBox/Assets/HotUpdate/Core/HotUpdateVersion.cs`（新） | `codeVersion` 常量 |
+| `GameBox/Assets/HotUpdate/Sudoku/Box.HotUpdate.Sudoku.asmdef` | `autoReferenced: true→false` + references 加 `Box.HotUpdate.Core` |
+| `GameBox/Assets/Core/ModuleBridge/Box.ModuleBridge.asmdef`（新） | `autoReferenced=true` + `defineConstraints:["!HYBRIDCLR_UNITY"]` + 引用 Sudoku，空标记类防优化 |
+| `GameBox/Assets/Editor/Phase9HybridCLRSetup.cs` | 名单写入 `["Box.HotUpdate.Core", "Box.HotUpdate.Sudoku"]` |
+| 测试 asmdef ×2 | references 补 `Box.HotUpdate.Core` |
+
+要点：Core 内容量控制（能不放就不放，边界越小 AOT 泛型面越小）；玩法 15 个源文件零改动；
+link.xml 双模式语义共存；grep 复查 Sudoku 无具体 SDK 实现引用（现走 ServiceLocator 已合规）。
+验证：① 编译 + CI-1 全绿 ② v1.0 完整回归（出包、无符号、体积不变）③ v1.1 过滤日志 `[FilterHotFixAssemblies] filter assembly:...`（不需真机）。
+**风险与备选**：桥方案是全计划最非常规处，若 defineConstraints 组合失效（v1.1 报悬垂引用）→
+构建脚本临时翻转 asmdef 文件后还原；30 分钟不通即切换并汇报。
+
+### 16.4 9-3 启动链路接入热更下载（待执行，核心新工作）
+
+**目标**：AOT 侧热更引导组件——无强制网络等待、失败静默降级、D-1 单通道、加载成功刷新 ModuleLoader。
+
+| 文件 | 动作 |
+|---|---|
+| `GameBox/Assets/Core/HotUpdate/HotUpdateService.cs`（新，Box.Gameplay 内） | 热更引导核心 |
+| `GameBox/Assets/Core/HotUpdate/ModuleOverrides.cs`（新） | 远程清单 JSON 模型 |
+| `GameBox/Assets/ModuleFramework/ModuleLoader.cs` | 加 `Refresh(IReadOnlyList<ModuleEntry>)` |
+| `GameBox/Assets/Gameplay/AppBootstrap.cs` | `Boot()` 第 6-7 步之间插 `HotUpdateService.Begin(ui)`（不 await 不阻塞） |
+
+要点：**全方法体无条件编译 + HybridCLR.RuntimeApi 走反射**（`Type.GetType("HybridCLR.RuntimeApi, HybridCLR.Runtime")`）：
+v1.0 主包无此类型 → null → 整链静默跳过；禁止直接引用（v1.0 会被 IL2CPP 裁剪 → MissingMethod 崩溃）。
+流程：反射探测 → `Addressables.CheckForCatalogUpdates/UpdateCatalogs`（套 `UniTask.Timeout(5s)`）→
+`LoadAssetAsync<TextAsset>` 加载 dll/metadata → 反射 `LoadMetadataForAOTAssembly(bytes, HomologousImageMode.Consistent)` →
+`Assembly.Load` → 加载 module_overrides JSON → `ModuleLoader.Refresh` 全量替换（= 最简单回滚）。
+任一步失败静默降级用包内版本；Assembly.Load 失败 → `ClearDependencyCacheAsync` 清缓存下轮重试。
+热更侧首版控泛型面（多用非泛型 UniTask/`Forget()`）；AOT 泛型缺口用 `[GenericMethodInstantiation]` 补齐。
+验证：① EditMode 新用例全绿（下载层抽象 `IHotUpdateContentSource` 注入 mock——Editor 是 Mono 且同名程序集已加载，**不能真 Assembly.Load**）
+② 编辑器 Play 冒烟：无 HybridCLR 启动 ≤2.5s、数独可玩（降级路径）③ **v1.1 真机闭环**（唯一真机项）：在线首启下载 → 数独可玩；断网冷启动 → 包内兜底；服务器停机 → 启动不卡。
+
+### 16.5 9-4 Addressables Remote Catalog 远程下发（待执行）
+
+**目标**：远程 catalog 落地、dll/metadata/overrides 远程化、module_overrides 生成、本机部署脚本、content_state.bin 入库。
+
+| 文件 | 动作 |
+|---|---|
+| `AddressableAssetSettings.asset` | `m_BuildRemoteCatalog: 0→1` + Profile 新变量 `RemoteHostURL`（开发值 `http://127.0.0.1:8000`）+ Remote.BuildPath/LoadPath |
+| `AssetGroups/HotUpdate_Local.asset`（新） | dll/metadata/overrides 组（Local + ContentUpdateGroupSchema"可变更"） |
+| `Phase9HybridCLRSetup.cs` | `GenerateContent()`：HotUpdateDlls 白名单拷贝（**只拷名单内两个 dll + metadata，勿整目录**）+ overrides 模板 |
+| `GameBox/Assets/Editor/Phase9Publish.cs`（新） | Content Update 增量构建封装 |
+| `tools/deploy_remote.ps1`（新） | 拷贝 ServerData + overrides 到 `_deploy_remote/`（gitignore）+ python http.server |
+| `.gitignore` | 否定规则放行 `addressables_content_state.bin`（**必须入库**，丢失=无法 Content Update）+ 忽略部署目录 |
+
+要点：module_overrides JSON 与 `ModuleEntry` 字段一一对应，从 `ModuleCatalog.asset` 序列化模板；
+更新流程 = 改代码 → GenerateAll → GenerateContent → BuildPlayerContent（产 ServerData）→ deploy → 真机验证"远程新 dll 覆盖包内旧 dll"；
+Content Update 增量验证放后半（先全量验证同 key 覆盖）。真机访问本机 HTTP：防火墙放行 + 同网段，失败先 `curl` 自测。
+验证：① BuildPlayerContent 产出 ServerData/ ② 真机在线更新闭环 ③ 断网冷启动包内可玩（回归）④ content_state.bin 入库。
+
+### 16.6 收尾勾账（待执行）+ 当前阻塞项
+
+**最终验收**：① v1.1 AAB 真机在线启动 → dll 经 Addressables 加载、Assembly.Load 成功、数独可玩；断网冷启动包内可玩
+② 首包 ≤60MB 预算：v1.0 对比 Phase 8 基线增量 ≈ 0；v1.1 = v1.0 + hybridclr 运行时（9-1 实测 +1.01MB）+ 包内 dll/metadata（≤1MB）
+③ v1.0 模式回归：出包无 HybridCLR 符号、数独可玩、CI-1 全绿 ④ 红线 9：仓库无远程内容、RemoteHostURL 为开发值
+⑤ 文档勾账：本 §16 验收打勾 + 17 文档补 v1.1 构建入口。
+
+**当前阻塞项**：v1.1 AAB 完整构建需环境变量 `BOX_KEYSTORE_PASS`（用户注入，agent 不碰密码明文）；
+已用 APK 中间态验证符号等价性，AAB 随时可跑：`PrepareV11 → BuildV11`。
+
+**风险排序**：R1 GenerateAll 在大工程失败（9-1 已通过，风险解除）→ R2 桥方案失效（备选已备，9-2 验证）
+→ R3 v1.0 回归破坏（最高优先，每步都回归）→ R4 AOT 泛型缺失（9-1 已审查，9-3 热更代码注意控泛型面）
+→ R5 真机闭环只能真机验（9-3 需准备设备）。
+
+## 16.7 Phase 9.5 — 新手引导（v1.x 留存优化，FR-16 P0）
 
 > **2026-08-30 拍板**：排本 Phase（下个迭代，热更接入前首包落地）;步骤配置用 ScriptableObject 数据驱动。
 > 背景:FR-16 标 P0 但此前未排期(10 文档无引导条目),方案详见下方,开工时直接执行。
