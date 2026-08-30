@@ -87,12 +87,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 23acdb601e0b69449bcbfe5e01690a52
-    m_Address: Art/Effects/Particles/spark_01_particle
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Art
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2bf40b40a3e3df141930c8bfac717442
     m_Address: Art/UI/Buttons/GameListCard (1)
     m_ReadOnly: 0
@@ -107,12 +101,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2cb252d2068da114fae2e1d0d8f3e5b4
     m_Address: Art/Audio/SFX/switch9
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Art
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 2e6fb9d64a49a494f9a78824fb1fbc25
-    m_Address: Art/Audio/SFX/switch4
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -209,12 +197,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 612330f53b4dff5458d7027b9eb7bdfb
     m_Address: Art/Audio/SFX/switch8
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Art
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 63e00accb799eb044b55a6f11cc0ab3f
-    m_Address: Art/Audio/SFX/switch38
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -375,12 +357,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 99228011501d15f44aa67c8df2c9910f
-    m_Address: Art/Audio/SFX/switch1
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Art
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9aac7f0412ff04c4f959caebe0057113
     m_Address: Art/UI/Panels/Bgm_1_panel
     m_ReadOnly: 0
@@ -395,12 +371,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 9d9e8de2db4efde40aba3d38026d9ca8
     m_Address: Art/UI/main_menu_bg
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Art
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: a3c001a0c167f4b4d801f0b7cfe2cbe4
-    m_Address: Art/Effects/Particles/star_01_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art
@@ -509,12 +479,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d06503ccbb413134abed6f2718780a97
     m_Address: Art/Audio/SFX/rollover6
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Art
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: dbf77b57c171c0b4cbb4ff839fbd9038
-    m_Address: Art/Effects/Particles/star_04_particle
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art

@@ -82,12 +82,13 @@ public static class FontSetup
 
     static void ReplaceInPrefabs(TMP_FontAsset regular, TMP_FontAsset bold)
     {
+        // 2026-08-30 资源归属分离后实际位置:公共 UI 在 UI/Prefabs,玩法模块在 Modules/Sudoku/Prefabs
         string[] paths =
         {
-            "Assets/Resources/UI/MainMenuView.prefab",
-            "Assets/Resources/UI/GameplayView.prefab",
-            "Assets/Resources/UI/Popups/SettlementPopup.prefab",
-            "Assets/Resources/UI/Popups/DifficultySelect.prefab",
+            "Assets/UI/Prefabs/MainMenuView.prefab",
+            "Assets/Modules/Sudoku/Prefabs/GameplayView.prefab",
+            "Assets/UI/Prefabs/Popups/SettlementPopup.prefab",
+            "Assets/Modules/Sudoku/Prefabs/DifficultySelect.prefab",
         };
         foreach (var path in paths)
         {

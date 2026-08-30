@@ -30,7 +30,8 @@ namespace Box.HotUpdate.Sudoku
             else
             {
                 GameContext.Reset();
-                UIService.Instance?.Router.PushAsync<DifficultySelectView>("UI/Popups/DifficultySelect").Forget();
+                // 难度弹窗是模块独有资源(2026-08-30 归属分离),地址走 Module_Sudoku 组
+                UIService.Instance?.Router.PushAsync<DifficultySelectView>("Sudoku/Prefabs/DifficultySelect").Forget();
             }
             return UniTask.CompletedTask;
         }

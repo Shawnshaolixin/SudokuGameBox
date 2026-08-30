@@ -16,8 +16,10 @@ namespace Box.Gameplay
     public sealed class AudioManager : IAudioService
     {
         // 地址约定(Phase6AddressablesSetup.RegisterArtAssets):Art/Audio/{SFX,BGM}/{名字}(去扩展名)
+        // 2026-08-30 资源归属分离:加 "mod:" 前缀的短名是模块独有音效,路由到 Sudoku/Audio/{名字}(Module_Sudoku 组)
         const string SfxAddressPrefix = "Art/Audio/SFX/";
         const string BgmAddressPrefix = "Art/Audio/BGM/";
+        const string ModuleSfxAddressPrefix = "Sudoku/Audio/"; // 模块音效目录(随模块资源移动,见 11 文档 §3.3)
 
         const float MusicVolume = 0.45f; // BGM 基础音量(换曲试听后微调)
         const float SfxVolume = 0.8f;    // SFX 基础音量
@@ -82,8 +84,13 @@ namespace Box.Gameplay
                 return;
             }
 
+            // 地址路由:mod: 前缀 → 模块独有音效(模块目录),否则公共 SFX(见 AudioSfx 常量注释)
+            string address = name.StartsWith("mod:", System.StringComparison.Ordinal)
+                ? ModuleSfxAddressPrefix + name.Substring(4)
+                : SfxAddressPrefix + name;
+
             // 首次播放:异步加载,完成后直接播(此后缓存命中零延迟)
-            _assets?.LoadAsset<AudioClip>(SfxAddressPrefix + name, clip =>
+            _assets?.LoadAsset<AudioClip>(address, clip =>
             {
                 if (clip == null) return;
                 _sfxCache[name] = clip;

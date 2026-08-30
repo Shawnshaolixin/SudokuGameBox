@@ -120,7 +120,7 @@ namespace Box.Gameplay.Tests
             Assert.NotNull(view, "GameplayView 场景实例存在");
 
             // 弹窗打开:返回键交还路由关闭弹窗(handler 返回 false)
-            var popup = await UIService.Instance.Router.PushAsync<DifficultySelectView>("UI/Popups/DifficultySelect");
+            var popup = await UIService.Instance.Router.PushAsync<DifficultySelectView>("Sudoku/Prefabs/DifficultySelect");
             Assert.NotNull(popup, "难度弹窗可推入");
             Assert.AreEqual(1, UIService.Instance.Router.StackCount);
             bool consumed = await UIService.Instance.CustomBackHandler();

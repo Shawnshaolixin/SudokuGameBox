@@ -88,24 +88,26 @@ namespace Box.Services
     /// <summary>
     /// 音效短名常量(与 IAudioService 配套):统一收敛魔法字符串。
     /// 各层(UIKit 统一点击音/玩法层播放点)引用本类常量,改名只改一处。
-    /// 对应资源:Art/Audio/SFX/{短名}(Kenney UI Pack,CC0,已入库 Art_Audio 分组)。
+    /// 地址约定:无前缀 = 公共 SFX(Art/Audio/SFX/{短名},Kenney UI Pack);
+    /// "mod:" 前缀 = 模块独有音效,AudioManager 路由到对应模块目录(Sudoku/Audio/{短名})。
+    /// 2026-08-30 资源归属分离:玩法独有音效(switch1/4/38)已随模块资源移入 Module_Sudoku 组。
     /// </summary>
     public static class AudioSfx
     {
-        /// <summary>通用按钮/选格点击。</summary>
+        /// <summary>通用按钮/选格点击(公共)。</summary>
         public const string Click = "click1";
 
-        /// <summary>填数(含清格/笔记切换)。</summary>
-        public const string Place = "switch1";
+        /// <summary>填数(含清格/笔记切换,模块独有)。</summary>
+        public const string Place = "mod:switch1";
 
-        /// <summary>擦除。</summary>
-        public const string Erase = "switch4";
+        /// <summary>擦除(模块独有)。</summary>
+        public const string Erase = "mod:switch4";
 
-        /// <summary>提示落子(轻音)。</summary>
+        /// <summary>提示落子(轻音,公共)。</summary>
         public const string Hint = "rollover1";
 
-        /// <summary>胜利(临时占位,待正式 fanfare 替换,见 TODO)。</summary>
-        public const string Win = "switch38";
+        /// <summary>胜利(临时占位,待正式 fanfare 替换,见 TODO;模块独有)。</summary>
+        public const string Win = "mod:switch38";
     }
 
     /// <summary>

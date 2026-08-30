@@ -22,6 +22,22 @@ public static class Phase6AddressablesSetup
     const string GroupUiLocal = "UI_Local";
     const string GroupArtAudio = "Art_Audio";
     const string GroupCore = "Core";
+    const string GroupModuleSudoku = "Module_Sudoku"; // 玩法模块组(v2.0 前本地组,热更时切远程,§3.3 模块资源隔离)
+
+    // 模块独有资源迁移表(Sudoku):源路径 → 模块目录目标路径 + 模块地址
+    // 判定标准(2026-08-30):仅 sudoku 模块使用的资源;框架/多模块共用的留公共组(UI_Local/Art_Audio)。
+    // 物理移动保 GUID(Addressables 条目与场景引用不断),幂等:已迁移跳过。
+    static readonly (string Src, string Dst, string Address)[] SudokuMigrations =
+    {
+        ("Assets/UI/Prefabs/GameplayView.prefab", "Assets/Modules/Sudoku/Prefabs/GameplayView.prefab", "Sudoku/Prefabs/GameplayView"),
+        ("Assets/UI/Prefabs/Popups/DifficultySelect.prefab", "Assets/Modules/Sudoku/Prefabs/DifficultySelect.prefab", "Sudoku/Prefabs/DifficultySelect"),
+        ("Assets/Art/Effects/Particles/star_01_particle.png", "Assets/Modules/Sudoku/Fx/star_01_particle.png", "Sudoku/Fx/star_01_particle"),
+        ("Assets/Art/Effects/Particles/spark_01_particle.png", "Assets/Modules/Sudoku/Fx/spark_01_particle.png", "Sudoku/Fx/spark_01_particle"),
+        ("Assets/Art/Effects/Particles/star_04_particle.png", "Assets/Modules/Sudoku/Fx/star_04_particle.png", "Sudoku/Fx/star_04_particle"),
+        ("Assets/Art/Audio/SFX/switch1.ogg", "Assets/Modules/Sudoku/Audio/switch1.ogg", "Sudoku/Audio/switch1"),
+        ("Assets/Art/Audio/SFX/switch4.ogg", "Assets/Modules/Sudoku/Audio/switch4.ogg", "Sudoku/Audio/switch4"),
+        ("Assets/Art/Audio/SFX/switch38.ogg", "Assets/Modules/Sudoku/Audio/switch38.ogg", "Sudoku/Audio/switch38"),
+    };
 
     // Resources/UI 迁移表:源相对路径 → 目标相对路径 + Addressables 地址
     static readonly (string Src, string Dst, string Address)[] UiMigrations =
@@ -58,9 +74,7 @@ public static class Phase6AddressablesSetup
             AddressableAssetSettingsDefaultObject.Settings = settings;
         }
 
-        EnsureGroup(settings, GroupCore, false);
-        EnsureGroup(settings, GroupUiLocal, false);
-        EnsureGroup(settings, GroupArtAudio, false);
+        EnsureGroups(settings); // 建组无条件执行(幂等),settings 已存在时也能补齐新组
         EditorUtility.SetDirty(settings);
         AssetDatabase.SaveAssets();
         Debug.Log("[Phase6] Addressables 初始化完成:Default Local Group + "
@@ -234,6 +248,116 @@ EditorUtility.SetDirty(settings);
         if (added > 0) EditorUtility.SetDirty(settings);
         AssetDatabase.SaveAssets();
         Debug.Log("[Phase6] Art 资源注册完成,新增 " + added + " 个 → " + GroupArtAudio + " (共 " + artGroup.entries.Count + " entries)");
+    }
+
+    /// <summary>
+    /// 迁移 Sudoku 模块独有资源到 Modules/Sudoku(2026-08-30 资源归属分离):
+    /// 物理移动(MoveAsset 保 GUID,场景引用与 Addressables 条目不断),幂等:目标已存在跳过。
+    /// 公共资源(框架 UI/字体/通用美术音频)留在 UI_Local/Art_Audio 不动。
+    /// </summary>
+    [MenuItem("Box/Phase6/5. Migrate Sudoku Module Assets")]
+    public static void MigrateSudokuModuleAssets()
+    {
+        foreach (var t in SudokuMigrations)
+        {
+            if (File.Exists(t.Dst)) continue; // 已迁移
+            if (!File.Exists(t.Src))
+            {
+                Debug.LogWarning("[Phase6] 缺失源文件(可能已迁移): " + t.Src);
+                continue;
+            }
+            EnsureFolder(Path.GetDirectoryName(t.Dst));
+            var err = AssetDatabase.MoveAsset(t.Src, t.Dst);
+            if (!string.IsNullOrEmpty(err))
+            {
+                Debug.LogError("[Phase6] 移动失败 " + t.Src + " → " + t.Dst + " : " + err);
+                continue;
+            }
+            Debug.Log("[Phase6] 已移动: " + t.Src + " → " + t.Dst);
+        }
+        AssetDatabase.SaveAssets();
+        Debug.Log("[Phase6] Sudoku 模块资源迁移完成(保 GUID,引用不断)");
+    }
+
+    /// <summary>
+    /// 注册 Modules/Sudoku 下全部资源到 Module_Sudoku 分组(幂等):
+    /// 地址约定 = "Sudoku/" + 相对 Modules/Sudoku 的路径去扩展名(如 Prefabs/GameplayView → "Sudoku/Prefabs/GameplayView")。
+    /// 已注册条目(迁移前在 UI_Local/Art_Audio)自动换组到 Module_Sudoku 并校正地址。
+    /// </summary>
+    [MenuItem("Box/Phase6/6. Register Sudoku Module Assets")]
+    public static void RegisterModuleAssets()
+    {
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        if (settings == null)
+        {
+            EnsureSetup();
+            settings = AddressableAssetSettingsDefaultObject.Settings;
+        }
+        // settings 已存在时 EnsureSetup 不会重跑,这里显式补建缺失组(幂等,含 Module_Sudoku)
+        EnsureGroups(settings);
+        var moduleGroup = settings.FindGroup(GroupModuleSudoku);
+        if (moduleGroup == null)
+        {
+            Debug.LogError("[Phase6] 分组 " + GroupModuleSudoku + " 不存在,请先执行 EnsureSetup");
+            return;
+        }
+
+        const string moduleRoot = "Assets/Modules/Sudoku";
+        if (!AssetDatabase.IsValidFolder(moduleRoot))
+        {
+            Debug.LogError("[Phase6] 模块目录不存在: " + moduleRoot + "(先执行迁移)");
+            return;
+        }
+
+        int added = 0;
+        foreach (var type in new[] { "t:Prefab", "t:Texture2D", "t:AudioClip" })
+        {
+            foreach (var guid in AssetDatabase.FindAssets(type, new[] { moduleRoot }))
+            {
+                var assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                if (!assetPath.StartsWith(moduleRoot + "/")) continue;
+                // 期望地址:Sudoku/ + 相对路径去扩展名
+                var expected = "Sudoku/" + assetPath.Substring(moduleRoot.Length + 1)
+                    .Replace(".prefab", "").Replace(".png", "").Replace(".ogg", "").Replace(".wav", "")
+                    .Replace('\\', '/');
+                var entry = settings.FindAssetEntry(guid);
+                if (entry != null)
+                {
+                    // 已入库:地址校正 + 换组(迁移前在公共组的条目移入模块组)
+                    if (entry.address != expected)
+                    {
+                        entry.address = expected;
+                        EditorUtility.SetDirty(settings);
+                        Debug.Log("[Phase6] 地址校正: " + assetPath + " → " + expected);
+                    }
+                    if (entry.parentGroup != moduleGroup)
+                    {
+                        settings.MoveEntry(entry, moduleGroup, false);
+                        EditorUtility.SetDirty(settings);
+                        Debug.Log("[Phase6] 换组: " + expected + " → " + GroupModuleSudoku);
+                    }
+                    continue;
+                }
+                entry = settings.CreateOrMoveEntry(guid, moduleGroup, false);
+                if (entry == null) continue;
+                entry.address = expected;
+                entry.labels.Add("Sudoku");
+                added++;
+                Debug.Log("[Phase6] 新注册: " + assetPath + " → " + expected);
+            }
+        }
+        EditorUtility.SetDirty(settings);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[Phase6] Module_Sudoku 注册完成,新增 " + added + " 个(组内共 " + moduleGroup.entries.Count + " entries)");
+    }
+
+    /// <summary>确保四个标准分组存在(幂等,settings 已存在时也可补齐新组)。</summary>
+    static void EnsureGroups(AddressableAssetSettings settings)
+    {
+        EnsureGroup(settings, GroupCore, false);
+        EnsureGroup(settings, GroupUiLocal, false);
+        EnsureGroup(settings, GroupArtAudio, false);
+        EnsureGroup(settings, GroupModuleSudoku, false); // 玩法模块组(2026-08-30 资源归属分离)
     }
 
     static void EnsureGroup(AddressableAssetSettings settings, string name, bool setAsDefault)

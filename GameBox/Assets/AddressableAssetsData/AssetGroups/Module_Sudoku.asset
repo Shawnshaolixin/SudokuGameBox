@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Module_Sudoku
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: Module_Sudoku
+  m_GUID: e05f9a11f04ab9d4889bcbfbd970f30a
+  m_SerializeEntries:
+  - m_GUID: 23acdb601e0b69449bcbfe5e01690a52
+    m_Address: Sudoku/Fx/spark_01_particle
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2e6fb9d64a49a494f9a78824fb1fbc25
+    m_Address: Sudoku/Audio/switch4
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 63e00accb799eb044b55a6f11cc0ab3f
+    m_Address: Sudoku/Audio/switch38
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 99228011501d15f44aa67c8df2c9910f
+    m_Address: Sudoku/Audio/switch1
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a3c001a0c167f4b4d801f0b7cfe2cbe4
+    m_Address: Sudoku/Fx/star_01_particle
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c24d016dc7c667b42be870a8a0bb6f4f
+    m_Address: Sudoku/Prefabs/GameplayView
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d3ab740af3f7980478fcebdbfb710ddc
+    m_Address: Sudoku/Prefabs/DifficultySelect
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - UI
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dbf77b57c171c0b4cbb4ff839fbd9038
+    m_Address: Sudoku/Fx/star_04_particle
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - Art
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 68b66f896e1f0094f97398d17cf2c77b, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 36bca7c7580329a428095d342c2abbcd, type: 2}
+    - {fileID: 11400000, guid: 3d2252969e7be544fb7d816541ad08c9, type: 2}

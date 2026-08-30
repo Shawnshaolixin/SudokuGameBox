@@ -22,11 +22,11 @@ namespace Box.HotUpdate.Sudoku
     {
         const int SortOrder = 1000; // 高于 UILayer 最高层(700):特效绘制在所有 UI 之上
 
-        // 播放点贴图地址(RegisterArtAssets 注册,Art/Effects/Particles/* 去扩展名)
+        // 播放点贴图地址(Module_Sudoku 组注册,Sudoku/Fx/* 去扩展名;2026-08-30 资源归属分离后移入模块组)
         // 注:2026-08-29 资产命名契约重命名(加 _particle 后缀,CI-2 资产校验白名单),地址同步
-        public const string StarTex = "Art/Effects/Particles/star_01_particle";     // 填数反馈(小星星)
-        public const string SparkTex = "Art/Effects/Particles/spark_01_particle";   // 提示/胜利(火花)
-        public const string StarBurstTex = "Art/Effects/Particles/star_04_particle"; // 胜利(大星星)
+        public const string StarTex = "Sudoku/Fx/star_01_particle";     // 填数反馈(小星星)
+        public const string SparkTex = "Sudoku/Fx/spark_01_particle";   // 提示/胜利(火花)
+        public const string StarBurstTex = "Sudoku/Fx/star_04_particle"; // 胜利(大星星)
 
         static readonly Dictionary<string, Queue<FxSlot>> _pools = new();          // 贴图地址 → 空闲粒子槽
         static readonly Dictionary<string, Texture2D> _textures = new();            // 贴图地址 → 纹理缓存
