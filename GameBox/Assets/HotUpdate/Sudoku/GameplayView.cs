@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Random = UnityEngine.Random; // 消歧:System.Random(using System) 与 UnityEngine.Random
 using Box.ModuleFramework;
 using Box.Services;
 using Box.UI;
@@ -349,19 +350,16 @@ namespace Box.HotUpdate.Sudoku
         }
 
         /// <summary>
-        /// 入场动效:给定数字逐个弹跳浮现(替代一次性渲染的呆板感)。
-        /// 节奏设计(2026-08-30 修复用户反馈"同时跳且频率不齐"):
-        /// ① 格间用固定帧步进(DelayFrame)而非时间间隔——25ms 在 60fps 下仅 1.5 帧,
-        ///    帧对齐抖动致起跳时刻错乱,观感"频率不一样";固定 2 帧绝对整齐。
-        /// ② 动画 0.1s 且间隔≥动画的 1/3,EaseOutBack 峰值逐格错开,观感"一个一个弹过去",
-        ///    而非旧版(0.2s 动画+25ms 间隔)8 格同时处于弹跳中一片乱跳。
-        /// ③ 总时长≈给定数×2帧:Easy 78 格≈2.6s,Hard 30 格≈1s,随难度自然缩短。
-        /// 调参:IntroStepFrames 越小越快(重叠越多),IntroJumpDuration 越大弹跳越明显。
+        /// 入场动效:所有给定数字同帧开始跳动,但各自节奏随机(用户拍板:同时跳但节奏不一,
+        /// 像雨点落水面各自起舞,而非整齐同频或串行扫描)。
+        /// 每格随机 1~3 拍:第 1 拍 0→1 大涌现,后续拍 0.8→1 小弹(数字保持可见);
+        /// 单拍时长与拍间间隔均随机 → 快跳/慢跳/连跳/单跳混杂,节奏错落。
+        /// 总时长 ≈ 最慢格 ≤1.5s;调参见下方常量。
         /// </summary>
         async UniTaskVoid PlayBoardIntro()
         {
-            const float IntroJumpDuration = 0.1f; // 单格弹跳时长
-            const int IntroStepFrames = 2;        // 格间固定帧步进(60fps≈33ms):帧对齐零抖动
+            const float JumpMin = 0.12f, JumpMax = 0.25f; // 单拍时长范围(快/慢跳)
+            const int MaxJumps = 3;                       // 每格最多跳拍数(1~MaxJumps 随机)
             var prev = _introCts;
             prev?.Cancel();
             _introCts = new CancellationTokenSource();
@@ -372,11 +370,31 @@ namespace Box.HotUpdate.Sudoku
                 {
                     ct.ThrowIfCancellationRequested();
                     if (_session == null || !_session.IsGiven(i)) continue;
-                    BoxTween.ScalePulse(_cellTexts[i].transform, 0f, 1f, IntroJumpDuration, ct).Forget(); // 0→1 EaseOutBack 回弹
-                    await UniTask.DelayFrame(IntroStepFrames, PlayerLoopTiming.Update, ct); // 逐格起跳
+                    // 同帧并发启动,各格节奏(拍数/时长/间隔)独立随机 → "同时跳、节奏不一"
+                    PlayCellIntro(_cellTexts[i].transform, JumpMin, JumpMax, MaxJumps, ct).Forget();
                 }
             }
             catch (OperationCanceledException) { /* 重开新局/销毁:中断入场 */ }
+        }
+
+        /// <summary>单格入场:随机拍数 × 随机单拍时长 × 随机拍间间隔,与邻格节奏错开。</summary>
+        async UniTaskVoid PlayCellIntro(Transform target, float jumpMin, float jumpMax, int maxJumps, CancellationToken ct)
+        {
+            try
+            {
+                int jumps = Random.Range(1, maxJumps + 1); // 每格跳 1~MaxJumps 拍
+                for (int j = 0; j < jumps; j++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    float dur = Random.Range(jumpMin, jumpMax);
+                    // 第 1 拍从 0 涌现(明显),后续拍从 0.8 小弹(数字保持可见,不闪烁消失)
+                    float from = j == 0 ? 0f : 0.8f;
+                    await BoxTween.ScalePulse(target, from, 1f, dur, ct); // EaseOutBack 回弹
+                    if (j < jumps - 1)
+                        await UniTask.Delay(Random.Range(80, 260), DelayType.DeltaTime, PlayerLoopTiming.Update, ct);
+                }
+            }
+            catch (OperationCanceledException) { /* 重开新局/销毁:取消该格弹跳 */ }
         }
 
         /// <summary>
