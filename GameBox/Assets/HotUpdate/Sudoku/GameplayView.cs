@@ -349,11 +349,19 @@ namespace Box.HotUpdate.Sudoku
         }
 
         /// <summary>
-        /// 入场动效:给定数字逐个弹跳浮现(波浪式错峰 25ms,替代一次性渲染的呆板感)。
-        /// 给定格才有值,只弹给定格;空格无内容不动,保持静止。
+        /// 入场动效:给定数字逐个弹跳浮现(替代一次性渲染的呆板感)。
+        /// 节奏设计(2026-08-30 修复用户反馈"同时跳且频率不齐"):
+        /// ① 格间用固定帧步进(DelayFrame)而非时间间隔——25ms 在 60fps 下仅 1.5 帧,
+        ///    帧对齐抖动致起跳时刻错乱,观感"频率不一样";固定 2 帧绝对整齐。
+        /// ② 动画 0.1s 且间隔≥动画的 1/3,EaseOutBack 峰值逐格错开,观感"一个一个弹过去",
+        ///    而非旧版(0.2s 动画+25ms 间隔)8 格同时处于弹跳中一片乱跳。
+        /// ③ 总时长≈给定数×2帧:Easy 78 格≈2.6s,Hard 30 格≈1s,随难度自然缩短。
+        /// 调参:IntroStepFrames 越小越快(重叠越多),IntroJumpDuration 越大弹跳越明显。
         /// </summary>
         async UniTaskVoid PlayBoardIntro()
         {
+            const float IntroJumpDuration = 0.1f; // 单格弹跳时长
+            const int IntroStepFrames = 2;        // 格间固定帧步进(60fps≈33ms):帧对齐零抖动
             var prev = _introCts;
             prev?.Cancel();
             _introCts = new CancellationTokenSource();
@@ -364,8 +372,8 @@ namespace Box.HotUpdate.Sudoku
                 {
                     ct.ThrowIfCancellationRequested();
                     if (_session == null || !_session.IsGiven(i)) continue;
-                    BoxTween.ScalePulse(_cellTexts[i].transform, 0f, 1f, 0.2f, ct).Forget(); // 0→1 EaseOutBack 回弹
-                    await UniTask.Delay(25, DelayType.DeltaTime, PlayerLoopTiming.Update, ct); // 波浪错峰
+                    BoxTween.ScalePulse(_cellTexts[i].transform, 0f, 1f, IntroJumpDuration, ct).Forget(); // 0→1 EaseOutBack 回弹
+                    await UniTask.DelayFrame(IntroStepFrames, PlayerLoopTiming.Update, ct); // 逐格起跳
                 }
             }
             catch (OperationCanceledException) { /* 重开新局/销毁:中断入场 */ }
