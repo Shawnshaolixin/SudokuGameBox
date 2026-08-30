@@ -263,6 +263,24 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 **验收**：AOT 构建 + 热更 dll 加载运行闭环；首包体积增量符合预算。
 
+## 16.5 Phase 9.5 — 新手引导（v1.x 留存优化，FR-16 P0）
+
+> **2026-08-30 拍板**：排本 Phase（下个迭代，热更接入前首包落地）;步骤配置用 ScriptableObject 数据驱动。
+> 背景:FR-16 标 P0 但此前未排期(10 文档无引导条目),方案详见下方,开工时直接执行。
+
+| 任务 | 内容 |
+|---|---|
+| 9.5-1 | TutorialMask 遮罩高亮组件(全屏遮罩+镂空,挂 UILayer 最高层,参考 FxPool overlay 思路) |
+| 9.5-2 | 引导步骤 SO 资产(OnboardingStepAsset:高亮目标/文案 key/等待事件/完成动作,6 步) |
+| 9.5-3 | TutorialController 步骤编排(事件驱动状态机,挂 GameplayView,可选钩子零开销) |
+| 9.5-4 | OnboardingService 状态管理(box.onboarding 存档分区,已完/可跳过持久化) |
+| 9.5-5 | 引导局整合(固定种子 Beginner 谜题、屏蔽全部广告、可跳过;结算弹每日挑战入口) |
+| 9.5-6 | 埋点 tutorial_step(step_index, skipped)(04 文档 §埋点契约) + EditMode/PlayMode 测试 |
+
+**验收**：新装用户首局 ≤6 步引导、≤90 秒,全程可跳过、零广告;引导完成状态断电重启不重复;埋点可见。
+
+---
+
 ## 17. Phase 10 — 热更内容管线
 
 | 任务 | 内容 |
