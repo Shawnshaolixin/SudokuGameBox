@@ -1,6 +1,7 @@
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Box.UI
 {
@@ -120,6 +121,26 @@ namespace Box.UI
                 if (target == null) return; // 场景切换销毁:静默退出
             }
             target.anchoredPosition = to;
+        }
+
+        /// <summary>UI 元素颜色渐变(Graphic:Image/Text 等,EaseInOutCubic;2026-08-30 单元凑齐扩散动效用)。</summary>
+        public static async UniTask ColorTo(Graphic target, Color from, Color to, float duration, CancellationToken ct = default)
+        {
+            if (target == null || duration <= 0f) return;
+            if (Time.deltaTime <= 0f) { target.color = to; return; } // EditMode/暂停:直接到位
+            target.color = from;
+            var elapsed = 0f;
+            while (elapsed < duration)
+            {
+                ct.ThrowIfCancellationRequested();
+                float dt = Time.deltaTime;
+                if (dt <= 0f) break; // 运行中暂停/无帧步进:立即结束,防 elapsed 永不增长挂起调用链
+                elapsed += dt;
+                target.color = Color.LerpUnclamped(from, to, EaseInOutCubic(Mathf.Min(elapsed / duration, 1f)));
+                await UniTask.Yield(ct);
+                if (target == null) return; // 场景切换销毁:静默退出
+            }
+            target.color = to;
         }
 
         /// <summary>抖动(本地位置,振幅随进度衰减,结束归位)。</summary>

@@ -14,6 +14,9 @@ namespace Box.HotUpdate.Sudoku
     {
         public enum InputMode { Number, Note }
 
+        /// <summary>凑齐单元类型(2026-08-30 扩散动效):宫(3x3)/行/列,9 格全对即凑齐。</summary>
+        public enum UnitKind { Box, Row, Column }
+
         /// <summary>一次落子(值/笔记)变更记录,双栈撤销重做。</summary>
         public readonly struct Move
         {
@@ -73,6 +76,13 @@ namespace Box.HotUpdate.Sudoku
         public event Action<int> CellSelected;
         public event Action GameFinished;
         public event Action HintExhausted;
+
+        /// <summary>
+        /// 凑齐单元(宫/行/列 9 格全对)事件:视图据此播放扩散高亮动效。
+        /// 触发顺序固定 宫 → 行 → 列(宫最醒目优先);一次填数可同时凑齐多个单元(中心格)。
+        /// 触发点:InputNumber 落子 / TryUseHint 提示落子(正向凑齐才触发,Undo/Erase 不触发)。
+        /// </summary>
+        public event Action<UnitKind, int> UnitCompleted;
 
         // ---- 内部 ----
 
@@ -190,6 +200,7 @@ namespace Box.HotUpdate.Sudoku
             HintsUsed++;
             hintIndex = idx;
             BoardChanged?.Invoke();
+            CheckUnitCompleted(idx); // 提示落子同样可能凑齐单元(与手填一致触发扩散动效)
             CheckFinish();
             // 仅在「免费 + 广告回奖」全部额度耗尽时才触发置灰事件;
             // 仅免费用尽(CAN 请求广告)时保持可点,让视图弹广告确认框(Phase 7 激励视频链路)。
@@ -242,6 +253,7 @@ namespace Box.HotUpdate.Sudoku
             _redo.Clear();
             if (value != 0 && value != Solution[idx]) MistakeCount++; // 错误累计,Undo 不减(旧工程规则)
             BoardChanged?.Invoke();
+            if (value != 0) CheckUnitCompleted(idx); // 正向落子才可能凑齐单元(清格不触发)
             CheckFinish();
         }
 
@@ -281,6 +293,49 @@ namespace Box.HotUpdate.Sudoku
                 }
         }
 
+        /// <summary>
+        /// 检测该落子是否凑齐了所在宫/行/列(9 格全部 == 解即凑齐,含给定格天然满足)。
+        /// 触发顺序 宫 → 行 → 列(宫最醒目优先);完成态不再触发(输入已冻结)。
+        /// </summary>
+        void CheckUnitCompleted(int idx)
+        {
+            if (IsFinished) return;
+            int row = SudokuBoard.RowOf(idx), col = SudokuBoard.ColOf(idx);
+
+            int box = SudokuBoard.BoxOf(row, col);
+            int boxRow = (box / SudokuBoard.BoxSize) * SudokuBoard.BoxSize; // 宫左上角行
+            int boxCol = (box % SudokuBoard.BoxSize) * SudokuBoard.BoxSize; // 宫左上角列
+            if (UnitMatchesBox(boxRow, boxCol))
+                UnitCompleted?.Invoke(UnitKind.Box, box);
+            if (UnitMatchesRow(row))
+                UnitCompleted?.Invoke(UnitKind.Row, row);
+            if (UnitMatchesCol(col))
+                UnitCompleted?.Invoke(UnitKind.Column, col);
+        }
+
+        bool UnitMatchesRow(int row)
+        {
+            for (int c = 0; c < SudokuBoard.Size; c++)
+                if (Board[row * SudokuBoard.Size + c] != Solution[row * SudokuBoard.Size + c]) return false;
+            return true;
+        }
+
+        bool UnitMatchesCol(int col)
+        {
+            for (int r = 0; r < SudokuBoard.Size; r++)
+                if (Board[r * SudokuBoard.Size + col] != Solution[r * SudokuBoard.Size + col]) return false;
+            return true;
+        }
+
+        bool UnitMatchesBox(int boxRow, int boxCol)
+        {
+            for (int r = boxRow; r < boxRow + SudokuBoard.BoxSize; r++)
+                for (int c = boxCol; c < boxCol + SudokuBoard.BoxSize; c++)
+                    if (Board[r * SudokuBoard.Size + c] != Solution[r * SudokuBoard.Size + c]) return false;
+            return true;
+        }
+
+        /// <summary>完成判定:全盘已解 → 冻结计时并触发 GameFinished(仅一次)。</summary>
         void CheckFinish()
         {
             if (_finished || !Board.IsSolved()) return;

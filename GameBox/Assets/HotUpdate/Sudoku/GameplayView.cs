@@ -34,6 +34,10 @@ namespace Box.HotUpdate.Sudoku
         BoxText _titleText, _timeText, _hintText;
         BoxButton _modeBtn, _undoBtn, _redoBtn, _eraseBtn, _hintBtn;
         CancellationTokenSource _timerCts;
+        CancellationTokenSource _introCts; // 入场弹跳动画(重开新局/销毁时取消)
+        CancellationTokenSource _fxCts;    // 单元扩散动画(新动画取代旧动画时取消)
+        int[] _rippleCells;                // 扩散动画进行中的单元格(新动画开始时恢复残留金色)
+        int _fxFrame = -1;                 // 同帧多单元凑齐(收官格 宫+行+列同帧触发)只播第一波的帧标记
 
         protected override UniTask OnCreate()
         {
@@ -95,6 +99,8 @@ namespace Box.HotUpdate.Sudoku
         {
             L10n.LanguageChanged -= OnLanguageChanged; // 退订,防泄漏
             _timerCts?.Cancel();
+            _introCts?.Cancel();
+            _fxCts?.Cancel();
             if (_svc != null) _svc.ClearBackHandler();
         }
 
@@ -142,9 +148,11 @@ namespace Box.HotUpdate.Sudoku
             _session.BoardChanged += RefreshBoard;
             _session.GameFinished += OnGameFinished;
             _session.HintExhausted += OnHintExhausted;
+            _session.UnitCompleted += OnUnitCompleted; // 凑齐单元 → 扩散高亮动效
 
             RefreshTitle(); // 标题走 L10n(每日挑战/数独-难度)
             RefreshBoard();
+            PlayBoardIntro(); // 给定数字逐个弹跳入场(波浪式)
             _svc?.Router.Analytics?.LogEvent("sudoku.level_start"); // §8.4 {module_id}.{action}
 
             _timerCts?.Cancel();
@@ -326,6 +334,131 @@ namespace Box.HotUpdate.Sudoku
             if (_hintBtn != null) _hintBtn.SetInteractable(false);
         }
 
+        // ---- 动效(2026-08-30 棋盘两个动效,BoxTween 自研补间,D-15 拍板不引入 DOTween) ----
+
+        /// <summary>
+        /// 凑齐单元 → 扩散高亮(视图侧订阅 GameSession.UnitCompleted)。
+        /// 同帧多单元凑齐(收官格 宫+行+列同帧触发)只播第一波(宫最醒目),避免三波动画同帧互抢;
+        /// 后续帧的新凑齐正常播放,新波取代旧波(旧波残留金色先归位)。
+        /// </summary>
+        void OnUnitCompleted(GameSession.UnitKind kind, int unitIndex)
+        {
+            if (_fxFrame == Time.frameCount) return;
+            _fxFrame = Time.frameCount;
+            PlayUnitRipple(kind, unitIndex);
+        }
+
+        /// <summary>
+        /// 入场动效:给定数字逐个弹跳浮现(波浪式错峰 25ms,替代一次性渲染的呆板感)。
+        /// 给定格才有值,只弹给定格;空格无内容不动,保持静止。
+        /// </summary>
+        async UniTaskVoid PlayBoardIntro()
+        {
+            var prev = _introCts;
+            prev?.Cancel();
+            _introCts = new CancellationTokenSource();
+            var ct = _introCts.Token;
+            try
+            {
+                for (int i = 0; i < _cells.Length; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (_session == null || !_session.IsGiven(i)) continue;
+                    BoxTween.ScalePulse(_cellTexts[i].transform, 0f, 1f, 0.2f, ct).Forget(); // 0→1 EaseOutBack 回弹
+                    await UniTask.Delay(25, DelayType.DeltaTime, PlayerLoopTiming.Update, ct); // 波浪错峰
+                }
+            }
+            catch (OperationCanceledException) { /* 重开新局/销毁:中断入场 */ }
+        }
+
+        /// <summary>
+        /// 凑齐单元扩散动效:9 格金色水波,从单元中心逐格向外扩散(错峰 55ms),
+        /// 短暂高亮后逆序逐格回原色(用户拍板:不引入 DOTween,高亮短暂后恢复)。
+        /// 动画期间被用户交互刷新(选中/Peer 高亮)的格不覆盖,交给正常渲染。
+        /// </summary>
+        async UniTaskVoid PlayUnitRipple(GameSession.UnitKind kind, int unitIndex)
+        {
+            var prev = _fxCts;
+            prev?.Cancel();
+            // 旧波动画被取代:残留金色格直接归位(新波马上开播,渐变会让两波视觉重叠)
+            if (prev != null && _rippleCells != null)
+                foreach (var idx in _rippleCells)
+                {
+                    var img = _cells[idx].GetComponent<Image>();
+                    if (img.color == s_RippleGold)
+                        img.color = _session != null && _session.IsGiven(idx) ? s_CellBgGiven : s_CellBgDefault;
+                }
+            _rippleCells = UnitCells(kind, unitIndex);
+            _fxCts = new CancellationTokenSource();
+            var ct = _fxCts.Token;
+            try
+            {
+                // 亮起波:逐格从当前色渐变金色,错峰 55ms(水花中心向外扩散)
+                for (int i = 0; i < _rippleCells.Length; i++)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var img = _cells[_rippleCells[i]].GetComponent<Image>();
+                    BoxTween.ColorTo(img, img.color, s_RippleGold, 0.12f, ct).Forget();
+                    await UniTask.Delay(55, DelayType.DeltaTime, PlayerLoopTiming.Update, ct);
+                }
+                await UniTask.Delay(60, DelayType.DeltaTime, PlayerLoopTiming.Update, ct); // 等最后一格亮完(0.12s)
+                // 回落波:逆序逐格回原色,错峰 55ms(扩散的镜像回收)
+                for (int i = _rippleCells.Length - 1; i >= 0; i--)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var img = _cells[_rippleCells[i]].GetComponent<Image>();
+                    // 防覆盖用户交互:动画期间被 RefreshBoard 刷新(选中/Peer 高亮)的格跳过,交给正常渲染
+                    if (img.color == s_RippleGold)
+                    {
+                        var restore = _session != null && _session.IsGiven(_rippleCells[i]) ? s_CellBgGiven : s_CellBgDefault;
+                        BoxTween.ColorTo(img, s_RippleGold, restore, 0.15f, ct).Forget();
+                    }
+                    await UniTask.Delay(55, DelayType.DeltaTime, PlayerLoopTiming.Update, ct);
+                }
+            }
+            catch (OperationCanceledException) { /* 新波取代/销毁:中断(残留由新波开头归位) */ }
+        }
+
+        /// <summary>单元 9 格索引,按到单元中心的距离排序(中心 → 外缘扩散序)。</summary>
+        static int[] UnitCells(GameSession.UnitKind kind, int unitIndex)
+        {
+            var cells = new int[9];
+            if (kind == GameSession.UnitKind.Row)
+            {
+                for (int c = 0; c < SudokuBoard.Size; c++) cells[c] = unitIndex * SudokuBoard.Size + c;
+            }
+            else if (kind == GameSession.UnitKind.Column)
+            {
+                for (int r = 0; r < SudokuBoard.Size; r++) cells[r] = r * SudokuBoard.Size + unitIndex;
+            }
+            else // Box:unitIndex 0-8 → 宫左上角 (boxRow, boxCol) 起 3x3
+            {
+                int boxRow = (unitIndex / SudokuBoard.BoxSize) * SudokuBoard.BoxSize;
+                int boxCol = (unitIndex % SudokuBoard.BoxSize) * SudokuBoard.BoxSize;
+                int k = 0;
+                for (int r = boxRow; r < boxRow + SudokuBoard.BoxSize; r++)
+                    for (int c = boxCol; c < boxCol + SudokuBoard.BoxSize; c++)
+                        cells[k++] = r * SudokuBoard.Size + c;
+            }
+            // 9 个元素,插入排序足够;行中心=第 4 列,列中心=第 4 行,宫中心=相对 (1,1)
+            for (int i = 0; i < cells.Length; i++)
+                for (int j = i + 1; j < cells.Length; j++)
+                    if (DistToCenter(kind, unitIndex, cells[j]) < DistToCenter(kind, unitIndex, cells[i]))
+                        (cells[i], cells[j]) = (cells[j], cells[i]);
+            return cells;
+        }
+
+        /// <summary>格到单元中心的距离(行/列:直线距离;宫:曼哈顿距离)。</summary>
+        static int DistToCenter(GameSession.UnitKind kind, int unitIndex, int idx)
+        {
+            int row = SudokuBoard.RowOf(idx), col = SudokuBoard.ColOf(idx);
+            if (kind == GameSession.UnitKind.Row) return Mathf.Abs(col - 4);
+            if (kind == GameSession.UnitKind.Column) return Mathf.Abs(row - 4);
+            int boxRow = (unitIndex / SudokuBoard.BoxSize) * SudokuBoard.BoxSize; // 宫左上角行
+            int boxCol = (unitIndex % SudokuBoard.BoxSize) * SudokuBoard.BoxSize; // 宫左上角列
+            return Mathf.Abs(row - boxRow - 1) + Mathf.Abs(col - boxCol - 1);
+        }
+
         // ---- 棋盘配色:对齐 docs/UIDesignSystem 设计 Token(浅色奶油棕系,原深灰板废止) ----
         // 宫间 8px 缝隙=Border 描边,格间 2px 缝隙=Background/Secondary,格底=Surface 两级
         // 2026-08-29 视觉修正:① 选中/错误区分(选中改草绿,错误加深红——原橙/红同属暖系难辨);
@@ -343,6 +476,7 @@ namespace Box.HotUpdate.Sudoku
         static readonly Color s_TextGiven = new Color(0.227f, 0.165f, 0.102f); // Text/Primary #3A2A1A(给定数字)
         static readonly Color s_TextInput = new Color(0.914f, 0.471f, 0.196f); // Primary #E97832(输入数字)
         static readonly Color s_TextNote = new Color(0.502f, 0.424f, 0.302f); // Text/Secondary #806C4D(笔记)
+        static readonly Color s_RippleGold = new Color(1f, 0.85f, 0.35f); // 凑齐单元扩散金色(与胜利粒子同色系,视觉统一)
 
         // ---- 棋盘渲染(81 格全量刷新,UI 轻量无性能问题) ----
 
@@ -425,7 +559,7 @@ namespace Box.HotUpdate.Sudoku
                 if (value != 0)
                 {
                     text.Text = value.ToString();
-                    text.SetFontSize(40);
+                    text.SetFontSize(44); // 2026-08-30 放大:棋盘数字 40→44(格宽约 100px,视觉更饱满)
                     // 选中(绿底)/错误(红底)实心高亮统一翻白字保对比;给定=深棕(Text/Primary),输入=主色橙(Primary)区分给定/自填
                     text.SetColor(_session.IsMistake(i) || i == _session.SelectedIndex ? Color.white : _session.IsGiven(i) ? s_TextGiven : s_TextInput);
                     text.SetVisible(true);

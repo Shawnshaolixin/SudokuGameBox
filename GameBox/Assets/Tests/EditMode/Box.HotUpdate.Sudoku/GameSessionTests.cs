@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using Sudoku.Core;
 
@@ -308,6 +309,127 @@ namespace Box.HotUpdate.Sudoku.Tests
             _session.SelectCell(0); _session.InputNumber(8);
             _session.SelectCell(40); _session.InputNumber(2);
             Assert.AreEqual(1, _session.StarRating, "2 错以上 1 星");
+        }
+
+        // ---- 凑齐单元事件(2026-08-30 扩散动效:9 格全对 → UnitCompleted,视图据此播金色扩散) ----
+
+        [Test]
+        public void UnitCompleted_All_Three_Kinds_In_Fixed_Order()
+        {
+            // 填满洞 0 → 宫0/行0/列0 同时凑齐;触发顺序固定 宫→行→列(宫最醒目优先)
+            var events = new List<(GameSession.UnitKind, int)>();
+            _session.UnitCompleted += (k, i) => events.Add((k, i));
+
+            _session.SelectCell(0);
+            _session.InputNumber(_session.Solution[0]); // 解=1
+
+            CollectionAssert.AreEqual(
+                new[] { (GameSession.UnitKind.Box, 0), (GameSession.UnitKind.Row, 0), (GameSession.UnitKind.Column, 0) },
+                events, "宫→行→列 固定顺序,同索引");
+        }
+
+        [Test]
+        public void UnitCompleted_Wrong_Fill_Does_Not_Fire()
+        {
+            bool fired = false;
+            _session.UnitCompleted += (_, _) => fired = true;
+
+            _session.SelectCell(0);
+            _session.InputNumber(8); // 错误值(解=1)
+
+            Assert.IsFalse(fired, "错填不凑齐单元");
+        }
+
+        [Test]
+        public void UnitCompleted_Fix_After_Mistake_Fires()
+        {
+            var events = new List<(GameSession.UnitKind, int)>();
+            _session.UnitCompleted += (k, i) => events.Add((k, i));
+
+            _session.SelectCell(0);
+            _session.InputNumber(8); // 先错
+            _session.InputNumber(1); // 改正 → 凑齐
+
+            Assert.AreEqual(3, events.Count, "改正后应触发 宫/行/列 三事件");
+        }
+
+        [Test]
+        public void UnitCompleted_Erase_And_Clear_Do_Not_Fire()
+        {
+            int fired = 0;
+            _session.UnitCompleted += (_, _) => fired++;
+            _session.SelectCell(0);
+
+            _session.InputNumber(_session.Solution[0]); // 凑齐:3 事件
+            _session.Erase();                          // 擦除:清格不触发
+            _session.InputNumber(_session.Solution[0]); // 再填:又 3 事件
+            _session.InputNumber(_session.Solution[0]); // 再点同数=清除:清格不触发
+
+            Assert.AreEqual(6, fired, "只有正向落子触发,擦除/清格不触发");
+        }
+
+        [Test]
+        public void UnitCompleted_Undo_Redo_Do_Not_Fire()
+        {
+            int fired = 0;
+            _session.UnitCompleted += (_, _) => fired++;
+            _session.SelectCell(0);
+
+            _session.InputNumber(_session.Solution[0]); // 3 事件
+            _session.Undo();                           // 撤销:不触发
+            _session.Redo();                           // 重做:不触发
+
+            Assert.AreEqual(3, fired, "Undo/Redo 走 BoardChanged,不走凑齐检测");
+        }
+
+        [Test]
+        public void UnitCompleted_Note_Input_Does_Not_Fire()
+        {
+            bool fired = false;
+            _session.UnitCompleted += (_, _) => fired = true;
+
+            _session.ToggleInputMode(); // 笔记模式
+            _session.SelectCell(0);
+            _session.InputNumber(1); // 只写笔记
+
+            Assert.IsFalse(fired, "笔记输入不凑齐单元");
+        }
+
+        [Test]
+        public void UnitCompleted_Finishing_Move_Still_Fires()
+        {
+            // 收官格:凑齐事件先于 GameFinished 触发(SetValue 内 CheckUnitCompleted 在 CheckFinish 前)
+            int fired = 0, finished = 0;
+            _session.UnitCompleted += (_, _) => fired++;
+            _session.GameFinished += () => finished++;
+
+            foreach (int hole in new[] { 0, 40, 80 })
+            {
+                _session.SelectCell(hole);
+                _session.InputNumber(_session.Solution[hole]);
+            }
+
+            Assert.AreEqual(9, fired, "三洞各触发 3 事件(收官格同样触发)");
+            Assert.AreEqual(1, finished);
+            // 完成后输入冻结,不再有凑齐事件
+            _session.SelectCell(0);
+            _session.InputNumber(2);
+            Assert.AreEqual(9, fired, "完成态输入冻结,不触发凑齐");
+        }
+
+        [Test]
+        public void UnitCompleted_Hint_Completing_Unit_Fires()
+        {
+            // 提示落子同样可能凑齐单元(与手填一致触发扩散动效,GameplayView 同样订阅)
+            var events = new List<GameSession.UnitKind>();
+            _session.UnitCompleted += (k, _) => events.Add(k);
+
+            Assert.IsTrue(_session.TryUseHint(out _));
+            // 默认谜题仅 3 洞,提示必然填满其中一洞 → 宫/行/列 同时凑齐
+            Assert.AreEqual(3, events.Count, "提示填满一洞应触发三事件");
+            Assert.AreEqual(GameSession.UnitKind.Box, events[0], "顺序仍是 宫→行→列");
+            Assert.AreEqual(GameSession.UnitKind.Row, events[1]);
+            Assert.AreEqual(GameSession.UnitKind.Column, events[2]);
         }
 
         // ---- 计时 ----
