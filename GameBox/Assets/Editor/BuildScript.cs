@@ -3,8 +3,11 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.AddressableAssets.Settings;
+using UnityEditor.Build;          // NamedBuildTarget(v1.1 符号操作)
 using UnityEditor.Build.Reporting;
 using UnityEngine;
+using HybridCLR.Editor;           // SettingsUtil(Phase 9:v1.0 兜底 / v1.1 状态检查)
+using HybridCLR.Editor.Commands; // PrebuildCommand.GenerateAll(Phase 9:9-1)
 
 /// <summary>
 /// 构建双入口(10 文档 Phase 1-3 / 11 文档 §4.9 checklist 第 9 步):
@@ -16,6 +19,12 @@ using UnityEngine;
 public static class BuildScript
 {
     const string OutputDir = "Build/Android";
+
+    // ---------- Phase 9 v1.1(HybridCLR 热更)常量 ----------
+    /// <summary>模式条件桥符号:定义时 AOT 侧 Box.ModuleBridge(defineConstraints 排除)不编译,热更程序集被 Filter 过滤。</summary>
+    const string V11Symbol = "HYBRIDCLR_UNITY";
+    /// <summary>本机 NDK r27c 路径(Jenkins 用环境变量 ANDROID_NDK_ROOT 注入,本地 CLI 用 EditorPrefs 双保险,17 文档)。</summary>
+    const string NdkR27cPath = "D:/Projects/AI/AndroidNDK/android-ndk-r27c";
 
     [MenuItem("Box/Build/Android APK (local)")]
     public static void BuildAndroidApk() => BuildAndroid(aab: false);
@@ -105,6 +114,23 @@ public static class BuildScript
     }
 
     static void BuildAndroidInternal(string[] scenes, bool aab)
+    {
+        // Phase 9 9-1 v1.0 幂等兜底:HybridCLR enable 必须为 false(D-2 开关,见 Phase9HybridCLRSetup)。
+        // v1.1 构建异常中断可能残留 enable=true,会让 FilterHotFixAssemblies 静默过滤热更程序集
+        // (产物缺玩法代码) —— 每次 v1.0 构建显式复位 + 残留符号硬失败,显式失败优于静默污染。
+        SettingsUtil.Enable = false;
+        if (HasV11Symbol())
+        {
+            Debug.LogError("[BuildScript] 检测到残留 HYBRIDCLR_UNITY 符号(上次 v1.1 构建未正常收尾),"
+                + "请先跑 BuildScript.BuildV11 或手动移除该符号后重试");
+            EditorApplication.Exit(1);
+            return;
+        }
+        BuildAndroidInternalCore(scenes, aab);
+    }
+
+    /// <summary>构建核心(签名纪律 + BuildPlayer + 产物命名);v1.0 与 v1.1(BuildV11)共用。</summary>
+    static void BuildAndroidInternalCore(string[] scenes, bool aab)
     {
         EditorUserBuildSettings.buildAppBundle = aab;
         EnsureJdkConfigured(); // 无头构建兜底 JDK 偏好(见方法注释)
@@ -226,5 +252,139 @@ public static class BuildScript
         PlayerSettings.Android.keystorePass = string.Empty;
         PlayerSettings.Android.keyaliasPass = string.Empty;
         Debug.Log("[BuildScript] 已清除签名密码字段(useCustomKeystore=false,防入库)");
+    }
+
+    // ==================== Phase 9 v1.1 热更构建(HybridCLR,双阶段 CLI) ====================
+    // 阶段 A PrepareV11:切 Android + NDK 偏好 + enable=true + 名单 + HYBRIDCLR_UNITY 符号(保存退出);
+    // 阶段 B BuildV11:GenerateAll 六步 → Addressables → 构建(签名纪律继承 Core) → finally 恢复 v1.0 语义。
+    // 拆两阶段的原因:GenerateAll 的 StripAOTDlls 需要 已安装运行时 + Android target,
+    // 且 MethodBridge 的 DEVELOPMENT flag 须与最终构建一致(GenerateAll 与构建同一会话内完成)。
+    // CLI:
+    //   unity -batchmode -quit -executeMethod BuildScript.PrepareV11
+    //   unity -batchmode -quit -executeMethod BuildScript.BuildV11   (需 BOX_KEYSTORE_PASS)
+
+    [MenuItem("Box/Build/Android AAB v1.1 (hybridclr, CLI 双阶段)")]
+    public static void BuildAndroidAabV11()
+    {
+        if (!Application.isBatchMode)
+        {
+            // GUI 下 v1.1 是双阶段有状态流程,提示走 CLI(与 CI 行为一致,避免 GUI 状态残留)
+            Debug.LogWarning("[BuildScript] v1.1 构建请用 CLI 双阶段:PrepareV11 → BuildV11(见方法注释)");
+            return;
+        }
+        BuildV11();
+    }
+
+    /// <summary>v1.1 阶段 A:环境就绪(D-2 开关 enable=true + 名单 + 模式符号 + NDK 偏好)。</summary>
+    public static void PrepareV11()
+    {
+        try
+        {
+            // GenerateAll 与 StripAOTDlls 依赖 activeBuildTarget=Android(从当前 target 解析产物目录)
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
+            {
+                if (!EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android))
+                {
+                    Debug.LogError("[BuildScript] PrepareV11: 切换到 Android target 失败");
+                    EditorApplication.Exit(1);
+                    return;
+                }
+            }
+
+            // NDK r27c 显式偏好(本地 CLI 双保险;Jenkins 走 ANDROID_NDK_ROOT 环境变量,17 文档)
+            // Unity 6000 的 NDK 偏好键带版本后缀(AndroidNdkRootR27C),两个键都写防解析差异
+            EditorPrefs.SetString("AndroidNdkRoot", NdkR27cPath);
+            EditorPrefs.SetString("AndroidNdkRootR27C", NdkR27cPath);
+            EditorPrefs.SetBool("NdkUseEmbedded", false);
+
+            // D-2 开关:enable=true + 热更名单(Phase9HybridCLRSetup.SetV11)
+            Phase9HybridCLRSetup.SetV11();
+            AddV11Symbol(); // 模式条件桥符号(9-2 起 Box.ModuleBridge 据此排除编译)
+
+            Debug.Log($"[BuildScript] PrepareV11 done: enable=true, NDK={NdkR27cPath}, symbol={V11Symbol}");
+            EditorApplication.Exit(0);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[BuildScript] PrepareV11 EXCEPTION: " + e);
+            EditorApplication.Exit(1);
+        }
+    }
+
+    /// <summary>v1.1 阶段 B:GenerateAll → Addressables → AAB 构建;finally 恢复 v1.0 语义。</summary>
+    public static void BuildV11()
+    {
+        // 防裸跑:未经过 PrepareV11 直接构建 = enable=false 或符号缺失,GenerateAll 结果不可预期
+        if (!SettingsUtil.Enable || !HasV11Symbol())
+        {
+            Debug.LogError("[BuildScript] BuildV11: 请先执行 PrepareV11(enable=true + HYBRIDCLR_UNITY 缺失)");
+            EditorApplication.Exit(1);
+            return;
+        }
+        try
+        {
+            // 1) GenerateAll 六步:CompileDll → Il2CppDef → LinkXml → StripAOTDlls → MethodBridge → AOTGenericReferences
+            PrebuildCommand.GenerateAll();
+
+            // StripAOTDlls 内部临时置 exportAsGoogleAndroidProject=true(导出 Android 工程跑 il2cpp),
+            // 显式复位防残留(残留会把后续构建从 AAB 变成工程导出)
+            EditorUserBuildSettings.exportAsGoogleAndroidProject = false;
+
+            // 2) Addressables 资源(先代码后资源,代码失败早暴露)
+            try
+            {
+                AddressableAssetSettings.BuildPlayerContent();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[BuildScript] BuildV11 Addressables BuildPlayerContent failed: " + e.Message);
+                EditorApplication.Exit(1);
+                return;
+            }
+
+            var scenes = EditorBuildSettings.scenes
+                .Where(s => s.enabled)
+                .Select(s => s.path)
+                .ToArray();
+            if (scenes.Length == 0)
+            {
+                Debug.LogError("[BuildScript] BuildV11: Build Settings 无启用的场景");
+                EditorApplication.Exit(1);
+                return;
+            }
+
+            Directory.CreateDirectory(OutputDir);
+            // 3) 复用 v1.0 构建核心(含 AAB 上传签名纪律)
+            BuildAndroidInternalCore(scenes, aab: true);
+        }
+        finally
+        {
+            // 4) 恢复 v1.0 语义:enable=false + 移除符号 —— 异常中断也不残留污染 v1.0 构建链
+            SettingsUtil.Enable = false;
+            RemoveV11Symbol();
+            Debug.Log("[BuildScript] BuildV11 收尾:enable=false + 移除 HYBRIDCLR_UNITY(已恢复 v1.0 语义)");
+        }
+    }
+
+    /// <summary>读 Android 平台脚本符号(Unity 6000 的 GetScriptingDefineSymbols 返回分号分隔 string)。</summary>
+    static string GetAndroidDefines() => PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Android);
+
+    /// <summary>Android 平台符号是否含 HYBRIDCLR_UNITY(按 ; 分词,防子串误判如 XX_HYBRIDCLR_UNITY_XX)。</summary>
+    static bool HasV11Symbol() =>
+        GetAndroidDefines().Split(';').Contains(V11Symbol);
+
+    /// <summary>给 Android 平台加 HYBRIDCLR_UNITY 符号(v1.1 模式条件桥开关)。</summary>
+    static void AddV11Symbol()
+    {
+        var defines = GetAndroidDefines().Split(';').Where(s => !string.IsNullOrEmpty(s)).ToList();
+        if (!defines.Contains(V11Symbol)) defines.Add(V11Symbol);
+        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
+    }
+
+    /// <summary>从 Android 平台移除 HYBRIDCLR_UNITY 符号(v1.0 语义恢复)。</summary>
+    static void RemoveV11Symbol()
+    {
+        var defines = GetAndroidDefines().Split(';').Where(s => !string.IsNullOrEmpty(s) && s != V11Symbol);
+        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
     }
 }

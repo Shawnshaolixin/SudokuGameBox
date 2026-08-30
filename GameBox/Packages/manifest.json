@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.code-philosophy.hybridclr": "https://gitee.com/focus-creative-games/hybridclr_unity.git#v8.14.1",
     "com.cysharp.unitask": "file:Packages/com.cysharp.unitask",
     "com.google.external-dependency-manager": "file:com.google.external-dependency-manager-1.2.188.tgz",
     "com.google.firebase.analytics": "file:com.google.firebase.analytics-13.15.0.tgz",

@@ -119,6 +119,11 @@ GameBox/Assets/Plugins/Android/FirebaseApp.androidlib/
 GameBox/Assets/Plugins/Android/FirebaseCrashlytics.androidlib/
 GameBox/Assets/Plugins/Android/*.androidlib.meta
 
+# HybridCLR 生成目录(Phase 9 9-1:Install 注入的 il2cpp 运行时 + GenerateAll 产物,可重跑生成,不入库)
+GameBox/HybridCLRData/
+GameBox/Assets/HybridCLRGenerate/
+GameBox/Assets/HybridCLRGenerate.meta
+
 # =========================================================
 # 素材中间产物与本地备份(不入库)
 # =========================================================

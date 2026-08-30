@@ -11,7 +11,8 @@
         "Unity.TextMeshPro",
         "Unity.InputSystem",
         "Unity.Addressables",
-        "Unity.Addressables.Editor"
+        "Unity.Addressables.Editor",
+        "HybridCLR.Editor"
     ],
     "includePlatforms": [
         "Editor"
