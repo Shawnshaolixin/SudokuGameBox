@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -125,8 +126,12 @@ public static class BuildScript
         }
 
         var ext = aab ? ".aab" : ".apk";
-        // 产物文件名与应用名保持一致(Rovilo),避免与工程目录 GameBox 混淆;仅影响文件名,不影响应用显示名
-        var output = Path.Combine(OutputDir, "Rovilo" + ext);
+        // 产物文件名带 构建类型/版本号/日期 标签(2026-08-30 用户要求):每次构建不覆盖旧产物,
+        // 便于回滚与存档;例 Rovilo-release-v11-20260830-1510.aab。应用显示名不受文件名影响。
+        var label = aab ? "release" : "debug";
+        var vc = PlayerSettings.Android.bundleVersionCode;
+        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmm");
+        var output = Path.Combine(OutputDir, $"Rovilo-{label}-v{vc}-{stamp}{ext}");
 
         var options = new BuildPlayerOptions
         {
