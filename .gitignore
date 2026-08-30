@@ -56,6 +56,9 @@ crashlytics-build.properties
 
 # 打包的 Addressables 数据（任意层级）
 **/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+# Addressables 构建自动生成的 link.xml(地址资源类型 preserve 白名单,每次构建重写,生成物不入库)
+GameBox/Assets/AddressableAssetsData/link.xml
+GameBox/Assets/AddressableAssetsData/link.xml.meta
 
 # 临时自动生成的 Android 资源（任意层级）
 **/[Aa]ssets/[Ss]treaming[Aa]ssets/aa.meta
