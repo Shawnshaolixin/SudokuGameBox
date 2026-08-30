@@ -272,7 +272,22 @@ public static class BuildScript
             Debug.LogWarning("[BuildScript] v1.1 构建请用 CLI 双阶段:PrepareV11 → BuildV11(见方法注释)");
             return;
         }
-        BuildV11();
+        BuildV11(aab: true);
+    }
+
+    /// <summary>
+    /// v1.1 中间态验证专用:APK(免签名,libil2cpp.so 与 AAB 一致,9-1 符号验证用)。
+    /// CLI:PrepareV11 → BuildV11Apk
+    /// </summary>
+    [MenuItem("Box/Build/Android APK v1.1 (hybridclr, 中间态验证)")]
+    public static void BuildV11Apk()
+    {
+        if (!Application.isBatchMode)
+        {
+            Debug.LogWarning("[BuildScript] v1.1 构建请用 CLI 双阶段:PrepareV11 → BuildV11Apk");
+            return;
+        }
+        BuildV11(aab: false);
     }
 
     /// <summary>v1.1 阶段 A:环境就绪(D-2 开关 enable=true + 名单 + 模式符号 + NDK 偏好)。</summary>
@@ -311,8 +326,14 @@ public static class BuildScript
         }
     }
 
-    /// <summary>v1.1 阶段 B:GenerateAll → Addressables → AAB 构建;finally 恢复 v1.0 语义。</summary>
-    public static void BuildV11()
+    /// <summary>v1.1 阶段 B 入口(AAB,上架形态;需 BOX_KEYSTORE_PASS 注入签名)。</summary>
+    public static void BuildV11() => BuildV11(aab: true);
+
+    /// <summary>
+    /// v1.1 阶段 B 核心:GenerateAll → Addressables → 构建;finally 恢复 v1.0 语义。
+    /// aab=true 走上传签名纪律(拒绝 debug 签名包);aab=false 为中间态验证(免签名)。
+    /// </summary>
+    static void BuildV11(bool aab)
     {
         // 防裸跑:未经过 PrepareV11 直接构建 = enable=false 或符号缺失,GenerateAll 结果不可预期
         if (!SettingsUtil.Enable || !HasV11Symbol())
@@ -354,8 +375,8 @@ public static class BuildScript
             }
 
             Directory.CreateDirectory(OutputDir);
-            // 3) 复用 v1.0 构建核心(含 AAB 上传签名纪律)
-            BuildAndroidInternalCore(scenes, aab: true);
+            // 3) 复用 v1.0 构建核心(aab=true 时含上传签名纪律)
+            BuildAndroidInternalCore(scenes, aab);
         }
         finally
         {
