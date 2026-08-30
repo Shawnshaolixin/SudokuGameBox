@@ -32,6 +32,21 @@ namespace Box.UI
             return t * t * t + 1f;
         }
 
+        /// <summary>
+        /// EaseOutBounce:球降落单次弹跳(用户拍板:数字从上面落下来,弹一下就好,不要弹好几下):
+        /// 自由落体下坠触底(t=1/2.75 处=1)→ 单次回弹(最高弹到 0.75,即落地高度的 25%)
+        /// → 回落封顶停住(之后保持 1)。整条曲线只有一个反弹,不衰减弹跳。
+        /// 用于入场"数字从上面落下来弹一下"的位移曲线。
+        /// </summary>
+        public static float EaseOutBounce(float t)
+        {
+            const float n1 = 7.5625f;
+            const float d1 = 2.75f;
+            if (t < 1f / d1) return n1 * t * t;              // 自由落体 → 触底 = 1
+            t -= 1.5f / d1;                                   // 反弹段:0.75 弹起 → 回升
+            return Mathf.Min(n1 * t * t + 0.75f, 1f);         // 到 1 封顶:弹一下即停,不再弹
+        }
+
         /// <summary>EaseInOutCubic:慢-快-慢(位移/淡入淡出)。</summary>
         public static float EaseInOutCubic(float t)
         {
@@ -117,6 +132,29 @@ namespace Box.UI
                 if (dt <= 0f) break; // 运行中暂停/无帧步进:立即结束,防 elapsed 永不增长挂起调用链(曾致 Router PushAsync 永久卡 _transitioning)
                 elapsed += dt;
                 target.anchoredPosition = Vector2.LerpUnclamped(from, to, EaseInOutCubic(Mathf.Min(elapsed / duration, 1f)));
+                await UniTask.Yield(ct);
+                if (target == null) return; // 场景切换销毁:静默退出
+            }
+            target.anchoredPosition = to;
+        }
+
+        /// <summary>
+        /// 竖直下落 + 落地回弹(球降落效果,EaseOutBounce:数字从上方 from 落到 to,弹一下停住)。
+        /// 2026-08-30 入场动效:数字从格子上面落下来弹一下。
+        /// </summary>
+        public static async UniTask DropBounce(RectTransform target, Vector2 from, Vector2 to, float duration, CancellationToken ct = default)
+        {
+            if (target == null || duration <= 0f) return;
+            if (Time.deltaTime <= 0f) { target.anchoredPosition = to; return; } // EditMode/暂停:直接到位
+            target.anchoredPosition = from;
+            var elapsed = 0f;
+            while (elapsed < duration)
+            {
+                ct.ThrowIfCancellationRequested();
+                float dt = Time.deltaTime;
+                if (dt <= 0f) break; // 运行中暂停/无帧步进:立即结束,防 elapsed 永不增长挂起调用链
+                elapsed += dt;
+                target.anchoredPosition = Vector2.LerpUnclamped(from, to, EaseOutBounce(Mathf.Min(elapsed / duration, 1f)));
                 await UniTask.Yield(ct);
                 if (target == null) return; // 场景切换销毁:静默退出
             }

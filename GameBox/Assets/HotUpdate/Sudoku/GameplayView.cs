@@ -350,16 +350,15 @@ namespace Box.HotUpdate.Sudoku
         }
 
         /// <summary>
-        /// 入场动效:所有给定数字同帧开始跳动,但各自节奏随机(用户拍板:同时跳但节奏不一,
-        /// 像雨点落水面各自起舞,而非整齐同频或串行扫描)。
-        /// 每格随机 1~3 拍:第 1 拍 0→1 大涌现,后续拍 0.8→1 小弹(数字保持可见);
-        /// 单拍时长与拍间间隔均随机 → 快跳/慢跳/连跳/单跳混杂,节奏错落。
-        /// 总时长 ≈ 最慢格 ≤1.5s;调参见下方常量。
+        /// 入场动效:所有给定数字同帧开始,从各自格子上方落下来、落地弹一下(球降落效果,
+        /// 用户拍板:不是原地缩放跳,是数字从上面掉下来弹一下;EaseOutBounce 只弹一次)。
+        /// 下落时长与起始高度均随机 → 快球/慢球/高落/低落错开,保持"同时动但节奏不一"。
+        /// 总时长 ≈ 最慢格 ≤0.55s;调参见下方常量。
         /// </summary>
         async UniTaskVoid PlayBoardIntro()
         {
-            const float JumpMin = 0.12f, JumpMax = 0.25f; // 单拍时长范围(快/慢跳)
-            const int MaxJumps = 3;                       // 每格最多跳拍数(1~MaxJumps 随机)
+            const float DropMin = 0.3f, DropMax = 0.55f;  // 下落时长范围(快球/慢球;DropMax 沿用用户调参 0.55)
+            const float HeightMin = 50f, HeightMax = 110f; // 起始高度(格子上方 px,越高落得越远)
             var prev = _introCts;
             prev?.Cancel();
             _introCts = new CancellationTokenSource();
@@ -370,31 +369,25 @@ namespace Box.HotUpdate.Sudoku
                 {
                     ct.ThrowIfCancellationRequested();
                     if (_session == null || !_session.IsGiven(i)) continue;
-                    // 同帧并发启动,各格节奏(拍数/时长/间隔)独立随机 → "同时跳、节奏不一"
-                    PlayCellIntro(_cellTexts[i].transform, JumpMin, JumpMax, MaxJumps, ct).Forget();
+                    // 同帧并发启动,各格下落时长/高度独立随机 → "同时落、节奏不一"
+                    PlayCellIntro((RectTransform)_cellTexts[i].transform, DropMin, DropMax, HeightMin, HeightMax, ct).Forget();
                 }
             }
             catch (OperationCanceledException) { /* 重开新局/销毁:中断入场 */ }
         }
 
-        /// <summary>单格入场:随机拍数 × 随机单拍时长 × 随机拍间间隔,与邻格节奏错开。</summary>
-        async UniTaskVoid PlayCellIntro(Transform target, float jumpMin, float jumpMax, int maxJumps, CancellationToken ct)
+        /// <summary>单格入场:数字从上方随机高度落下,落地弹一下(EaseOutBounce 单次反弹),时长/高度与邻格错开。</summary>
+        async UniTaskVoid PlayCellIntro(RectTransform target, float dropMin, float dropMax, float heightMin, float heightMax, CancellationToken ct)
         {
             try
             {
-                int jumps = Random.Range(1, maxJumps + 1); // 每格跳 1~MaxJumps 拍
-                for (int j = 0; j < jumps; j++)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    float dur = Random.Range(jumpMin, jumpMax);
-                    // 第 1 拍从 0 涌现(明显),后续拍从 0.8 小弹(数字保持可见,不闪烁消失)
-                    float from = j == 0 ? 0f : 0.8f;
-                    await BoxTween.ScalePulse(target, from, 1f, dur, ct); // EaseOutBack 回弹
-                    if (j < jumps - 1)
-                        await UniTask.Delay(Random.Range(80, 260), DelayType.DeltaTime, PlayerLoopTiming.Update, ct);
-                }
+                ct.ThrowIfCancellationRequested();
+                float dur = Random.Range(dropMin, dropMax);
+                float height = Random.Range(heightMin, heightMax);
+                // from=(0, height) 格子上方 → to=(0,0) 原位,触底弹一下停住
+                await BoxTween.DropBounce(target, new Vector2(0f, height), Vector2.zero, dur, ct);
             }
-            catch (OperationCanceledException) { /* 重开新局/销毁:取消该格弹跳 */ }
+            catch (OperationCanceledException) { /* 重开新局/销毁:取消该格下落 */ }
         }
 
         /// <summary>
