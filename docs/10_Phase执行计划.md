@@ -301,7 +301,7 @@ Gate1 空工程初始化（HybridCLR_Gate1）
   中间态验证用 `BuildV11Apk`（免签名）。AAB 完整构建需 BOX_KEYSTORE_PASS（尚未跑，见 16.6 阻塞项）。
 - **提交**：fc8aee3 / 97533e4 / 89d579a / 8eb65b9。
 
-### 16.3 9-2 边界 + 模式条件桥（待执行）
+### 16.3 9-2 边界 + 模式条件桥（✅ 2026-08-31，验收证据见下）
 
 **目标**：`Box.HotUpdate.Core` 成立、Sudoku 引用它；模式桥消除 v1.1 悬垂引用；v1.0 完整回归。
 
@@ -320,7 +320,18 @@ link.xml 双模式语义共存；grep 复查 Sudoku 无具体 SDK 实现引用�
 **风险与备选**：桥方案是全计划最非常规处，若 defineConstraints 组合失效（v1.1 报悬垂引用）→
 构建脚本临时翻转 asmdef 文件后还原；30 分钟不通即切换并汇报。
 
-### 16.4 9-3 启动链路接入热更下载（待执行，核心新工作）
+**验收证据（✅ 2026-08-31）**：
+- **提交**：87b259c（边界+桥 14 文件）+ 769f780（GenerateAll 名单落盘 HybridCLRSettings.asset）。
+- **验证①**：CLI 编译零错误（`Exiting batchmode successfully now!`，`Box.HotUpdate.Core.dll`/`Box.ModuleBridge.dll` 均编译）；
+  EditMode 全量 175/175（9-3 验收时回归，覆盖 9-2 改动）。
+- **验证③**：`PrepareV11 → BuildV11Apk`（产物 `Rovilo-debug-v12-20260831-2051.apk`，69,202,156 B），
+  过滤日志同时出现 `filter assembly:Box.HotUpdate.Core` 与 `filter assembly:Box.HotUpdate.Sudoku` ✓；
+  libil2cpp.so **38 处 "HybridCLR" 字符串** + LoadMetadataForAOTAssembly/RuntimeApi 符号（与 9-1 数量级一致）；
+  **桥方案生效**：v1.1（HYBRIDCLR_UNITY）下 `Box.ModuleBridge` 被 defineConstraints 排除编译，全链路零悬垂引用错误；
+  BuildV11 finally 正确恢复 enable=false + 移除符号。
+- **验证②（v1.0 完整回归）**：未单独跑，计划随 9-3 完成后合并回归（见 16.4 待办）。
+
+### 16.4 9-3 启动链路接入热更下载（✅ ①② 2026-08-31；③ 真机待验）
 
 **目标**：AOT 侧热更引导组件——无强制网络等待、失败静默降级、D-1 单通道、加载成功刷新 ModuleLoader。
 
@@ -340,6 +351,18 @@ v1.0 主包无此类型 → null → 整链静默跳过；禁止直接引用（v
 热更侧首版控泛型面（多用非泛型 UniTask/`Forget()`）；AOT 泛型缺口用 `[GenericMethodInstantiation]` 补齐。
 验证：① EditMode 新用例全绿（下载层抽象 `IHotUpdateContentSource` 注入 mock——Editor 是 Mono 且同名程序集已加载，**不能真 Assembly.Load**）
 ② 编辑器 Play 冒烟：无 HybridCLR 启动 ≤2.5s、数独可玩（降级路径）③ **v1.1 真机闭环**（唯一真机项）：在线首启下载 → 数独可玩；断网冷启动 → 包内兜底；服务器停机 → 启动不卡。
+
+**验收证据（✅ ① ② 2026-08-31）**：
+- **提交**：3b7577f（11 文件 +558 行：HotUpdateService/IHotUpdateContentSource/ModuleOverrides + ModuleLoader.Refresh + AppBootstrap 接入 + 6 用例）。
+- **设计要点落实**：全反射（`Type.GetType("HybridCLR.RuntimeApi, HybridCLR.Runtime")` 探测，HomologousImageMode 经方法参数类型 `Enum.Parse`，v1.0 零编译期依赖）；
+  地址约定 `HotUpdate/Dll/{asm}`、`HotUpdate/Metadata/{asm}`、`HotUpdate/module_overrides`（9-4 配 HotUpdate_Local 组时对应）；
+  任一步失败静默降级包内版本；Assembly.Load 失败 → `ClearDependencyCacheAsync` 下轮重试；`Begin()` fire-and-forget 不阻塞启动。
+- **验证①**：EditMode 全量 **175/175 全绿**（6 新用例：无运行时跳过 / catalog 失败降级 / 成功装载+清单刷新 / 装载失败清缓存 / metadata 缺失容错 / overrides 无效保底）。
+- **验证②**：PlayMode **4/4 全绿**，新增 `Startup_Under_Timeout_With_HotUpdate_Degrade`（启动 ≤2.5s 断言通过）；
+  覆盖降级路径：Editor 下 HybridCLR.Runtime 存在 → 热更链路走 Addressables 本地查找 → 无远程资源 → 静默降级包内版本，数独全链路可玩。
+- **验证③（真机闭环）**：待 9-4 远程资源就绪 + Android 设备执行（在线首启 / 断网冷启动 / 服务器停机三态）。
+- **已知问题**：Android 符号 `SENTIS_ANALYTICS_ENABLED` 两次被 Unity 进程保存漂移丢失（2026-08-31，已手工恢复）；
+  嫌疑为 hybridclr CheckSettings 或 Unity 6000 符号序列化，根因排查中 —— 后续构建前需 `git diff` 复核该文件。
 
 ### 16.5 9-4 Addressables Remote Catalog 远程下发（待执行）
 
@@ -369,9 +392,9 @@ Content Update 增量验证放后半（先全量验证同 key 覆盖）。真机
 **当前阻塞项**：v1.1 AAB 完整构建需环境变量 `BOX_KEYSTORE_PASS`（用户注入，agent 不碰密码明文）；
 已用 APK 中间态验证符号等价性，AAB 随时可跑：`PrepareV11 → BuildV11`。
 
-**风险排序**：R1 GenerateAll 在大工程失败（9-1 已通过，风险解除）→ R2 桥方案失效（备选已备，9-2 验证）
-→ R3 v1.0 回归破坏（最高优先，每步都回归）→ R4 AOT 泛型缺失（9-1 已审查，9-3 热更代码注意控泛型面）
-→ R5 真机闭环只能真机验（9-3 需准备设备）。
+**风险排序**：R1 GenerateAll 在大工程失败（9-1 已通过，风险解除）→ R2 桥方案失效（✅ 9-2 验证通过：v1.1 无悬垂引用，风险解除）
+→ R3 v1.0 回归破坏（最高优先，每步都回归；9-3 后待合并回归）→ R4 AOT 泛型缺失（9-1 已审查，9-3 热更代码注意控泛型面）
+→ R5 真机闭环只能真机验（9-4 需准备设备）。
 
 ## 16.7 Phase 9.5 — 新手引导（v1.x 留存优化，FR-16 P0）
 
