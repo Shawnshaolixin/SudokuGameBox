@@ -56,6 +56,9 @@ crashlytics-build.properties
 
 # 打包的 Addressables 数据（任意层级）
 **/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+# Addressables 构建自动生成的 link.xml(地址资源类型 preserve 白名单,每次构建重写,生成物不入库)
+GameBox/Assets/AddressableAssetsData/link.xml
+GameBox/Assets/AddressableAssetsData/link.xml.meta
 
 # 临时自动生成的 Android 资源（任意层级）
 **/[Aa]ssets/[Ss]treaming[Aa]ssets/aa.meta
@@ -114,6 +117,11 @@ GameBox/Assets/GeneratedLocalRepo.meta
 # 编辑器崩溃恢复目录
 GameBox/Assets/_Recovery/
 GameBox/Assets/_Recovery.meta
+# HybridCLR 生成产物(AOTGenericReferences/link.xml,编辑器 Generate 生成,可重建)
+GameBox/Assets/HybridCLRGenerate/
+GameBox/Assets/HybridCLRGenerate.meta
+# HybridCLR 构建中间产物(热更 DLL/剥离 AOT DLL/il2cpp 工程/第三方仓库克隆,体积大且可重建)
+GameBox/HybridCLRData/
 # External Dependency Manager 解析产物(Firebase aar,构建时自动生成)
 GameBox/Assets/Plugins/Android/FirebaseApp.androidlib/
 GameBox/Assets/Plugins/Android/FirebaseCrashlytics.androidlib/
