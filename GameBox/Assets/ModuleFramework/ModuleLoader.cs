@@ -26,6 +26,24 @@ namespace Box.ModuleFramework
 
         public IReadOnlyList<ModuleEntry> Entries => _entriesList;
 
+        /// <summary>
+        /// 全量替换模块清单(Phase 9 9-3:热更 overrides 用)。
+        /// 只换清单不碰运行中模块实例(_active 不受影响);远程清单即为最终清单(= 最简单回滚)。
+        /// </summary>
+        public void Refresh(IReadOnlyList<ModuleEntry> entries)
+        {
+            _entries.Clear();
+            _entriesList.Clear();
+            if (entries != null)
+                foreach (var e in entries)
+                    if (e != null && !string.IsNullOrEmpty(e.id))
+                    {
+                        _entries[e.id] = e;
+                        _entriesList.Add(e);
+                    }
+            Debug.Log($"[ModuleFramework] 模块清单已刷新,共 {_entriesList.Count} 项");
+        }
+
         readonly UIService _ui;
         readonly List<ModuleEntry> _entriesList = new();
         readonly Dictionary<string, ModuleEntry> _entries = new();

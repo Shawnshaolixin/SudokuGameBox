@@ -1,3 +1,4 @@
+using Box.Gameplay.HotUpdate;
 using Box.ModuleFramework;
 using Box.Services;
 using Box.UI;
@@ -79,6 +80,12 @@ namespace Box.Gameplay
             // 缺失时注册空清单,大厅入口静默不渲染(Editor 脚本 Phase45ModuleSetup 保证资产存在并入库)。
             var catalog = Resources.Load<ModuleCatalog>("Config/ModuleCatalog");
             ModuleLoader.Register(new ModuleLoader(ui, catalog != null ? catalog.entries : null));
+
+            // ===== Phase 9 9-3:热更引导(不 await 不阻塞,失败静默降级包内版本) =====
+            // v1.0 主包无 HybridCLR 运行时 → 反射探测失败整链跳过,启动开销≈0;
+            // v1.1 后台异步:目录检查(5s 超时)→ 装载热更 dll → 远程清单刷新 ModuleLoader。
+            HotUpdateService.Begin(ModuleLoader.Instance);
+
             Debug.Log($"[AppBootstrap] UIService + ModuleLoader + Services registered (存档:{save.Exists})");
         }
     }
