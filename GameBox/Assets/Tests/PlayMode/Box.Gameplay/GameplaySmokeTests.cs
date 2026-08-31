@@ -2,6 +2,7 @@ using System.Collections;
 using System.Reflection;
 using Box.Gameplay;
 using Box.HotUpdate.Sudoku;
+using Box.ModuleFramework;
 using Box.UI;
 using Cysharp.Threading.Tasks;
 using NUnit.Framework;
@@ -129,6 +130,20 @@ namespace Box.Gameplay.Tests
             await UIService.Instance.HandleBackAsync();
             await UniTask.WaitUntil(() => Object.FindFirstObjectByType<DifficultySelectView>() == null);
             Assert.AreEqual(0, UIService.Instance.Router.StackCount, "返回键关闭弹窗");
+        });
+
+        [UnityTest]
+        public IEnumerator Startup_Under_Timeout_With_HotUpdate_Degrade() => UniTask.ToCoroutine(async () =>
+        {
+            // 验证②(10 文档 §16.4):Editor 下 HybridCLR.Runtime 存在 → 热更链路走本地降级,
+            // 启动(场景加载 + AppBootstrap 同步注册 + 热更 Begin fire-and-forget)不得被阻塞。
+            GameContext.Reset();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            await LoadScene("MainMenu");
+            sw.Stop();
+            Assert.NotNull(UIService.Instance, "AppBootstrap 已注册 UIService");
+            Assert.NotNull(ModuleLoader.Instance, "ModuleLoader 已注册");
+            Assert.Less(sw.ElapsedMilliseconds, 2500, "启动(场景加载+服务注册)应 ≤2.5s,热更链路不得阻塞");
         });
 
         // ---- helpers ----
