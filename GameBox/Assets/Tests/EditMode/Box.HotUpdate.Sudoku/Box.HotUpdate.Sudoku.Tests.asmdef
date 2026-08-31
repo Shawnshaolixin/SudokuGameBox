@@ -2,6 +2,7 @@
     "name": "Box.HotUpdate.Sudoku.Tests",
     "rootNamespace": "Box.HotUpdate.Sudoku.Tests",
     "references": [
+        "Box.HotUpdate.Core",
         "Box.HotUpdate.Sudoku",
         "Box.Services.Abstractions",
         "Sudoku.Core",

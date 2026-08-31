@@ -3,6 +3,7 @@
     "rootNamespace": "Box.Gameplay.Tests",
     "references": [
         "Box.Gameplay",
+        "Box.HotUpdate.Core",
         "Box.HotUpdate.Sudoku",
         "Box.ModuleFramework",
         "Box.UI",

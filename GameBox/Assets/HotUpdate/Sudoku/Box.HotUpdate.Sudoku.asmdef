@@ -2,6 +2,7 @@
     "name": "Box.HotUpdate.Sudoku",
     "rootNamespace": "Box.HotUpdate.Sudoku",
     "references": [
+        "Box.HotUpdate.Core",
         "Box.ModuleFramework",
         "Box.Services.Abstractions",
         "Box.UI",
@@ -14,7 +15,7 @@
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
-    "autoReferenced": true,
+    "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false

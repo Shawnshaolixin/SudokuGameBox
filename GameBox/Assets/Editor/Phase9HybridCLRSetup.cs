@@ -16,9 +16,9 @@ public static class Phase9HybridCLRSetup
 {
     /// <summary>
     /// 热更程序集名单(无 .dll 后缀,与热更 asmdef 名字一一对应)。
-    /// 9-1 阶段先只有 Sudoku;9-2 建 Box.HotUpdate.Core 后补入首项。
+    /// 9-2 起含 Core 基座(内容最小化)+ Sudoku 玩法。
     /// </summary>
-    public static readonly string[] HotUpdateAssemblies = { "Box.HotUpdate.Sudoku" };
+    public static readonly string[] HotUpdateAssemblies = { "Box.HotUpdate.Core", "Box.HotUpdate.Sudoku" };
 
     /// <summary>v1.0 语义:enable=false + 名单(Filter 不介入,热更程序集照常编译进主包)。</summary>
     public static void SetupV10()
