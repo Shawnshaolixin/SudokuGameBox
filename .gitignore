@@ -56,9 +56,15 @@ crashlytics-build.properties
 
 # 打包的 Addressables 数据（任意层级）
 **/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+# content_state.bin 必须入库（Phase 9 9-4:丢失则无法做 Content Update 增量更新,故显式放行;
+# 实际产物在 [BuildTarget] 子目录:AddressableAssetsData/Android/）
+!GameBox/Assets/AddressableAssetsData/Android/addressables_content_state.bin
 # Addressables 构建自动生成的 link.xml(地址资源类型 preserve 白名单,每次构建重写,生成物不入库)
 GameBox/Assets/AddressableAssetsData/link.xml
 GameBox/Assets/AddressableAssetsData/link.xml.meta
+# 远程内容构建产物(Phase 9 9-4:ServerData 为 Remote.BuildPath 输出,红线 9 不入库)
+GameBox/ServerData/
+GameBox/ServerData.meta
 
 # 临时自动生成的 Android 资源（任意层级）
 **/[Aa]ssets/[Ss]treaming[Aa]ssets/aa.meta
@@ -133,6 +139,15 @@ GameBox/Assets/HybridCLRGenerate.meta
 _art_originals_backup/
 rovilo_slices/
 rovilo_ui_layers/
+
+# =========================================================
+# Phase 9 9-4 热更远程内容(红线 9:仓库无远程内容,全部本地生成)
+# =========================================================
+# GenerateContent 产物(热更 dll/metadata/module_overrides,可重生成,不入库)
+GameBox/Assets/RemoteContent/
+GameBox/Assets/RemoteContent.meta
+# 部署目录(deploy_remote.ps1 拷贝 ServerData 并起 http 服务)
+_deploy_remote/
 
 # Firebase 等 UPM 本地包 tgz(官方仅 tgz 分发,大体积不入库,clone 后需手动放置)
 GameBox/Packages/*.tgz

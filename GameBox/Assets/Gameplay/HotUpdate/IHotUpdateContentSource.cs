@@ -20,8 +20,8 @@ namespace Box.Gameplay.HotUpdate
         /// <summary>加载热更程序集 dll 字节(按程序集名,无资源返回 null)。</summary>
         UniTask<byte[]> LoadDllAsync(string assemblyName);
 
-        /// <summary>加载 AOT 元数据字节(Consistent 模式要求与包内剥离 dll 逐字节一致;无资源返回 null)。</summary>
-        UniTask<byte[]> LoadMetadataAsync(string assemblyName);
+        /// <summary>加载 AOT 程序集元数据字节(按 AOT 程序集名,如 Box.UI/mscorlib;Consistent 模式要求与包内剥离 dll 逐字节一致,无资源返回 null)。</summary>
+        UniTask<byte[]> LoadMetadataAsync(string aotAssemblyName);
 
         /// <summary>加载远程模块清单 JSON;无资源返回 null。</summary>
         UniTask<string> LoadOverridesJsonAsync();
@@ -39,8 +39,11 @@ namespace Box.Gameplay.HotUpdate
         /// <summary>HybridCLR 运行时是否可用(v1.0 主包无 RuntimeApi → false,整链静默跳过)。</summary>
         bool IsRuntimeAvailable { get; }
 
-        /// <summary>装载元数据 + 程序集;任一步失败返回 false(不抛,调用方清缓存)。</summary>
-        bool Load(string assemblyName, byte[] dllBytes, byte[] metadataBytes);
+        /// <summary>装载单个 AOT 程序集元数据(LoadMetadataForAOTAssembly,Consistent 模式);失败返回 false。</summary>
+        bool LoadMetadata(string aotAssemblyName, byte[] metadataBytes);
+
+        /// <summary>装载热更程序集(Assembly.Load,元数据全部装载完成后调用);失败返回 false。</summary>
+        bool LoadAssembly(string assemblyName, byte[] dllBytes);
     }
 
     /// <summary>
@@ -161,6 +164,8 @@ namespace Box.Gameplay.HotUpdate
     /// HybridCLR 运行时装载器(9-3 默认实现):全反射,禁止编译期引用 HybridCLR.Runtime
     /// (v1.0 主包无该程序集,直接引用会被 IL2CPP 裁剪 → MissingMethod 崩溃)。
     /// 反射探测成功后才执行;HomologousImageMode 枚举经方法参数类型解析,不硬编码命名空间/数值。
+    /// 9-4 起语义与真实 HybridCLR 对齐:LoadMetadata 按 AOT 程序集逐个装载(Consistent 模式),
+    /// 全部元数据就绪后再 Assembly.Load 热更程序集。
     /// </summary>
     public sealed class HybridCLRAssemblyLoader : IHotUpdateAssemblyLoader
     {
@@ -168,24 +173,34 @@ namespace Box.Gameplay.HotUpdate
 
         public bool IsRuntimeAvailable => Type.GetType(RuntimeApiTypeName) != null;
 
-        public bool Load(string assemblyName, byte[] dllBytes, byte[] metadataBytes)
+        public bool LoadMetadata(string aotAssemblyName, byte[] metadataBytes)
         {
             try
             {
                 var runtimeApi = Type.GetType(RuntimeApiTypeName);
                 if (runtimeApi == null) return false;
+                if (metadataBytes == null || metadataBytes.Length == 0) return false;
 
-                // 1) AOT 元数据装载(Consistent 严格一致模式)—— 先元数据后 dll,顺序不可反
-                if (metadataBytes != null && metadataBytes.Length > 0)
-                {
-                    var loadMetadata = runtimeApi.GetMethod("LoadMetadataForAOTAssembly");
-                    if (loadMetadata == null) return false;
-                    var modeType = loadMetadata.GetParameters()[1].ParameterType;
-                    var consistent = Enum.Parse(modeType, "Consistent");
-                    loadMetadata.Invoke(null, new object[] { metadataBytes, consistent });
-                }
+                var loadMetadata = runtimeApi.GetMethod("LoadMetadataForAOTAssembly");
+                if (loadMetadata == null) return false;
+                var modeType = loadMetadata.GetParameters()[1].ParameterType;
+                var consistent = Enum.Parse(modeType, "Consistent");
+                loadMetadata.Invoke(null, new object[] { metadataBytes, consistent });
+                Debug.Log($"[HotUpdate] AOT 元数据已装载: {aotAssemblyName}");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[HotUpdate] 装载 AOT 元数据 {aotAssemblyName} 失败: {e.Message}");
+                return false;
+            }
+        }
 
-                // 2) 程序集装载(Assembly.Load 后热更类型进入 AppDomain,ModuleLoader.ResolveType 可命中)
+        public bool LoadAssembly(string assemblyName, byte[] dllBytes)
+        {
+            try
+            {
+                // Assembly.Load 后热更类型进入 AppDomain,ModuleLoader.ResolveType 可命中
                 Assembly.Load(dllBytes);
                 Debug.Log($"[HotUpdate] 程序集已装载: {assemblyName}");
                 return true;

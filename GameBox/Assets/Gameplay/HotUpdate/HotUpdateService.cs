@@ -22,6 +22,20 @@ namespace Box.Gameplay.HotUpdate
             "Box.HotUpdate.Sudoku"
         };
 
+        /// <summary>
+        /// AOT 元数据清单(Consistent 模式装载对象 = 热更代码引用的 AOT 程序集剥离 dll)。
+        /// 与 GenerateAll 产出 AOTGenericReferences.PatchedAOTAssemblyList 一致(9-1 审查);
+        /// 更新需与 Phase9HybridCLRSetup.GenerateContent 的拷贝名单保持同步。
+        /// </summary>
+        public static readonly IReadOnlyList<string> AotMetadataAssemblies = new[]
+        {
+            "Box.UI",
+            "System.Core",
+            "UniTask",
+            "UnityEngine.CoreModule",
+            "mscorlib"
+        };
+
         public static HotUpdateService Instance { get; private set; }
 
         readonly IHotUpdateContentSource _source;
@@ -78,7 +92,24 @@ namespace Box.Gameplay.HotUpdate
                     return;
                 }
 
-                // 3) 依次装载热更程序集(元数据 → dll);任一失败清缓存,下轮启动重试
+                // 3) AOT 元数据先行(Consistent 模式:热更 dll 引用 AOT 类型/泛型时依赖元数据,缺一不可安全装载);
+                //    任一失败清缓存,下轮启动重试(不阻断本局,包内版本继续)
+                foreach (var aot in AotMetadataAssemblies)
+                {
+                    var metadata = await _source.LoadMetadataAsync(aot);
+                    if (metadata == null || metadata.Length == 0)
+                    {
+                        Debug.LogWarning($"[HotUpdate] 缺少 AOT 元数据: {aot},降级包内版本");
+                        return;
+                    }
+                    if (!_loader.LoadMetadata(aot, metadata))
+                    {
+                        await _source.ClearCacheAsync();
+                        return;
+                    }
+                }
+
+                // 4) 元数据就绪后装载热更程序集(Assembly.Load)
                 foreach (var asm in HotUpdateAssemblies)
                 {
                     var dll = await _source.LoadDllAsync(asm);
@@ -87,15 +118,14 @@ namespace Box.Gameplay.HotUpdate
                         Debug.LogWarning($"[HotUpdate] 缺少 dll 资源: {asm},降级包内版本");
                         return;
                     }
-                    var metadata = await _source.LoadMetadataAsync(asm);
-                    if (!_loader.Load(asm, dll, metadata))
+                    if (!_loader.LoadAssembly(asm, dll))
                     {
-                        await _source.ClearCacheAsync(); // 缓存损坏 → 清空重试(不阻断本局,包内版本继续)
+                        await _source.ClearCacheAsync(); // 缓存损坏 → 清空重试
                         return;
                     }
                 }
 
-                // 4) 远程清单(module_overrides)全量替换包内清单;无远程清单保持现状
+                // 5) 远程清单(module_overrides)全量替换包内清单;无远程清单保持现状
                 var overridesJson = await _source.LoadOverridesJsonAsync();
                 if (!string.IsNullOrEmpty(overridesJson))
                 {

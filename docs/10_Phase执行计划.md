@@ -254,15 +254,15 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 
 ## 16. Phase 9 — v1.1 HybridCLR 热更接入（正式工程落地）
 
-> 状态：**9-1 ✅ 完成（2026-08-31，dev/phase9 分支）**；9-2~9-4 待执行（详细计划见下）
+> 状态：**9-1 ~ 9-4 ✅ 完成（2026-08-31，dev/phase9 分支；9-4 ①②④ 编辑器侧验收，②③ 真机闭环待设备）**
 > 分支：`dev/phase9`（基于 main de5d2dc）；红线 6（v1.0 构建链不破坏）与红线 9（不 push）全程适用
 
 | 任务 | 内容 | 状态 |
 |---|---|---|
 | 9-1 | 将 Gate 1 结论落地正式工程（安装 hybridclr_unity v8.14.1 + GenerateAll 集成构建链） | ✅ 2026-08-31 |
-| 9-2 | HotUpdate.Core + 热更程序集边界搭建（玩法 dll 禁止互引，只引 HotUpdate.Core + AOT 接口） | 待执行 |
-| 9-3 | 启动链路接入热更下载（无强制网络等待，D-10 细化） | 待执行 |
-| 9-4 | Addressables Remote Catalog 远程下发（D-1） | 待执行 |
+| 9-2 | HotUpdate.Core + 热更程序集边界搭建（玩法 dll 禁止互引，只引 HotUpdate.Core + AOT 接口） | ✅ 2026-08-31 |
+| 9-3 | 启动链路接入热更下载（无强制网络等待，D-10 细化） | ✅ 2026-08-31 |
+| 9-4 | Addressables Remote Catalog 远程下发（D-1） | ✅ 2026-08-31（真机闭环待设备） |
 
 **验收**：AOT 构建 + 热更 dll 加载运行闭环；首包体积增量符合预算。
 
@@ -361,26 +361,40 @@ v1.0 主包无此类型 → null → 整链静默跳过；禁止直接引用（v
 - **验证②**：PlayMode **4/4 全绿**，新增 `Startup_Under_Timeout_With_HotUpdate_Degrade`（启动 ≤2.5s 断言通过）；
   覆盖降级路径：Editor 下 HybridCLR.Runtime 存在 → 热更链路走 Addressables 本地查找 → 无远程资源 → 静默降级包内版本，数独全链路可玩。
 - **验证③（真机闭环）**：待 9-4 远程资源就绪 + Android 设备执行（在线首启 / 断网冷启动 / 服务器停机三态）。
-- **已知问题**：Android 符号 `SENTIS_ANALYTICS_ENABLED` 两次被 Unity 进程保存漂移丢失（2026-08-31，已手工恢复）；
-  嫌疑为 hybridclr CheckSettings 或 Unity 6000 符号序列化，根因排查中 —— 后续构建前需 `git diff` 复核该文件。
+- **已知问题**：Android 符号 `SENTIS_ANALYTICS_ENABLED` **三次**被 Unity 批处理进程保存漂移丢失（2026-08-31，已手工恢复）；
+  规律：均发生在 `-batchmode` 进程（2 次 `-runTests` PlayMode、1 次编译检查）后，Android defines 末项被截断、Standalone 完好；
+  仓库内无 PlayMode 期写入方（仅 3 个 Editor 脚本 -executeMethod 才写）→ 疑为 Unity 6000 批处理符号序列化 bug；
+  防御：**每次批处理进程后 `git diff` 复核该文件**，根因排查列为待办（不阻塞 Phase 9）。
 
-### 16.5 9-4 Addressables Remote Catalog 远程下发（待执行）
+### 16.5 9-4 Addressables Remote Catalog 远程下发（✅ ① ④ 2026-08-31，②③ 待真机）
 
 **目标**：远程 catalog 落地、dll/metadata/overrides 远程化、module_overrides 生成、本机部署脚本、content_state.bin 入库。
 
 | 文件 | 动作 |
 |---|---|
-| `AddressableAssetSettings.asset` | `m_BuildRemoteCatalog: 0→1` + Profile 新变量 `RemoteHostURL`（开发值 `http://127.0.0.1:8000`）+ Remote.BuildPath/LoadPath |
-| `AssetGroups/HotUpdate_Local.asset`（新） | dll/metadata/overrides 组（Local + ContentUpdateGroupSchema"可变更"） |
-| `Phase9HybridCLRSetup.cs` | `GenerateContent()`：HotUpdateDlls 白名单拷贝（**只拷名单内两个 dll + metadata，勿整目录**）+ overrides 模板 |
-| `GameBox/Assets/Editor/Phase9Publish.cs`（新） | Content Update 增量构建封装 |
-| `tools/deploy_remote.ps1`（新） | 拷贝 ServerData + overrides 到 `_deploy_remote/`（gitignore）+ python http.server |
-| `.gitignore` | 否定规则放行 `addressables_content_state.bin`（**必须入库**，丢失=无法 Content Update）+ 忽略部署目录 |
+| `AddressableAssetSettings.asset` | ✅ `m_BuildRemoteCatalog: 0→1` + Profile 新变量 `RemoteHostURL`（开发值 `http://127.0.0.1:8000`）+ Remote.BuildPath=`ServerData/[BuildTarget]` / Remote.LoadPath=`{RemoteHostURL}/[BuildTarget]` |
+| `AssetGroups/HotUpdate_Local.asset`（新） | ✅ dll/metadata/overrides 组（Bundled + ContentUpdateGroupSchema"可变更"），8 entries（2 dll + 5 metadata + overrides） |
+| `Phase9HybridCLRSetup.cs` | ✅ `EnsureRemoteSetup()`（catalog 开关/Profile 变量/组创建，幂等）+ `GenerateContent()`：白名单拷贝（**只拷 2 dll + 5 metadata + overrides 模板，勿整目录**）→ `Assets/RemoteContent/`（gitignore） |
+| `GameBox/Assets/Editor/Phase9Publish.cs`（新） | ✅ `BuildAll`（CleanPlayerContent + BuildPlayerContent）+ `ContentUpdateBuild`（ContentUpdateScript.BuildContentUpdate 增量） |
+| `tools/deploy_remote.ps1`（新） | ✅ 拷贝 `GameBox/ServerData/{Target}` 到 `_deploy_remote/`（gitignore）+ python http.server |
+| `.gitignore` | ✅ 否定规则放行 `addressables_content_state.bin`（**必须入库**，丢失=无法 Content Update；产物在 `AddressableAssetsData/Android/`）+ 忽略 `ServerData/`、`RemoteContent/`、`_deploy_remote/` |
 
-要点：module_overrides JSON 与 `ModuleEntry` 字段一一对应，从 `ModuleCatalog.asset` 序列化模板；
+要点：module_overrides JSON 与 `ModuleEntry` 字段一一对应，从 `ModuleCatalog.asset` 序列化模板（`{"version":"1.1.0","entries":[{"id":"sudoku",...}]}` 已验证）；
 更新流程 = 改代码 → GenerateAll → GenerateContent → BuildPlayerContent（产 ServerData）→ deploy → 真机验证"远程新 dll 覆盖包内旧 dll"；
 Content Update 增量验证放后半（先全量验证同 key 覆盖）。真机访问本机 HTTP：防火墙放行 + 同网段，失败先 `curl` 自测。
-验证：① BuildPlayerContent 产出 ServerData/ ② 真机在线更新闭环 ③ 断网冷启动包内可玩（回归）④ content_state.bin 入库。
+
+**验收证据（✅ ① ④ 2026-08-31）**：
+- **提交**：Phase9HybridCLRSetup（EnsureRemoteSetup/GenerateContent）+ Phase9Publish + deploy_remote.ps1 + .gitignore + 组/schema 资产 + HotUpdateServiceTests 语义修正（metadata 按 AOT 程序集逐个装载）。
+- **验证①（BuildPlayerContent 产出 ServerData/）**：全量构建产出 `ServerData/Android/`：`catalog_1.0.bin/.hash` + `hotupdate_local_assets_all_....bundle`（1.8MB）；
+  临时解包脚本 `AssetBundle.LoadFromFile` 校验 **8/8 资源就位**：2 热更 dll（Core 4.6KB / Sudoku 49KB）+ 5 AOT metadata（Box.UI 39KB / System.Core 401KB / UniTask 396KB / UnityEngine.CoreModule 910KB / mscorlib 2.2MB）+ module_overrides（167 字符含 sudoku 条目）。
+- **验证④（content_state.bin 入库）**：产物在 `Assets/AddressableAssetsData/Android/addressables_content_state.bin`，gitignore 否定规则放行；
+  增量 `ContentUpdateBuild` 基于它构建成功（catalog 重建、bundle 哈希未变不重写）。
+- **部署链路**：deploy_remote.ps1 拷贝 + `python -m http.server` 起服，`curl http://127.0.0.1:8765/ServerData/Android/{catalog,bundle}` 均 200。
+- **回归**：编译零错误；EditMode **175/175 全绿**（7 热更用例含新 metadata 语义：元数据缺失→降级不碰 dll）；PlayMode **4/4 全绿**。
+- **踩坑记录（根因已修，代码幂等防复发）**：① Phase 6 建 settings 时 `m_RemoteCatalogBuildPath/LoadPath` 空引用，开远程 catalog 后 CreateRemoteCatalog 直接失败 → EnsureRemoteSetup 显式 `SetVariableByName`；
+  ② `profile.SetValue(profileId, 变量名, 值)` 第二参数是**变量名不是 GUID**，传 id 静默失败 → 已改传名字；
+  ③ 组 schema 路径残留 Local 变量 → bundle 误入本地构建路径 → EnsureHotUpdateGroup 改为幂等校正并自检。
+- **验证②③（真机）**：待 Android 设备执行（在线首启 / 断网冷启动 / 服务器停机三态；远程新 dll 覆盖包内旧 dll）。
 
 ### 16.6 收尾勾账（待执行）+ 当前阻塞项
 

@@ -32,6 +32,7 @@ namespace Box.Gameplay.Tests
             public byte[] MetadataBytes = { 4, 5 };
             public string OverridesJson;
             public readonly List<string> LoadedDlls = new();
+            public readonly List<string> LoadedMetadatas = new();
             public int DllLoadCount;
             public int MetadataLoadCount;
             public bool ClearedCache;
@@ -45,8 +46,9 @@ namespace Box.Gameplay.Tests
                 return DllBytes;
             }
 
-            public async UniTask<byte[]> LoadMetadataAsync(string assemblyName)
+            public async UniTask<byte[]> LoadMetadataAsync(string aotAssemblyName)
             {
+                LoadedMetadatas.Add(aotAssemblyName);
                 MetadataLoadCount++;
                 return MetadataBytes;
             }
@@ -65,13 +67,20 @@ namespace Box.Gameplay.Tests
         {
             public bool Available = true;
             public bool LoadResult = true;
-            public readonly List<string> Loaded = new();
+            public readonly List<string> LoadedMetadatas = new();
+            public readonly List<string> LoadedAssemblies = new();
 
             public bool IsRuntimeAvailable => Available;
 
-            public bool Load(string assemblyName, byte[] dllBytes, byte[] metadataBytes)
+            public bool LoadMetadata(string aotAssemblyName, byte[] metadataBytes)
             {
-                Loaded.Add(assemblyName);
+                LoadedMetadatas.Add(aotAssemblyName);
+                return LoadResult;
+            }
+
+            public bool LoadAssembly(string assemblyName, byte[] dllBytes)
+            {
+                LoadedAssemblies.Add(assemblyName);
                 return LoadResult;
             }
         }
@@ -121,18 +130,27 @@ namespace Box.Gameplay.Tests
                 }
             };
             var source = new FakeSource { OverridesJson = JsonUtility.ToJson(overrides) };
+            var al = new FakeLoader();
 
-            await new HotUpdateService(source, new FakeLoader()).RunAsync(loader);
+            await new HotUpdateService(source, al).RunAsync(loader);
 
             CollectionAssert.AreEqual(
                 new[] { "Box.HotUpdate.Core", "Box.HotUpdate.Sudoku" },
                 source.LoadedDlls, "按名单顺序装载两个热更程序集");
-            Assert.AreEqual(2, source.MetadataLoadCount, "两个程序集各加载一次元数据");
+            CollectionAssert.AreEqual(
+                HotUpdateService.AotMetadataAssemblies,
+                source.LoadedMetadatas, "按 AOT 元数据清单逐个加载");
+            CollectionAssert.AreEqual(
+                HotUpdateService.AotMetadataAssemblies,
+                al.LoadedMetadatas, "装载器逐个收到 AOT 元数据");
+            CollectionAssert.AreEqual(
+                new[] { "Box.HotUpdate.Core", "Box.HotUpdate.Sudoku" },
+                al.LoadedAssemblies, "元数据就绪后装载热更程序集");
             Assert.AreEqual(2, loader.Entries.Count, "远程 overrides 全量替换包内清单");
             Assert.AreEqual("sudoku2", loader.Entries[1].id);
         }
 
-        /// <summary>Assembly.Load 失败(缓存损坏) → 清缓存,不刷新清单,下轮重试。</summary>
+        /// <summary>程序集装载失败(缓存损坏) → 清缓存,不刷新清单,下轮重试。</summary>
         [Test]
         public async Task AssemblyLoadFailure_ClearsCache()
         {
@@ -146,9 +164,9 @@ namespace Box.Gameplay.Tests
             Assert.AreEqual(1, loader.Entries.Count, "清单保持包内版本");
         }
 
-        /// <summary>metadata 缺失(9-3 阶段地址未配置) → 跳过元数据装载,仍能完成 dll 装载。</summary>
+        /// <summary>AOT 元数据缺失 → 立即降级(Consistent 模式缺元数据不能安全装载),不碰 dll。</summary>
         [Test]
-        public async Task MetadataMissing_StillLoadsAssembly()
+        public async Task MetadataMissing_DegradesBeforeDll()
         {
             var loader = NewLoader(ValidEntries);
             var source = new FakeSource { MetadataBytes = null };
@@ -156,8 +174,9 @@ namespace Box.Gameplay.Tests
 
             await new HotUpdateService(source, al).RunAsync(loader);
 
-            Assert.AreEqual(2, source.LoadedDlls.Count, "dll 装载不受元数据缺失影响");
-            Assert.AreEqual(2, al.Loaded.Count, "装载器收到两个程序集");
+            Assert.AreEqual(0, source.DllLoadCount, "元数据缺失时不应加载 dll");
+            Assert.AreEqual(0, al.LoadedAssemblies.Count, "不应装载任何程序集");
+            Assert.AreEqual(1, loader.Entries.Count, "包内清单保持不变");
         }
 
         /// <summary>overrides 无效/为空 → 保持包内清单(dll 已装载仍生效)。</summary>
@@ -169,6 +188,7 @@ namespace Box.Gameplay.Tests
 
             await new HotUpdateService(source, new FakeLoader()).RunAsync(loader);
 
+            Assert.AreEqual(5, source.MetadataLoadCount, "AOT 元数据仍正常加载");
             Assert.AreEqual(2, source.DllLoadCount, "dll 仍正常装载");
             Assert.AreEqual(1, loader.Entries.Count, "远程清单无效时保持包内清单");
         }

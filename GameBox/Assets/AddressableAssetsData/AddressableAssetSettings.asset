@@ -17,7 +17,7 @@ MonoBehaviour:
     serializedVersion: 2
     Hash: 00000000000000000000000000000000
   m_OptimizeCatalogSize: 0
-  m_BuildRemoteCatalog: 0
+  m_BuildRemoteCatalog: 1
   m_CatalogRequestsTimeout: 0
   m_DisableCatalogUpdateOnStart: 0
   m_InternalIdNamingMode: 0
@@ -51,15 +51,16 @@ MonoBehaviour:
   m_CheckForContentUpdateRestrictionsOption: 0
   m_MonoScriptBundleCustomNaming: 
   m_RemoteCatalogBuildPath:
-    m_Id: 
+    m_Id: a326c8f12958d8840a34435465c83c75
   m_RemoteCatalogLoadPath:
-    m_Id: 
+    m_Id: 43ee86d7f9a1d0c41a4a406e06883dd1
   m_ContentStateBuildPathProfileVariableName: 
   m_CustomContentStateBuildPath: 
   m_ContentStateBuildPath: 
   m_BuildAddressablesWithPlayerBuild: 0
   m_overridePlayerVersion: '[UnityEditor.PlayerSettings.bundleVersion]'
   m_GroupAssets:
+  - {fileID: 11400000, guid: 10c60bcd1ca782f4fa24bbbfb6586608, type: 2}
   - {fileID: 11400000, guid: 7a197f3d31b9198449361f289bbf8776, type: 2}
   - {fileID: 11400000, guid: eaea9858207209b47b57f933f78774c9, type: 2}
   - {fileID: 11400000, guid: 0581cc5f7be9c1a46b4e3eaecd0102e9, type: 2}
@@ -75,7 +76,9 @@ MonoBehaviour:
       m_ProfileName: Default
       m_Values:
       - m_Id: 43ee86d7f9a1d0c41a4a406e06883dd1
-        m_Value: <undefined>
+        m_Value: '{RemoteHostURL}/[BuildTarget]'
+      - m_Id: 5a6b5fa639e8d2248a93fa6806864ee8
+        m_Value: http://127.0.0.1:8000
       - m_Id: 94daf6f972a51024c8b8d81450196d3f
         m_Value: '[UnityEditor.EditorUserBuildSettings.activeBuildTarget]'
       - m_Id: 9b667c5ebd1ee234d9233e2fb48679af
@@ -87,6 +90,9 @@ MonoBehaviour:
     m_ProfileEntryNames:
     - m_Id: 43ee86d7f9a1d0c41a4a406e06883dd1
       m_Name: Remote.LoadPath
+      m_InlineUsage: 0
+    - m_Id: 5a6b5fa639e8d2248a93fa6806864ee8
+      m_Name: RemoteHostURL
       m_InlineUsage: 0
     - m_Id: 94daf6f972a51024c8b8d81450196d3f
       m_Name: BuildTarget
