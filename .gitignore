@@ -154,3 +154,4 @@ GameBox/Packages/*.tgz
 
 # Firebase Hosting 内容目录(deploy_firebase.ps1 每次从 ServerData 重建,红线 9 不入库)
 firebase-hosting/public/*/Android/
+firebase-hosting/.firebase/
