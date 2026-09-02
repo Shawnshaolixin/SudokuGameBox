@@ -65,13 +65,17 @@ namespace Box.Gameplay.HotUpdate
         public const string RemoteHostVariableName = "RemoteHostURL";
 
         /// <summary>
-        /// 远程内容服务器地址(开发期=本机局域网 IP + deploy_remote.ps1 端口)。
-        /// 2026-09-02 真机踩坑:家庭光猫将终端按网段隔离(手机 192.168.1.x / 电脑 192.168.0.x 跨段不通),
-        /// 需给电脑 WLAN 加同段别名 IP 才能被手机访问:管理员执行
-        ///   netsh interface ipv4 add address "WLAN" 192.168.1.100 255.255.255.0 store=persistent
-        /// 生产环境应改为 CDN 域名或服务端下发的配置(见 10 文档 §16.5 部署规划;Firebase Hosting 接入中)。
+        /// 远程内容服务器地址。双通道 Firebase Hosting 布局(2026-09-02 拍板,见 tools/deploy_firebase.ps1):
+        ///   https://sudokugamebox.web.app/staging    ← 开发/真机验证(dev APK 指这里,本常量)
+        ///   https://sudokugamebox.web.app/production ← 上架内容(发布构建注入,仓库保持 staging/dev 值,红线 9)
+        /// 每个通道下目录结构相同:Android/(Addressables 契约目录,catalog 内 id 烘焙为 /Android/) + manifest/(预留)。
+        /// 内容先上 staging → 真机验收 → 验收通过后 deploy_firebase.ps1 -Env production 提升。
+        /// 离网/局域网联调回退:改回 "http://192.168.1.100:8000"(deploy_remote.ps1 起本机服务)——真机坑:光猫按网段隔离
+        /// (手机 192.168.1.x / 电脑 192.168.0.x 不通),需给电脑 WLAN 加同段别名 IP:netsh interface ipv4 add address
+        /// "WLAN" 192.168.1.100 255.255.255.0 store=persistent;改回 http 后真机须卸载重装(UnityWebRequest 缓存)。
+        /// 缓存头(firebase.json):.bin/.hash no-cache(每次启动拿最新),bundle 内容寻址 immutable。
         /// </summary>
-        public const string RemoteServerUrl = "http://192.168.1.100:8000";
+        public const string RemoteServerUrl = "https://sudokugamebox.web.app/staging";
 
         /// <summary>
         /// Addressables 2.x 无 SetProfileVariable(1.x API 已移除),远程 URL 改写走

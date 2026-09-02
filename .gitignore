@@ -151,3 +151,6 @@ _deploy_remote/
 
 # Firebase 等 UPM 本地包 tgz(官方仅 tgz 分发,大体积不入库,clone 后需手动放置)
 GameBox/Packages/*.tgz
+
+# Firebase Hosting 内容目录(deploy_firebase.ps1 每次从 ServerData 重建,红线 9 不入库)
+firebase-hosting/public/*/Android/
