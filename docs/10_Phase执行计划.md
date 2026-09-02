@@ -430,9 +430,9 @@ Content Update 增量验证放后半（先全量验证同 key 覆盖）。真机
 **最终验收**：① v1.1 AAB 真机在线启动 → dll 经 Addressables 加载、Assembly.Load 成功、数独可玩；断网冷启动包内可玩
 ② 首包 ≤60MB 预算：v1.0 对比 Phase 8 基线增量 ≈ 0；v1.1 = v1.0 + hybridclr 运行时（9-1 实测 +1.01MB）+ 包内 dll/metadata（≤1MB）
 ③ v1.0 模式回归：出包无 HybridCLR 符号、数独可玩、CI-1 全绿 ④ 红线 9：仓库无远程内容、RemoteHostURL 为开发值
-⑤ 文档勾账：本 §16 验收打勾 + 17 文档补 v1.1 构建入口。
+⑤ 文档勾账：本 §16 验收打勾 + 17 文档补 v1.1 构建入口 —— ✅ 2026-09-03：17 文档已补 §6 v1.1 发布流程（含 BOX_REMOTE_URL 注入）。
 
-**当前阻塞项**：v1.1 AAB 完整构建需环境变量 `BOX_KEYSTORE_PASS`（用户注入，agent 不碰密码明文）；
+**当前阻塞项**：v1.1 AAB 完整构建需环境变量 `BOX_KEYSTORE_PASS`（用户注入，agent 不碰密码明文）+ `BOX_REMOTE_URL=production`（发布通道注入，机制 2026-09-03 已落地，见 17 文档 §6）；
 已用 APK 中间态验证符号等价性，AAB 随时可跑：`PrepareV11 → BuildV11`。
 
 **风险排序**：R1 GenerateAll 在大工程失败（9-1 已通过，风险解除）→ R2 桥方案失效（✅ 9-2 验证通过：v1.1 无悬垂引用，风险解除）

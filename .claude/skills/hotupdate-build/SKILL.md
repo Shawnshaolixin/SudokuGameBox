@@ -20,7 +20,7 @@ description: v1.1(HybridCLR)热更 APK 构建与远程内容部署全链(四段�
 | 工程 | `d:\Projects\AI\SudokuGameBox\GameBox`,ADB 在 Unity SDK 下 `.../AndroidPlayer/SDK/platform-tools/adb.exe` |
 | APK 产物 | `GameBox/Build/Android/Rovilo-debug-v12-*.apk`(免签名中间态,Development;正式上架走 build-android-aab skill) |
 | 包名/入口 | `com.lixingames.rovilo` / `com.unity3d.player.UnityPlayerGameActivity`(查入口用 aapt dump badging,勿猜) |
-| 远程 URL(客户端) | 常量 `AddressablesHotUpdateSource.RemoteServerUrl`(`GameBox/Assets/Gameplay/HotUpdate/IHotUpdateContentSource.cs`):dev=`https://sudokugamebox.web.app/staging`,生产 production 留给发布构建注入(红线 9:仓库保持 staging/dev 值) |
+| 远程 URL(客户端) | 常量 `AddressablesHotUpdateSource.RemoteServerUrl`(`GameBox/Assets/Gameplay/HotUpdate/IHotUpdateContentSource.cs`):`#if BOX_REMOTE_PRODUCTION` 双值 —— 仓库常态=`https://sudokugamebox.web.app/staging`(红线 9),发布注入 `export BOX_REMOTE_URL=production` → PrepareV11 自动加符号切 production(17 文档 §6,收尾自愈) |
 | Firebase | firebase-tools 已装;配置在 `firebase-hosting/`(firebase.json/.firebaserc);本机直连 web.app 被墙,curl 自测须 `-x http://127.0.0.1:7897`(真机不受影响,实测可直连) |
 | 退出码噪音 | Unity 批处理 exit=2/日志尾 `##utp:{...MemoryLeaks...}` 均为噪音;以 `Exiting batchmode successfully now!` 与 `error CS`=0 为准 |
 
@@ -92,6 +92,7 @@ sleep 12 && "$ADB" logcat -d | grep -E "已装载|程序集已装载|模块清�
 
 ## 红线(提交前核对)
 
-- ServerData/`firebase-hosting/public/*/Android/` 内容不入库(gitignore 已配);编辑器 profile 变量 RemoteHostURL 保持开发值。
+- ServerData/`firebase-hosting/public/*/Android/` 内容不入库(gitignore 已配);编辑器 profile 变量 RemoteHostURL 保持开发值;RemoteServerUrl 仓库保持 staging 分支(#if 双值,生产 URL 只在发布注入的 BOX_REMOTE_PRODUCTION 分支)。
+- 发布 AAB:PrepareV11 前 `export BOX_REMOTE_URL=production`(与 BOX_KEYSTORE_PASS 同 env 范式,17 文档 §6);不设 = staging(dev 包),BuildV11 收尾自动移除符号,无残留。
 - 代码注释必须中文;commit 中文 `type(模块): 描述`;只提交本次相关文件(水排序线文件不混入)。
-- 正式上架 AAB 不走本 skill(走 build-android-aab:签名 + BOX_KEYSTORE_PASS 注入 + jarsigner 验证)。
+- 正式上架 AAB 不走本 skill(走 build-android-aab:签名 + BOX_KEYSTORE_PASS 注入 + jarsigner 验证 + BOX_REMOTE_URL 注入)。

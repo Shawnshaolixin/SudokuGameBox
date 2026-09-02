@@ -75,7 +75,13 @@ namespace Box.Gameplay.HotUpdate
         /// "WLAN" 192.168.1.100 255.255.255.0 store=persistent;改回 http 后真机须卸载重装(UnityWebRequest 缓存)。
         /// 缓存头(firebase.json):.bin/.hash no-cache(每次启动拿最新),bundle 内容寻址 immutable。
         /// </summary>
+#if BOX_REMOTE_PRODUCTION
+        // 生产通道:符号由 BuildScript.PrepareV11 依环境变量 BOX_REMOTE_URL 注入(与 BOX_KEYSTORE_PASS 同款范式),
+        // BuildV11 收尾自动移除 —— 仓库默认分支保持 staging(红线 9),玩家包经发布流程注入后指向生产
+        public const string RemoteServerUrl = "https://sudokugamebox.web.app/production";
+#else
         public const string RemoteServerUrl = "https://sudokugamebox.web.app/staging";
+#endif
 
         /// <summary>
         /// Addressables 2.x 无 SetProfileVariable(1.x API 已移除),远程 URL 改写走

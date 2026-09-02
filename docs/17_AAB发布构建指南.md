@@ -96,6 +96,38 @@ Jenkins CI-3（14 号文档 6.5-3）复用 `BuildScript.BuildAndroidApkAndAab`�
 3. **JDK**：SYSTEM 账户无 GUI 偏好 → CI 构建前需设置 `JdkUseEmbedded=1`（或等价配置），否则撞 `JDK not found`；
 4. **NDK**：Jenkinsfile environment 块已注入 `ANDROID_NDK_ROOT`，保持。
 
-## 6. 变更记录
+## 6. v1.1（HybridCLR 热更）AAB 发布流程（2026-09-03 补充，10 文档 §16.6 勾账项）
+
+v1.1 上架包 = 双阶段 CLI（10 文档 §16/20 复盘）+ 签名注入 + **生产远程 URL 注入**。
+v1.0 的 §3.2/§3.3 验证依旧适用（签名日志 + jarsigner `CN=SudokuGameBox`）。
+
+```bash
+export BOX_KEYSTORE_PASS="SudokuGameBox_Upload_2026"   # 与 Build/keystore/README.md 一致
+export BOX_KEY_PASS="SudokuGameBox_Upload_2026"
+export ANDROID_NDK_ROOT="D:/Projects/AI/AndroidNDK/android-ndk-r27c"
+export BOX_REMOTE_URL="production"                     # ★ 发布必须:注入生产通道(不设 = staging,dev 包)
+U="C:/Program Files/Unity/Hub/Editor/6000.3.20f1/Editor/Unity.exe"
+P="d:/Projects/AI/SudokuGameBox/GameBox"
+# 阶段 A:enable=true + HYBRIDCLR_UNITY + 依 BOX_REMOTE_URL 注入/清除 BOX_REMOTE_PRODUCTION
+"$U" -batchmode -quit -projectPath "$P" -executeMethod BuildScript.PrepareV11
+# 阶段 B:GenerateAll → Addressables → 签名 AAB;收尾自动移除两符号(自愈,dev 流程无残留)
+"$U" -batchmode -quit -projectPath "$P" -executeMethod BuildScript.BuildV11
+```
+
+要点与验证：
+
+- **生产 URL 注入原理**：`RemoteServerUrl`(IHotUpdateContentSource.cs)为 `#if BOX_REMOTE_PRODUCTION` 双值——
+  默认分支 staging(仓库常态,红线 9),符号注入后编译产物切 production;符号只存在于本次构建进程,
+  PrepareV11(无 env 时)/BuildV11 收尾均幂等清除,dev 流程永远回 staging。
+- **构建日志确认**：`grep "BOX_REMOTE_URL" Build/Logs/release-aab.log` 应见"注入 BOX_REMOTE_PRODUCTION,本次构建 RemoteServerUrl=production 通道"；
+  BuildV11 收尾日志应见"移除 ... BOX_REMOTE_PRODUCTION(已恢复 v1.0/dev 语义)"。
+- **产物级验证(可选,上架前抽查)**：解 AAB 取 `base/lib/arm64-v8a/libil2cpp.so` 与 `global-metadata.dat`,
+  `strings | grep "sudokugamebox.web.app/production"` 命中即 URL 已烘焙生产(全局唯一:staging 不该出现)。
+- **热更链验证(重要)**：新装的 v1.1 玩家包启动即拉 `/production/Android/` catalog —— 先确保内容已
+  `deploy_firebase.ps1 -Channel production`(工具链见 hotupdate-build skill),否则玩家静默降级包内版本。
+- 版本号 +1 要求与 §3.1 相同(Play Console 现有 versionCode + 1)。
+
+## 7. 变更记录
 
 - 2026-08-26：本指南建立；BuildScript.cs 三项修复（keystore 路径 / 签名硬失败 / JDK 兜底）；`JdkUseEmbedded=1` 落注册表；首次成功产出签名 AAB。
+- 2026-09-03：补 §6 v1.1 发布流程 —— 双阶段命令 + `BOX_REMOTE_URL` 生产通道注入(与 BOX_KEYSTORE_PASS 同款 env 范式,符号收尾自愈)。

@@ -326,6 +326,7 @@ public static class BuildScript
             // D-2 开关:enable=true + 热更名单(Phase9HybridCLRSetup.SetV11)
             Phase9HybridCLRSetup.SetV11();
             AddV11Symbol(); // 模式条件桥符号(9-2 起 Box.ModuleBridge 据此排除编译)
+            ApplyRemoteUrlSymbol(); // 发布注入:env BOX_REMOTE_URL 非空 → BOX_REMOTE_PRODUCTION(RemoteServerUrl 切 production)
 
             Debug.Log($"[BuildScript] PrepareV11 done: enable=true, NDK={NdkR27cPath}, symbol={V11Symbol}");
             EditorApplication.Exit(0);
@@ -404,10 +405,11 @@ public static class BuildScript
         }
         finally
         {
-            // 4) 恢复 v1.0 语义:enable=false + 移除符号 —— 异常中断也不残留污染 v1.0 构建链
+            // 4) 恢复 v1.0/dev 语义:enable=false + 移除模式符号 + 移除生产 URL 符号 —— 异常中断也不残留
             SettingsUtil.Enable = false;
             RemoveV11Symbol();
-            Debug.Log("[BuildScript] BuildV11 收尾:enable=false + 移除 HYBRIDCLR_UNITY(已恢复 v1.0 语义)");
+            RemoveRemoteUrlSymbol();
+            Debug.Log("[BuildScript] BuildV11 收尾:enable=false + 移除 HYBRIDCLR_UNITY/BOX_REMOTE_PRODUCTION(已恢复 v1.0/dev 语义)");
         }
     }
 
@@ -430,6 +432,44 @@ public static class BuildScript
     static void RemoveV11Symbol()
     {
         var defines = GetAndroidDefines().Split(';').Where(s => !string.IsNullOrEmpty(s) && s != V11Symbol);
+        PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
+    }
+
+    /// <summary>生产远程 URL 符号名:RemoteServerUrl(#if 双值)切 production 通道,17 文档发布流程。</summary>
+    const string RemoteUrlProductionSymbol = "BOX_REMOTE_PRODUCTION";
+
+    /// <summary>
+    /// 依环境变量 BOX_REMOTE_URL 注入/清除生产 URL 符号(与 BOX_KEYSTORE_PASS 同款注入范式,
+    /// env 经启动终端继承给 Unity 进程;值非空即视为生产构建请求,具体 URL 由代码 #if 分支固定)。
+    /// 发布:export BOX_REMOTE_URL=production → PrepareV11 → BuildV11;
+    /// 开发(无 env):幂等清除残留 —— 防止发布中断后符号残留污染后续 dev 包。
+    /// </summary>
+    static void ApplyRemoteUrlSymbol()
+    {
+        var remoteUrl = System.Environment.GetEnvironmentVariable("BOX_REMOTE_URL");
+        var defines = GetAndroidDefines().Split(';').Where(s => !string.IsNullOrEmpty(s)).ToList();
+        bool has = defines.Contains(RemoteUrlProductionSymbol);
+        if (string.IsNullOrEmpty(remoteUrl))
+        {
+            if (!has) return;
+            defines.Remove(RemoteUrlProductionSymbol);
+            PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
+            Debug.Log("[BuildScript] BOX_REMOTE_URL 未设置,已清除 BOX_REMOTE_PRODUCTION(dev 包回 staging)");
+            return;
+        }
+        if (!has)
+        {
+            defines.Add(RemoteUrlProductionSymbol);
+            PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
+        }
+        Debug.Log($"[BuildScript] BOX_REMOTE_URL='{remoteUrl}' → 注入 BOX_REMOTE_PRODUCTION,本次构建 RemoteServerUrl=production 通道");
+    }
+
+    /// <summary>构建收尾/异常兜底:移除生产 URL 符号(与 RemoveV11Symbol 并列的 v1.0/dev 语义恢复)。</summary>
+    static void RemoveRemoteUrlSymbol()
+    {
+        var defines = GetAndroidDefines().Split(';')
+            .Where(s => !string.IsNullOrEmpty(s) && s != RemoteUrlProductionSymbol);
         PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.Android, string.Join(";", defines));
     }
 }
