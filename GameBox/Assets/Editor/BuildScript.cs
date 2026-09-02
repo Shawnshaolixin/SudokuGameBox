@@ -151,6 +151,9 @@ public static class BuildScript
             }
         }
 
+        // 架构不在此处切换:Unity 6000 已硬禁 Android x86_64 IL2CPP 构建
+        // ("x86-64 (Magic Leap) support is now limited"),多架构包无法产出;
+        // 模拟器验证走 arm64 镜像(host 为 x86 时 QEMU 全模拟),架构保持工程设置默认 arm64。
         var ext = aab ? ".aab" : ".apk";
         // 产物文件名带 构建类型/版本号/日期 标签(2026-08-30 用户要求):每次构建不覆盖旧产物,
         // 便于回滚与存档;例 Rovilo-release-v11-20260830-1510.aab。应用显示名不受文件名影响。
@@ -165,7 +168,10 @@ public static class BuildScript
             target = BuildTarget.Android,
             targetGroup = BuildTargetGroup.Android,
             locationPathName = output,
-            options = BuildOptions.None,
+            // APK 必须带 Development:insecureHttpOption=DevelopmentOnly 仅对 development build 生效
+            // (真机踩坑:纯 debug 签名不带 Development 选项 → 引擎仍拒明文 HTTP)。
+            // AAB 保持 None → 上架 release 自动禁止明文 HTTP,安全语义正确。
+            options = aab ? BuildOptions.None : BuildOptions.Development,
         };
 
         try
@@ -312,6 +318,11 @@ public static class BuildScript
             EditorPrefs.SetString("AndroidNdkRootR27C", NdkR27cPath);
             EditorPrefs.SetBool("NdkUseEmbedded", false);
 
+            // Unity 6000 引擎层安全策略:WebRequest 默认拒绝非 localhost 明文 HTTP
+            // (真机报 "Insecure connection not allowed",usesCleartextTraffic 管不到引擎层)。
+            // DevelopmentOnly=仅开发构建允许 HTTP → debug 包通局域网,上架 release AAB 自动禁止,正好安全。
+            PlayerSettings.insecureHttpOption = InsecureHttpOption.DevelopmentOnly;
+
             // D-2 开关:enable=true + 热更名单(Phase9HybridCLRSetup.SetV11)
             Phase9HybridCLRSetup.SetV11();
             AddV11Symbol(); // 模式条件桥符号(9-2 起 Box.ModuleBridge 据此排除编译)
@@ -345,7 +356,20 @@ public static class BuildScript
         try
         {
             // 1) GenerateAll 六步:CompileDll → Il2CppDef → LinkXml → StripAOTDlls → MethodBridge → AOTGenericReferences
-            PrebuildCommand.GenerateAll();
+            // Development 对齐(2026-09-02 坑⑥):StripAOTDlls/CompileDll/MethodBridge 读的是
+            // EditorUserBuildSettings.development(非 BuildPlayer 参数),batchmode 下默认 false;
+            // 未对齐时 strip 产物与正式 Development 构建的 AOT 程序集宏不一致 → Consistent 模式
+            // metadata 装载失败。此处显式开 true 与下方 BuildPlayer(Development)对齐,finally 恢复原值。
+            var prevDevelopment = EditorUserBuildSettings.development;
+            EditorUserBuildSettings.development = true;
+            try
+            {
+                PrebuildCommand.GenerateAll();
+            }
+            finally
+            {
+                EditorUserBuildSettings.development = prevDevelopment;
+            }
 
             // StripAOTDlls 内部临时置 exportAsGoogleAndroidProject=true(导出 Android 工程跑 il2cpp),
             // 显式复位防残留(残留会把后续构建从 AAB 变成工程导出)

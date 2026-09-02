@@ -6,4 +6,12 @@
         v1.1 解释执行模式下 HybridCLR 另有热更侧链接规则,本文件只管 AOT 入口。
     -->
     <assembly fullname="Box.HotUpdate.Sudoku" preserve="all" />
+
+    <!--
+        Phase 9 9-4 真机闭环踩坑:HybridCLR.RuntimeApi 必须保留!
+        HotUpdateService 用 Type.GetType("HybridCLR.RuntimeApi") 反射探测运行时存在性,
+        无静态引用 → IL2CPP 链接裁剪掉 → 真机判定 v1.0 语义 → 热更链路静默跳过。
+        (编辑器 Mono 不裁剪故 9-3 编辑器验收通过,真机首次暴露)
+    -->
+    <assembly fullname="HybridCLR.Runtime" preserve="all" />
 </linker>

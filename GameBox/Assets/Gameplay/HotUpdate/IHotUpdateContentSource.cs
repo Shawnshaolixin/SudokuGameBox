@@ -57,11 +57,41 @@ namespace Box.Gameplay.HotUpdate
         public const string MetadataAddressPrefix = "HotUpdate/Metadata/";
         public const string OverridesAddress = "HotUpdate/module_overrides";
 
+        /// <summary>
+        /// 远程加载路径的 profile 变量名(与编辑器 Remote.LoadPath="{RemoteHostURL}/[BuildTarget]" 对应)。
+        /// 真机踩坑:Addressables 远程 bundle 的变量表在设备端求值,构建值不烘焙进 catalog;
+        /// 不显式设置时占位符原样输出("RemoteHostURL/Android/...bundle" 加载失败)。
+        /// </summary>
+        public const string RemoteHostVariableName = "RemoteHostURL";
+
+        /// <summary>
+        /// 远程内容服务器地址(开发期=本机局域网 IP + deploy_remote.ps1 端口)。
+        /// 2026-09-02 真机踩坑:家庭光猫将终端按网段隔离(手机 192.168.1.x / 电脑 192.168.0.x 跨段不通),
+        /// 需给电脑 WLAN 加同段别名 IP 才能被手机访问:管理员执行
+        ///   netsh interface ipv4 add address "WLAN" 192.168.1.100 255.255.255.0 store=persistent
+        /// 生产环境应改为 CDN 域名或服务端下发的配置(见 10 文档 §16.5 部署规划;Firebase Hosting 接入中)。
+        /// </summary>
+        public const string RemoteServerUrl = "http://192.168.1.100:8000";
+
+        /// <summary>
+        /// Addressables 2.x 无 SetProfileVariable(1.x API 已移除),远程 URL 改写走
+        /// InternalIdTransformFunc 钩子:每次解析资源 id 时把 {RemoteHostURL} 占位符替换为实际服务器地址。
+        /// 必须在任何远程请求前设置(构造函数即装,覆盖 catalog 与 bundle 全部远程加载)。
+        /// </summary>
+        public AddressablesHotUpdateSource()
+        {
+            Addressables.InternalIdTransformFunc = location =>
+                location.InternalId.Replace(RemoteHostVariableName, RemoteServerUrl);
+        }
+
         /// <summary>catalog 更新失败/异常一律视为"无更新可用",调用方继续走包内版本。</summary>
         public async UniTask<bool> TryUpdateCatalogAsync()
         {
             try
             {
+                // 确保远程地址改写已生效(构造函数已装,此处兜底防外部覆盖)
+                Addressables.InternalIdTransformFunc = location =>
+                    location.InternalId.Replace(RemoteHostVariableName, RemoteServerUrl);
                 var catalogs = await AwaitHandleAsync(Addressables.CheckForCatalogUpdates());
                 if (catalogs == null || catalogs.Count == 0) return true;
                 await AwaitHandleAsync(Addressables.UpdateCatalogs(catalogs));
@@ -191,7 +221,8 @@ namespace Box.Gameplay.HotUpdate
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[HotUpdate] 装载 AOT 元数据 {aotAssemblyName} 失败: {e.Message}");
+                // 完整异常链(含反射 Invoke 内层,真机 2026-09-02 遇过 TargetInvocationException 吞详情)
+                Debug.LogWarning($"[HotUpdate] 装载 AOT 元数据 {aotAssemblyName} 失败: {e}");
                 return false;
             }
         }

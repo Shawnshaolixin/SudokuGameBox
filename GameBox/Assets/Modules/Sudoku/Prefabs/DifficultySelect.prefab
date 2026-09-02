@@ -947,6 +947,7 @@ GameObject:
   - component: {fileID: 3078836117221030002}
   - component: {fileID: 4022265365020827576}
   - component: {fileID: 1865644725030939416}
+  - component: {fileID: 4154577741192321804}
   m_Layer: 0
   m_Name: DifficultySelect
   m_TagString: Untagged
@@ -1036,6 +1037,19 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
+--- !u!114 &4154577741192321804
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6734091883463433119}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee809b23a4849c645a3066dc8d22b80d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Box.UI::Box.UI.HotViewBinder
+  viewTypeFullName: Box.HotUpdate.Sudoku.DifficultySelectView, Box.HotUpdate.Sudoku
 --- !u!1 &7109344144296430137
 GameObject:
   m_ObjectHideFlags: 0

@@ -27,14 +27,20 @@ if (-not (Test-Path $serverData)) {
 if (Test-Path $deploy) { Remove-Item -Recurse -Force $deploy }
 New-Item -ItemType Directory -Path $deploy | Out-Null
 
-# 拷贝 ServerData(含 catalog.bin + bundle + hash)到部署根,保持 {RemoteHostURL}/[BuildTarget] 目录结构
-Copy-Item -Recurse -Force $serverData (Join-Path $deploy "ServerData\$Target") | Out-Null
+# 拷贝 ServerData(含 catalog.bin + bundle + hash)到部署根: _deploy_remote/$Target。
+# 9-4 真机踩坑(2026-09-02):目录结构必须与 Addressables profile 的 URL 完全对齐 ——
+# Remote.LoadPath = "{RemoteHostURL}/[BuildTarget]" → URL 形如 /Android/...,
+# serve 根必须是 _deploy_remote,文件放在 _deploy_remote/Android/ 下(/Android/ 首段命中目录)。
+# 两种错误结构都曾 404(服务器日志可证):_deploy_remote/ServerData/Android(多一层)、
+# serve root 设为 _deploy_remote/Android(URL 又多找一层 Android/)。
+# 注意:重跑本脚本前先确认旧 http.server 已停止(占用 _deploy_remote 目录会导致 Remove-Item/Copy-Item 静默失败,产物 404)
+Copy-Item -Recurse -Force $serverData (Join-Path $deploy $Target) | Out-Null
 
-Write-Host "`n[deploy_remote] 已拷贝 ServerData\$Target → _deploy_remote\ServerData\$Target`n" -ForegroundColor Green
-Get-ChildItem -Recurse -File (Join-Path $deploy "ServerData\$Target") | ForEach-Object {
+Write-Host "`n[deploy_remote] 已拷贝 ServerData\$Target → _deploy_remote\$Target`n" -ForegroundColor Green
+Get-ChildItem -Recurse -File (Join-Path $deploy $Target) | ForEach-Object {
     Write-Host ("  " + $_.FullName.Substring($deploy.Length + 1) + "  (" + [math]::Round($_.Length/1KB, 1) + " KB)")
 }
 
 Write-Host "`n[deploy_remote] 启动 HTTP 服务: http://127.0.0.1:$Port (Ctrl+C 停止)`n" -ForegroundColor Cyan
-Write-Host "真机自测: curl http://<本机IP>:$Port/ServerData/$Target/catalog_$Target.hash"
+Write-Host "真机自测: curl http://<本机IP>:$Port/$Target/catalog_1.0.hash"
 python -m http.server $Port --directory $deploy

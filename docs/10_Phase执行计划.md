@@ -366,7 +366,7 @@ v1.0 主包无此类型 → null → 整链静默跳过；禁止直接引用（v
   仓库内无 PlayMode 期写入方（仅 3 个 Editor 脚本 -executeMethod 才写）→ 疑为 Unity 6000 批处理符号序列化 bug；
   防御：**每次批处理进程后 `git diff` 复核该文件**，根因排查列为待办（不阻塞 Phase 9）。
 
-### 16.5 9-4 Addressables Remote Catalog 远程下发（✅ ① ④ 2026-08-31，②③ 待真机）
+### 16.5 9-4 Addressables Remote Catalog 远程下发（✅ ① ④ 2026-08-31；②③ 真机闭环 2026-09-02 ✅ 修复轮闭环：踩坑 9 条全部定位修复，用户真机全流程验收"功能正常"）
 
 **目标**：远程 catalog 落地、dll/metadata/overrides 远程化、module_overrides 生成、本机部署脚本、content_state.bin 入库。
 
@@ -394,7 +394,36 @@ Content Update 增量验证放后半（先全量验证同 key 覆盖）。真机
 - **踩坑记录（根因已修，代码幂等防复发）**：① Phase 6 建 settings 时 `m_RemoteCatalogBuildPath/LoadPath` 空引用，开远程 catalog 后 CreateRemoteCatalog 直接失败 → EnsureRemoteSetup 显式 `SetVariableByName`；
   ② `profile.SetValue(profileId, 变量名, 值)` 第二参数是**变量名不是 GUID**，传 id 静默失败 → 已改传名字；
   ③ 组 schema 路径残留 Local 变量 → bundle 误入本地构建路径 → EnsureHotUpdateGroup 改为幂等校正并自检。
-- **验证②③（真机）**：待 Android 设备执行（在线首启 / 断网冷启动 / 服务器停机三态；远程新 dll 覆盖包内旧 dll）。
+- **验证②③（真机，2026-09-01 进行中）**：在线首启 / 断网冷启动 / 服务器停机三态；远程新 dll 覆盖包内旧 dll。
+  真机执行已暴露 **4 个纯真机问题**（编辑器 Mono 侧全部测不出），根因与修复见下节「真机闭环踩坑记录」。
+  当前进展：坑①②③④已修复（link.xml / InternalIdTransformFunc / 双层 cleartext 放行+Development / manifest 补全），
+  坑③ 最终根因（DevelopmentOnly 需 development build）已修复,APK 第 6 次重建中。
+  2026-09-02 修复轮：坑⑤⑥⑦⑧ 已修复并验收（网络排查 + Development 宏对齐,APK 第 12 次构建在线首启热更链全通）；
+  随后暴露 **坑⑨ = 热更视图挂载架构缺陷**（非 AB 场景/prefab 序列化热更组件 → 真机静默丢失,见下表）,
+  HotViewBinder 桥修复后 APK 重建（v12-2203）→ 重装冷启动热更链复通（5 metadata + 2 dll + overrides v1.1.0,~0.6s）,
+  真机日志实锤：`missing script (Box.HotUpdate.Sudoku.GameplayView)` 警告后紧跟 `[HotViewBinder] 运行时附加热更视图` → **修复生效**；
+  用户真机全流程检查 2026-09-02 **"功能正常"**（主页/难度弹窗/棋盘渲染/按钮响应/返回,9/9 条踩坑全部定位修复闭环）。
+  完整复盘（现象→排查→根因证据链→方案→复发坑→验收）见 `docs/20_9-4热更真机验收复盘.md`。
+
+**真机闭环踩坑记录（2026-09-01，均已在代码修复并附注释）**：
+
+| # | 症状（真机日志） | 根因 | 修复 | 为何编辑器测不出 |
+|---|---|---|---|---|
+| ① | `[HotUpdate] 主包无 HybridCLR 运行时(v1.0 语义),热更链路跳过` | IL2CPP 链接裁剪掉 `HybridCLR.RuntimeApi`(主包无静态引用,link.xml 未保留) → `Type.GetType` 返回 null → 整链静默跳过 | `Assets/link.xml` 加 `<assembly fullname="HybridCLR.Runtime" preserve="all"/>` | 编辑器 Mono 不裁剪,反射能找到 |
+| ② | `Unable to open archive file: RemoteHostURL/Android/...bundle` | 远程 bundle 路径的 `{RemoteHostURL}` 是**运行时变量**,构建值不烘焙进 catalog,设备端无值 → 占位符原样输出;且 Addressables 2.8 **已移除 1.x 的 `SetProfileVariable`**(编译即报 CS0117) | `Addressables.InternalIdTransformFunc` 钩子把 `RemoteHostURL` 替换为实际服务器地址(开发期局域网 IP,生产换 CDN);构造函数即装 + 每次 catalog 更新前兜底 | 编辑器 profile 有变量值,本地可求值 |
+| ③ | bundle 秒级失败,但 `nc`/ping 全通;服务器日志显示请求**根本没到达** | **双层拦截**:Unity 6000 引擎层 WebRequest 默认拒绝非 localhost 明文 HTTP(报 `Insecure connection not allowed`,`usesCleartextTraffic` 管不到引擎层);Android 9+ 系统层另有限制。Addressables 还把远程 catalog 请求失败静默吞成"无更新"。**最坑**:`insecureHttpOption=DevelopmentOnly` 只对 **development build** 生效——原 APK 构建选项是 `BuildOptions.None`,选项写了也不生效,直到构建期日志核对才发现 | ① `PlayerSettings.insecureHttpOption = InsecureHttpOption.DevelopmentOnly`(BuildScript.PrepareV11)+ manifest `usesCleartextTraffic="true"` ② **APK 构建加 `BuildOptions.Development`**、AAB 保持 `None`(BuildScript.BuildAndroidInternalCore,注释说明) | 编辑器 PlayMode 用 `127.0.0.1`(localhost 豁免),桌面无此策略;选项生效依赖构建选项,编辑器态验证不到 |
+| ④ | 安装后 `No activities found to launch`(monkey 无法启动) | 自定义主 manifest 是**替换而非补全**,极简 manifest 丢掉了 `UnityPlayerGameActivity` 声明 | 基于官方模板 `PlaybackEngines/AndroidPlayer/Apk/UnityManifest.xml` 补全 activity 声明(属性取自正常构建旧 APK:singleTask/fullUser/configChanges 等) | 编辑器不打包,构建阶段不校验 launcher |
+| ⑤ | ——(诊断工具) | 定位③时:请求未达服务器 = 本地拦截;错误详情在 `UnityWebRequest result : ConnectionError : ...`(Addressables 外层只报 "Unable to load asset bundle",**实时流式抓 logcat** 才能看到内层) | 无(记录排查路径:logcat 流式抓取 + python http.server 访问日志 + `toybox nc` 验证) | —— |
+| ⑥ | 服务器日志 404(bundle 下载失败),但文件确实在部署目录 | 目录结构与 profile 的 URL 不对齐:Remote.LoadPath=`{RemoteHostURL}/[BuildTarget]` → URL `/Android/...`;旧部署从 `_deploy_remote` 根起服务(URL 变成 `/ServerData/Android/...`),另一错误做法是把 serve root 设成 `_deploy_remote/Android`(URL 又多找一层)。**http.server 的 root 必须是 `_deploy_remote`,文件放在 `_deploy_remote/Android/`** | `tools/deploy_remote.ps1` 拷贝目标改为 `_deploy_remote/$Target` + `--directory $deploy`;附注释说明两种错误结构 | 编辑器 profile 变量本地可求值,目录错位测不出 |
+| ⑦ | 旧 http.server 未停时重跑 deploy 脚本,`Remove-Item`/`Copy-Item` 静默失败(产物缺失,curl 404) | 旧 python 进程占用 `_deploy_remote` 目录(Windows 文件锁),脚本 `$ErrorActionPreference=Stop` 未中止(疑似句柄共享) | 重跑前 `netstat -ano \| grep :8000` 确认无 LISTEN,或 taskkill 旧 python;脚本注释已加提示 | —— |
+| ⑧ | `[HotUpdate] 装载 AOT 元数据 Box.UI 失败: ... TargetInvocationException`(完整异常链此前被 catch 吞掉,2026-09-02 真机+模拟器) | **Development 宏不一致**:HybridCLR 的 `StripAOTDlls`/`CompileDll`/`MethodBridge` 读的是 `EditorUserBuildSettings.development`(batchmode 默认 **false**),而 BuildScript 正式构建传的是 `BuildPlayerOptions` 级 `BuildOptions.Development`(不写回编辑器开关)→ strip 产物(AOT metadata 来源)与包内 AOT 程序集 **DEVELOPMENT_BUILD 宏不同 → IL 不同** → Consistent 模式逐程序集校验失败。重跑 GenerateContent 也无效:metadata 永远是"无宏"版本 | `BuildV11` 在 `GenerateAll` 前显式 `EditorUserBuildSettings.development = true`(与正式 Development 构建对齐,finally 恢复原值);另 `LoadMetadata` catch 改打印完整异常链(含反射 Invoke 内层) | 编辑器 Mono 不涉 IL2CPP 宏;旧 bundle 时间戳与 metadata 拷贝时序在真机才暴露 |
+| ⑨ | 主页(AOT MainMenuView)渲染/点击正常;进数独对局页:**静态 UI(标题/工具条/数字盘/返回)全部正常显示,棋盘(代码生成)缺失,所有按钮无响应**,日志零报错(2026-09-02 真机) | **热更视图组件序列化丢失**:GameplayView/DifficultySelectView(Box.HotUpdate.Sudoku)作为 MonoBehaviour **直接挂在 prefab 根**(Gameplay.unity 通过 PrefabInstance 引用);v1.1 打包 FilterHotFixAssemblies 把热更程序集从主包剥离 → IL2CPP 资源反序列化按**构建期静态 MonoScript 表**解析,该类不在表内 → 组件静默丢弃(Awake/OnCreate 永不执行:棋盘 = OnCreate 里代码生成,按钮 onClick = OnCreate 里绑定)。HybridCLR 官方:prefab/场景挂热更脚本仅 **AB 打包资源**可还原,**Build Settings 非 AB 场景必丢**;官方唯一"无限制"路径 = Assembly.Load 后代码 `AddComponent`。APK 解剖佐证:ScriptingAssemblies.json 含热更 dll(官方 patch 生效)但组件仍丢 → 证明关卡是脚本表而非 dll 注册 | 新增 **HotViewBinder**(AOT,Box.UI)+ 迁移脚本 Phase9HotViewBinderSetup:两视图 prefab 根挂 Binder 并写入 viewTypeFullName;运行期根上无 UIView(序列化组件已被剥)时按类型名 AppDomain 解析 + `AddComponent` 挂回 → 同步触发 Awake,生命周期与序列化直挂一致;类型未载(热更 dll 未装载)时逐帧重试 10s 兜底;v1.0/编辑器组件正常序列化 → GetComponent 命中 → 桥空转幂等,双模式共用同一 prefab。**架构纪律:热更视图组件永不直接进 prefab/场景,一律经桥运行时附加** | 编辑器全量编译(无 filter),组件序列化还原正常;真机才丢,且丢失是静默的(无任何 error 日志) |
+
+**真机网络排查备忘(下次直接照做)**：① 电脑 `ipconfig` 与手机 `adb shell ip addr show wlan0` 对比网段,不同网段互相不可达 → 手机切到同 WiFi;
+② Windows 默认拦 ICMP,ping 不通≠不可达,直接验证 TCP:`adb shell "printf 'GET /... HTTP/1.0\r\n\r\n' \| toybox nc -w 5 <电脑IP> 8000"`(Android 自带 toybox nc);
+③ 手机连 WiFi 后注意切换时序(断旧连新需几秒,立刻启动会踩空);④ AP 隔离验证:电脑 ping 手机 0% 丢包即二层可达;
+⑤ 每次 batchmode 构建后 `git diff ProjectSettings.asset` 查 SENTIS 符号漂移(已 3 次复发,批处理进程截断 Android defines 末尾条目);
+⑥ 构建日志的 `summary.totalSize` 会虚报(2026-09-02 第 8 次构建报 1189.8 MB,磁盘实际 79.7 MB,ZIP 校验完整)——以磁盘文件大小为准,别被日志吓到重建。
 
 ### 16.6 收尾勾账（待执行）+ 当前阻塞项
 

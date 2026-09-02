@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Phase 9 9-4 真机闭环踩坑:
+    1) Android 9+(API 28)默认禁止明文 HTTP,UnityWebRequest 请求局域网 http://192.168.0.101:8000
+       被系统拦截 → bundle 下载 3 秒内失败。usesCleartextTraffic=true 放行开发期 HTTP,
+       上架前如走 HTTPS CDN 可移除本属性。
+    2) 自定义主 manifest 是"替换"而非"补全":必须自带 UnityPlayerGameActivity 声明,
+       否则 APK 无 launcher activity 无法启动(踩坑实录:22:25 构建产物无 activity)。
+       本文件基于 Unity 6000 官方模板(PlaybackEngines/AndroidPlayer/Apk/UnityManifest.xml),
+       activity 属性取自正常构建的旧 APK(singleTask/fullUser/configChanges 等)。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application android:usesCleartextTraffic="true" tools:targetApi="28">
+        <activity android:name="com.unity3d.player.UnityPlayerGameActivity"
+                  android:theme="@style/BaseUnityGameActivityTheme"
+                  android:enabled="true"
+                  android:exported="true"
+                  android:launchMode="2"
+                  android:screenOrientation="13"
+                  android:configChanges="0x40003fff"
+                  android:hardwareAccelerated="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="unityplayer.UnityActivity" android:value="true" />
+            <meta-data android:name="android.app.lib_name" android:value="game" />
+        </activity>
+    </application>
+</manifest>
