@@ -126,6 +126,15 @@ GameBox/HybridCLRData/
 GameBox/Assets/Plugins/Android/FirebaseApp.androidlib/
 GameBox/Assets/Plugins/Android/FirebaseCrashlytics.androidlib/
 GameBox/Assets/Plugins/Android/*.androidlib.meta
+# Phase 9 热更构建产物(内置/远程热更 DLL 与元数据拷贝,HydridCLR 构建时生成,可重建)
+GameBox/Assets/BuiltinHotUpdate/
+GameBox/Assets/BuiltinHotUpdate.meta
+GameBox/Assets/RemoteContent/
+GameBox/Assets/RemoteContent.meta
+# Addressables 构建输出与热更部署产物(ServerData 为默认 LocalBuildPath;部署目录为拷贝/上传用,均可重建)
+GameBox/ServerData/
+_deploy_remote/
+firebase-hosting/
 
 # =========================================================
 # 素材中间产物与本地备份(不入库)
