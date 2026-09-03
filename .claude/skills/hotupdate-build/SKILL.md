@@ -1,6 +1,6 @@
 ---
 name: hotupdate-build
-description: v1.1(HybridCLR)热更 APK 构建与远程内容部署全链(四段构建 + Firebase Hosting 双通道发布 + 真机验证守门)。当用户要求"打 v1.1 包/热更构建/打热更 APK/部署远程内容/发布 Firebase/更新热更内容"时使用。坑记录权威:docs/10_Phase执行计划.md §16.5(坑①~⑨)与 docs/20_9-4热更真机验收复盘.md。
+description: v1.1(HybridCLR)热更 APK 构建与远程内容部署全链(四段构建 + Firebase Hosting 双通道发布 + 真机验证守门)。当用户要求"打 v1.1 包/热更构建/打热更 APK/部署远程内容/发布 Firebase/更新热更内容"时使用。坑记录权威:docs/10_Phase执行计划.md §16.5(坑①~⑩,含断网空降级修复)与 docs/20_9-4热更真机验收复盘.md(§10 坑⑩ 复盘)。
 ---
 
 # v1.1 热更包构建 + 远程内容部署
