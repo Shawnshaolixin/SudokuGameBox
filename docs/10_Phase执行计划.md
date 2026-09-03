@@ -404,6 +404,9 @@ Content Update 增量验证放后半（先全量验证同 key 覆盖）。真机
   真机日志实锤：`missing script (Box.HotUpdate.Sudoku.GameplayView)` 警告后紧跟 `[HotViewBinder] 运行时附加热更视图` → **修复生效**；
   用户真机全流程检查 2026-09-02 **"功能正常"**（主页/难度弹窗/棋盘渲染/按钮响应/返回,9/9 条踩坑全部定位修复闭环）。
   完整复盘（现象→排查→根因证据链→方案→复发坑→验收）见 `docs/20_9-4热更真机验收复盘.md`。
+  **2026-09-03 断网修复轮：坑⑩ 空降级缺陷发现→修复→双态真机验收闭环**（详见下表 ⑩）——
+  内置兜底组 HotUpdate_Builtin(dll/metadata 随包副本)+ 装载层兜底(任何远程装载失败 → 固化切内置),
+  v12-2156 重装后 **飞行模式冷启动数独可玩** + **直连不可达(有网无代理)同样兜底可玩**,用户人工确认"可玩"。
 
 **真机闭环踩坑记录（2026-09-01，均已在代码修复并附注释）**：
 
@@ -418,6 +421,7 @@ Content Update 增量验证放后半（先全量验证同 key 覆盖）。真机
 | ⑦ | 旧 http.server 未停时重跑 deploy 脚本,`Remove-Item`/`Copy-Item` 静默失败(产物缺失,curl 404) | 旧 python 进程占用 `_deploy_remote` 目录(Windows 文件锁),脚本 `$ErrorActionPreference=Stop` 未中止(疑似句柄共享) | 重跑前 `netstat -ano \| grep :8000` 确认无 LISTEN,或 taskkill 旧 python;脚本注释已加提示 | —— |
 | ⑧ | `[HotUpdate] 装载 AOT 元数据 Box.UI 失败: ... TargetInvocationException`(完整异常链此前被 catch 吞掉,2026-09-02 真机+模拟器) | **Development 宏不一致**:HybridCLR 的 `StripAOTDlls`/`CompileDll`/`MethodBridge` 读的是 `EditorUserBuildSettings.development`(batchmode 默认 **false**),而 BuildScript 正式构建传的是 `BuildPlayerOptions` 级 `BuildOptions.Development`(不写回编辑器开关)→ strip 产物(AOT metadata 来源)与包内 AOT 程序集 **DEVELOPMENT_BUILD 宏不同 → IL 不同** → Consistent 模式逐程序集校验失败。重跑 GenerateContent 也无效:metadata 永远是"无宏"版本 | `BuildV11` 在 `GenerateAll` 前显式 `EditorUserBuildSettings.development = true`(与正式 Development 构建对齐,finally 恢复原值);另 `LoadMetadata` catch 改打印完整异常链(含反射 Invoke 内层) | 编辑器 Mono 不涉 IL2CPP 宏;旧 bundle 时间戳与 metadata 拷贝时序在真机才暴露 |
 | ⑨ | 主页(AOT MainMenuView)渲染/点击正常;进数独对局页:**静态 UI(标题/工具条/数字盘/返回)全部正常显示,棋盘(代码生成)缺失,所有按钮无响应**,日志零报错(2026-09-02 真机) | **热更视图组件序列化丢失**:GameplayView/DifficultySelectView(Box.HotUpdate.Sudoku)作为 MonoBehaviour **直接挂在 prefab 根**(Gameplay.unity 通过 PrefabInstance 引用);v1.1 打包 FilterHotFixAssemblies 把热更程序集从主包剥离 → IL2CPP 资源反序列化按**构建期静态 MonoScript 表**解析,该类不在表内 → 组件静默丢弃(Awake/OnCreate 永不执行:棋盘 = OnCreate 里代码生成,按钮 onClick = OnCreate 里绑定)。HybridCLR 官方:prefab/场景挂热更脚本仅 **AB 打包资源**可还原,**Build Settings 非 AB 场景必丢**;官方唯一"无限制"路径 = Assembly.Load 后代码 `AddComponent`。APK 解剖佐证:ScriptingAssemblies.json 含热更 dll(官方 patch 生效)但组件仍丢 → 证明关卡是脚本表而非 dll 注册 | 新增 **HotViewBinder**(AOT,Box.UI)+ 迁移脚本 Phase9HotViewBinderSetup:两视图 prefab 根挂 Binder 并写入 viewTypeFullName;运行期根上无 UIView(序列化组件已被剥)时按类型名 AppDomain 解析 + `AddComponent` 挂回 → 同步触发 Awake,生命周期与序列化直挂一致;类型未载(热更 dll 未装载)时逐帧重试 10s 兜底;v1.0/编辑器组件正常序列化 → GetComponent 命中 → 桥空转幂等,双模式共用同一 prefab。**架构纪律:热更视图组件永不直接进 prefab/场景,一律经桥运行时附加** | 编辑器全量编译(无 filter),组件序列化还原正常;真机才丢,且丢失是静默的(无任何 error 日志) |
+| ⑩ | **断网(飞行模式)冷启动进不去游戏**:连点入口报 `[ModuleFramework] 入口类型不可用: Box.HotUpdate.Sudoku.SudokuModule`;热更链静默放弃,dll 从未装载(2026-09-03 用户报告"没有网络的情况下没法进入游戏") | **v1.1 剥离热更程序集后的"空降级"**:包内无 dll/metadata,"降级包内版本"是空操作。首轮修复把切换点放 catalog 阶段,但 **catalog 阶段成败判定不可靠,两种路径都绕过**:①断网时 Addressables `CheckForCatalogUpdates` 把远程 hash 下载失败**静默吞成"无更新"**(CheckCatalogsOperation 仅全部失败才报错)→ 返回成功 → 源不切内置;②网络部分可达(直连 web.app 被 SSL 拦)时 catalog 检查/更新成功、**bundle 实际下载失败发生在 LoadAsset 阶段** → catalog 阶段无从感知。两态实锤日志:`加载 HotUpdate/Metadata/Box.UI 失败: Dependency Exception`(无远程条目)/ `RemoteProviderException: Unable to complete SSL connection`(有条目下载失败),地址前缀始终是远程而非 Builtin —— UseBuiltinContent 从未置位 | ①新增 **HotUpdate_Builtin 本地组**(GenerateContent 同批双写 dll/metadata 副本到 `Assets/BuiltinHotUpdate`,BuildV11 内插 GenerateContent 保证与包内 AOT 同批;组 BuildPath/LoadPath 强制 Local 变量)②**切换点后置到装载层**(核心):`LoadWithFallbackAsync` 每次装载先试首选源,**任何失败(任何原因)固化切内置再试一次**,此后本进程全走本地(零网络)——杜绝远程/内置混载,一致性由"内置=同批"天然保证;catalog 阶段预切换保留为双保险 ③编排层(HotUpdateService)catalog 失败/超时不再 return,继续走装载链 | 编辑器 Mono 下网络层与 Addressables 行为差异大;Addressables 吞 hash 失败/部分可达等状态只有真机才出现;catalog 阶段"成功"却无任何日志,不看 LoadAsset 失败详情无法定位 |
 
 **真机网络排查备忘(下次直接照做)**：① 电脑 `ipconfig` 与手机 `adb shell ip addr show wlan0` 对比网段,不同网段互相不可达 → 手机切到同 WiFi;
 ② Windows 默认拦 ICMP,ping 不通≠不可达,直接验证 TCP:`adb shell "printf 'GET /... HTTP/1.0\r\n\r\n' \| toybox nc -w 5 <电脑IP> 8000"`(Android 自带 toybox nc);
@@ -427,10 +431,11 @@ Content Update 增量验证放后半（先全量验证同 key 覆盖）。真机
 
 ### 16.6 收尾勾账（待执行）+ 当前阻塞项
 
-**最终验收**：① v1.1 AAB 真机在线启动 → dll 经 Addressables 加载、Assembly.Load 成功、数独可玩；断网冷启动包内可玩
-② 首包 ≤60MB 预算：v1.0 对比 Phase 8 基线增量 ≈ 0；v1.1 = v1.0 + hybridclr 运行时（9-1 实测 +1.01MB）+ 包内 dll/metadata（≤1MB）
+**最终验收**：① v1.1 AAB 真机在线启动 → dll 经 Addressables 加载、Assembly.Load 成功、数独可玩；断网冷启动包内可玩 —— **断网态已 ✅ 2026-09-03 APK 中间态闭环**（坑⑩ 修复后 v12-2156 飞行模式冷启动 + 直连不可达双态可玩,用户人工确认;AAB 最终形态待阻塞解除后按 17 文档 §6 跑 `PrepareV11 → BuildV11` 复验一次）
+② 首包 ≤60MB 预算：v1.0 对比 Phase 8 基线增量 ≈ 0；v1.1 = v1.0 + hybridclr 运行时（9-1 实测 +1.01MB）+ 包内 dll/metadata —— **坑⑩ 修复体积账：内置兜底 bundle 实测增量 ≈ +1.96MB**（同构 APK 对比 20260902-2331→20260903-2156:hotupdate_builtin bundle 1,883,413 Stored 免二次压缩 + libil2cpp +80KB + metadata +346B,逐项吻合;AAB 上界同理,预算仍 ≤60MB 口径内）
 ③ v1.0 模式回归：出包无 HybridCLR 符号、数独可玩、CI-1 全绿 ④ 红线 9：仓库无远程内容、RemoteHostURL 为开发值
 ⑤ 文档勾账：本 §16 验收打勾 + 17 文档补 v1.1 构建入口 —— ✅ 2026-09-03：17 文档已补 §6 v1.1 发布流程（含 BOX_REMOTE_URL 注入）。
+⑥ **坑⑩ 修复纪律（防复发）**：改 AOT 侧热更链代码 → 必重跑 GenerateAll→GenerateContent→BuildPlayerContent 同批（内置副本 = 与包内 AOT 同批,擅自只传远程内容会造成内置/远程不一致）;内置兜底内容变更一律走新包,禁 Content Update 更新 HotUpdate_Builtin 组（无 ContentUpdate schema）。
 
 **当前阻塞项**：v1.1 AAB 完整构建需环境变量 `BOX_KEYSTORE_PASS`（用户注入，agent 不碰密码明文）+ `BOX_REMOTE_URL=production`（发布通道注入，机制 2026-09-03 已落地，见 17 文档 §6）；
 已用 APK 中间态验证符号等价性，AAB 随时可跑：`PrepareV11 → BuildV11`。

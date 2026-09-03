@@ -36,8 +36,15 @@ public static class Phase9HybridCLRSetup
     /// <summary>热更远程组(9-4:dll/metadata/overrides 组,Local + 可变更)。</summary>
     public const string GroupHotUpdateLocal = "HotUpdate_Local";
 
+    /// <summary>热更内置兜底组(2026-09-03 断网空降级缺陷修复):dll/metadata 副本随主包,
+    /// 断网/远程不可达时装载兜底 —— 真"包内版本"(v1.1 剥离后远程失效不再是裸奔)。</summary>
+    public const string GroupHotUpdateBuiltin = "HotUpdate_Builtin";
+
     /// <summary>生成内容根目录(不入库,红线 9:仓库无远程内容)。</summary>
     public const string RemoteContentRoot = "Assets/RemoteContent";
+
+    /// <summary>内置兜底内容根目录(不入库;GenerateAll 产物副本,随包构建,打包前由 BuildV11 内部 GenerateContent 刷新)。</summary>
+    public const string BuiltinContentRoot = "Assets/BuiltinHotUpdate";
 
     /// <summary>module_overrides 模板版本(与 HotUpdateVersion.CodeVersion 约定一致;Box.HotUpdate.Core 是热更程序集,Editor 侧不可引用,故常量同步)。</summary>
     public const string OverridesTemplateVersion = "1.1.0";
@@ -117,6 +124,8 @@ public static class Phase9HybridCLRSetup
     /// <summary>
     /// 9-4 热更内容生成:从 HybridCLRData 白名单拷贝 dll/metadata 到 RemoteContent 并注册地址,
     /// 再从 ModuleCatalog.asset 生成 module_overrides 模板(远程模块清单)。
+    /// 2026-09-03(断网空降级修复):同批产物再拷一份到 BuiltinHotUpdate 本地组(HotUpdate_Builtin,
+    /// 随主包内置的兜底副本 —— v1.1 打包必须在本方法之后(BuildV11 内部已插入调用),保证副本与包内 AOT 同批)。
     /// 前置:已执行 HybridCLR GenerateAll(产物在 HybridCLRData/,gitignore 不入库)。
     /// 只拷名单内文件(2 热更 dll + 5 AOT metadata),绝不整目录拷贝。
     /// </summary>
@@ -129,47 +138,30 @@ public static class Phase9HybridCLRSetup
             Debug.LogError("[Phase9Setup] Addressables 未初始化,请先执行 EnsureRemoteSetup");
             return;
         }
-        var group = settings.FindGroup(GroupHotUpdateLocal);
-        if (group == null)
+        var remoteGroup = settings.FindGroup(GroupHotUpdateLocal);
+        if (remoteGroup == null)
         {
             Debug.LogError($"[Phase9Setup] 组 {GroupHotUpdateLocal} 不存在,请先执行 EnsureRemoteSetup");
             return;
         }
+        var builtinGroup = EnsureBuiltinGroup(settings);
 
         // ① 准备目标目录(Dll / Metadata 分置,避免同名 dll 冲突;.dll.bytes 后缀导入为 TextAsset)
         EnsureFolder(RemoteContentRoot + "/Dll");
         EnsureFolder(RemoteContentRoot + "/Metadata");
+        EnsureFolder(BuiltinContentRoot + "/Dll");
+        EnsureFolder(BuiltinContentRoot + "/Metadata");
 
-        var buildTarget = EditorUserBuildSettings.activeBuildTarget.ToString();
-        var hotUpdateSrc = Path.Combine("HybridCLRData", "HotUpdateDlls", buildTarget);
-        var aotSrc = Path.Combine("HybridCLRData", "AssembliesPostIl2CppStrip", buildTarget);
+        // ② dll/metadata 双份:RemoteContent(远程组,可变更)+ BuiltinHotUpdate(内置兜底组,随包)。
+        //    注意 Builtin 目录只覆盖不清空(首次生成的 .meta 保留 → GUID 稳定 → 组 entry 不漂移)
         int copied = 0;
+        copied += CopyAssemblyBatch(settings, remoteGroup, $"{RemoteContentRoot}/Dll", "HotUpdate/Dll/", metadata: false);
+        copied += CopyAssemblyBatch(settings, remoteGroup, $"{RemoteContentRoot}/Metadata", "HotUpdate/Metadata/", metadata: true);
+        copied += CopyAssemblyBatch(settings, builtinGroup, $"{BuiltinContentRoot}/Dll", "BuiltinHotUpdate/Dll/", metadata: false);
+        copied += CopyAssemblyBatch(settings, builtinGroup, $"{BuiltinContentRoot}/Metadata", "BuiltinHotUpdate/Metadata/", metadata: true);
 
-        // ② 热更 dll(白名单:仅 HotUpdateAssemblies,勿整目录)
-        foreach (var asm in HotUpdateAssemblies)
-        {
-            var src = Path.Combine(hotUpdateSrc, asm + ".dll");
-            if (!File.Exists(src))
-            {
-                Debug.LogError($"[Phase9Setup] 缺少热更 dll: {src} —— 请先执行 HybridCLR GenerateAll(目标 {buildTarget})");
-                continue;
-            }
-            copied += CopyAndRegister(settings, group, src, $"{RemoteContentRoot}/Dll/{asm}.dll.bytes", $"HotUpdate/Dll/{asm}");
-        }
-
-        // ③ AOT metadata 白名单(与 HotUpdateService.AotMetadataAssemblies 单一来源)
-        foreach (var asm in HotUpdateService.AotMetadataAssemblies)
-        {
-            var src = Path.Combine(aotSrc, asm + ".dll");
-            if (!File.Exists(src))
-            {
-                Debug.LogError($"[Phase9Setup] 缺少 AOT 剥离 dll: {src} —— 请先执行 GenerateAll(目标 {buildTarget})");
-                continue;
-            }
-            copied += CopyAndRegister(settings, group, src, $"{RemoteContentRoot}/Metadata/{asm}.dll.bytes", $"HotUpdate/Metadata/{asm}");
-        }
-
-        // ④ module_overrides 模板:从 ModuleCatalog.asset 序列化(与 ModuleOverrides 字段一一对应)
+        // ③ module_overrides 模板:从 ModuleCatalog.asset 序列化(与 ModuleOverrides 字段一一对应)。
+        //    只走远程(内置兜底清单 = 包内 Resources ModuleCatalog,无需副本)
         var catalog = AssetDatabase.LoadAssetAtPath<ModuleCatalog>("Assets/Resources/Config/ModuleCatalog.asset");
         if (catalog == null)
         {
@@ -180,12 +172,69 @@ public static class Phase9HybridCLRSetup
         var overridesPath = $"{RemoteContentRoot}/module_overrides.json";
         File.WriteAllText(overridesPath, JsonUtility.ToJson(overrides));
         AssetDatabase.ImportAsset(overridesPath, ImportAssetOptions.ForceUpdate);
-        RegisterAsset(settings, group, overridesPath, "HotUpdate/module_overrides"); // 已写盘,无需再拷贝
+        RegisterAsset(settings, remoteGroup, overridesPath, "HotUpdate/module_overrides"); // 已写盘,无需再拷贝
         copied++;
 
         AssetDatabase.SaveAssets();
         Debug.Log($"[Phase9Setup] GenerateContent 完成:拷贝/写入 {copied} 个" +
-                  $"(dll×{HotUpdateAssemblies.Length} + metadata×{HotUpdateService.AotMetadataAssemblies.Count} + overrides)");
+                  $"(dll×{HotUpdateAssemblies.Length}×2源 + metadata×{HotUpdateService.AotMetadataAssemblies.Count}×2源 + overrides)");
+    }
+
+    /// <summary>
+    /// 拷一批 dll/metadata 到指定组与目录(调用方显式给出目标根目录与地址前缀,远程组/内置组各调两批)。
+    /// </summary>
+    static int CopyAssemblyBatch(AddressableAssetSettings settings, AddressableAssetGroup group,
+        string dstRoot, string addressPrefix, bool metadata)
+    {
+        var buildTarget = EditorUserBuildSettings.activeBuildTarget.ToString();
+        var srcRoot = metadata
+            ? Path.Combine("HybridCLRData", "AssembliesPostIl2CppStrip", buildTarget)
+            : Path.Combine("HybridCLRData", "HotUpdateDlls", buildTarget);
+        // 两分支统一 IReadOnlyList 遍历(避免引入 System.Linq 只为 ToArray)
+        IReadOnlyList<string> names = metadata ? HotUpdateService.AotMetadataAssemblies : HotUpdateAssemblies;
+        int copied = 0;
+        foreach (var asm in names)
+        {
+            var src = Path.Combine(srcRoot, asm + ".dll");
+            if (!File.Exists(src))
+            {
+                Debug.LogError($"[Phase9Setup] 缺少 {(metadata ? "AOT 剥离" : "热更")} dll: {src} —— 请先执行 HybridCLR GenerateAll(目标 {buildTarget})");
+                continue;
+            }
+            copied += CopyAndRegister(settings, group, src, $"{dstRoot}/{asm}.dll.bytes", addressPrefix + asm);
+        }
+        return copied;
+    }
+
+    /// <summary>
+    /// HotUpdate_Builtin 本地组(内置兜底内容):Local 构建 + 无 ContentUpdate schema(内置副本不可变更,变更走新包)。
+    /// 幂等:已存在仅校正路径;新组 .asset 自动入库(与 HotUpdate_Local 同套路)。
+    /// </summary>
+    static AddressableAssetGroup EnsureBuiltinGroup(AddressableAssetSettings settings)
+    {
+        var group = settings.FindGroup(GroupHotUpdateBuiltin);
+        if (group == null)
+        {
+            group = settings.CreateGroup(GroupHotUpdateBuiltin, false, false, false,
+                new List<AddressableAssetGroupSchema>());
+            if (group == null)
+            {
+                Debug.LogError("[Phase9Setup] 分组创建失败: " + GroupHotUpdateBuiltin);
+                return null;
+            }
+            // 本地组默认模板带 BundledAssetGroupSchema + ContentUpdate 模板?CreateGroup 传空 schema 需自建
+            group.AddSchema<BundledAssetGroupSchema>();
+            Debug.Log($"[Phase9Setup] 分组已创建: {GroupHotUpdateBuiltin}(Bundled,本地内置)");
+        }
+        // 指向本地构建/加载路径(内置兜底永远随包,禁止指远程变量 —— 那会让"兜底"也依赖网络)
+        var bundle = group.GetSchema<BundledAssetGroupSchema>();
+        if (bundle == null)
+        {
+            bundle = group.AddSchema<BundledAssetGroupSchema>();
+        }
+        bundle.BuildPath.SetVariableByName(settings, "Local.BuildPath");
+        bundle.LoadPath.SetVariableByName(settings, "Local.LoadPath");
+        return group;
     }
 
     /// <summary>

@@ -146,6 +146,9 @@ rovilo_ui_layers/
 # GenerateContent 产物(热更 dll/metadata/module_overrides,可重生成,不入库)
 GameBox/Assets/RemoteContent/
 GameBox/Assets/RemoteContent.meta
+# 内置兜底副本(2026-09-03:GenerateContent 同批双写产物,随包构建,不入库)
+GameBox/Assets/BuiltinHotUpdate/
+GameBox/Assets/BuiltinHotUpdate.meta
 # 部署目录(deploy_remote.ps1 拷贝 ServerData 并起 http 服务)
 _deploy_remote/
 

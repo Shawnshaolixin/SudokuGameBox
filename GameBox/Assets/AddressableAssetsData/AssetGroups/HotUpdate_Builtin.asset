@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: HotUpdate_Builtin
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: HotUpdate_Builtin
+  m_GUID: 14842a36dd1e2824f82cf35fa2ca2362
+  m_SerializeEntries:
+  - m_GUID: 11aee36e954d34d42914fab1e762ce36
+    m_Address: BuiltinHotUpdate/Metadata/Box.UI
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - HotUpdate
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 18843b230de46364fae254911762a338
+    m_Address: BuiltinHotUpdate/Metadata/mscorlib
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - HotUpdate
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1db7ff6a1d8f10c489e3d5309bab4aec
+    m_Address: BuiltinHotUpdate/Metadata/UniTask
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - HotUpdate
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 31ce03b2982ed514b86b90a61140c70e
+    m_Address: BuiltinHotUpdate/Dll/Box.HotUpdate.Core
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - HotUpdate
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7eb70626eed157f41b343faf63d7c458
+    m_Address: BuiltinHotUpdate/Metadata/System.Core
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - HotUpdate
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 91495396c03864e498355128b2af71bc
+    m_Address: BuiltinHotUpdate/Metadata/UnityEngine.CoreModule
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - HotUpdate
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a6dbb87cd21af424e975164afb9b3446
+    m_Address: BuiltinHotUpdate/Dll/Box.HotUpdate.Sudoku
+    m_ReadOnly: 0
+    m_SerializedLabels:
+    - HotUpdate
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: 68b66f896e1f0094f97398d17cf2c77b, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 58fc7ca26311eb546bdf67307dac7856, type: 2}

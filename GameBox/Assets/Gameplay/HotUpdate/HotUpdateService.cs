@@ -74,26 +74,27 @@ namespace Box.Gameplay.HotUpdate
                     return;
                 }
 
-                // 2) 远程 catalog 更新(网络等待 5s 上限,超时/失败降级包内版本)
-                bool catalogOk;
+                // 2) 远程 catalog 更新(网络等待总上限 5s)。失败/超时 **不再放弃** ——
+                //    2026-09-03 断网空降级缺陷修复:source 已切内置兜底源(BuiltinHotUpdate 本地组),
+                //    步骤 3 起的装载走本地 location(零网络)。真到"内置也没有"才降级(裸机/数据异常)。
+                bool remoteOk;
                 try
                 {
-                    catalogOk = await _source.TryUpdateCatalogAsync()
+                    remoteOk = await _source.TryUpdateCatalogAsync()
                         .Timeout(TimeSpan.FromSeconds(5));
                 }
                 catch (TimeoutException)
                 {
-                    Debug.LogWarning("[HotUpdate] catalog 更新超时(5s),降级包内版本");
-                    return;
+                    _source.UseBuiltinFallback(); // 显式切内置(内层自切双保险)
+                    remoteOk = false;
                 }
-                if (!catalogOk)
+                if (!remoteOk)
                 {
-                    Debug.Log("[HotUpdate] catalog 无更新或不可用,保持包内版本");
-                    return;
+                    Debug.Log("[HotUpdate] catalog 更新失败/超时 → 内置兜底源继续尝试装载");
                 }
 
                 // 3) AOT 元数据先行(Consistent 模式:热更 dll 引用 AOT 类型/泛型时依赖元数据,缺一不可安全装载);
-                //    任一失败清缓存,下轮启动重试(不阻断本局,包内版本继续)
+                //    任一失败清缓存,下轮启动重试(不阻断本局;内置源下清缓存无用武之地但语义一致)
                 foreach (var aot in AotMetadataAssemblies)
                 {
                     var metadata = await _source.LoadMetadataAsync(aot);

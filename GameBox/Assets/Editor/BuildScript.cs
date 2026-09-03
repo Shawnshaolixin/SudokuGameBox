@@ -376,6 +376,20 @@ public static class BuildScript
             // 显式复位防残留(残留会把后续构建从 AAB 变成工程导出)
             EditorUserBuildSettings.exportAsGoogleAndroidProject = false;
 
+            // 1b) 热更内容生成(9-4 + 2026-09-03 内置兜底):GenerateAll 产物双写
+            //     RemoteContent(远程组)+ BuiltinHotUpdate(内置组),必须紧跟 GenerateAll(同一 strip 批次,
+            //     Consistent 模式要求 metadata 与包内剥离 AOT 逐字节一致),再进 BuildPlayerContent 打包
+            try
+            {
+                Phase9HybridCLRSetup.GenerateContent();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[BuildScript] BuildV11 GenerateContent failed: " + e.Message);
+                EditorApplication.Exit(1);
+                return;
+            }
+
             // 2) Addressables 资源(先代码后资源,代码失败早暴露)
             try
             {

@@ -31,8 +31,12 @@ description: v1.1(HybridCLR)热更 APK 构建与远程内容部署全链(四段�
 | 改动类型 | 需要 |
 |---|---|
 | 改热更 dll(Box.HotUpdate.*) | 全链(四段 + 部署) |
-| 改 AOT 白名单程序集(Box.UI/Box.Gameplay 等主包代码) | 全链 —— **GenerateContent 必跑**(strip 产物变 → 远程 metadata 必须同步,坑⑧ 复发点) |
+| 改 AOT 白名单程序集(Box.UI/Box.Gameplay 等主包代码) | 全链 —— **GenerateContent 必跑**(strip 产物变 → 远程+内置 metadata 必须同步,坑⑧⑩ 复发点) |
 | 只改远程内容配置/overrides | 仅 GenerateContent → BuildAll → 部署 |
+
+> **2026-09-03 起(BuildV11 内插 GenerateContent,坑⑩ 修复)**:阶段 ② 内部已自动执行 GenerateContent 双写
+> (RemoteContent 远程组 + BuiltinHotUpdate 内置兜底组,紧跟 GenerateAll 保证与包内 AOT 同批)。
+> **改 AOT/热更代码后出包 = 内置副本自动同批刷新,无需单独跑 ③**;③ 仅用于"不改代码、只刷新远程素材"的轻量轮。
 
 ### 2. 四段构建(串行,每段单独 -executeMethod,建议后台跑)
 
@@ -73,11 +77,12 @@ ADB=".../platform-tools/adb.exe"
 sleep 12 && "$ADB" logcat -d | grep -E "已装载|程序集已装载|模块清单已按远程|HotViewBinder|降级"
 ```
 
-通过标志(约 4s):`5× AOT 元数据已装载(Box.UI/System.Core/UniTask/UnityEngine.CoreModule/mscorlib)` + `2× 程序集已装载(Box.HotUpdate.Core/Sudoku)` + `模块清单已按远程 overrides 刷新 v1.1.0`。
-降级(出现 `catalog 检查失败(降级包内版本)`)排查顺序:① 内容是否已部署到当前 APK 指向的通道(URL 常量)② 缓存键(换 URL 才自动失效;同 URL 改内容后旧缓存 → 卸载重装)③ 服务器日志。
+通过标志(在线,约 4s):`5× AOT 元数据已装载(Box.UI/System.Core/UniTask/UnityEngine.CoreModule/mscorlib)` + `2× 程序集已装载(Box.HotUpdate.Core/Sudoku)` + `模块清单已按远程 overrides 刷新 v1.1.0`。
+通过标志(断网/直连不可达,2026-09-03 坑⑩ 修复后):远程装载失败日志(RemoteProviderException / Dependency)后跟 `固化切内置兜底源`(或 catalog 预切换日志)→ 同一套 `5× metadata + 2× dll 已装载`(走 BuiltinHotUpdate 本地组,零网络)→ 数独可玩。
+**坑⑩ 教训:别用"catalog 检查成功/失败"判远程可用** —— Addressables 把 hash 下载失败吞成"无更新",catalog 成功但 bundle 下载失败也常见;装载层(LoadWithFallbackAsync)任何失败自动固化切内置才是最终防线。内置兜底缺内容 = 新包没重打(GenerateContent 在 BuildV11 内部自动跑,勿手删 BuiltinHotUpdate)。
 进入对局页应见:`missing script(Box.HotUpdate.Sudoku.GameplayView)` 警告后紧跟 `[HotViewBinder] 运行时附加热更视图`(桥修复正常;只见 missing 不见 binder = 桥缺失或类型未解析)。
 
-## 坑速查(细节见 10 文档 §16.5 表,共 9 条 + 复盘)
+## 坑速查(细节见 10 文档 §16.5 表,共 10 条 + 复盘)
 
 | 坑 | 症状 | 一句话对策 |
 |---|---|---|
@@ -88,11 +93,13 @@ sleep 12 && "$ADB" logcat -d | grep -E "已装载|程序集已装载|模块清�
 | ⑥ 目录错位 | 服务器 404 但文件在 | serve/站点根必须是部署根,URL `/Android/` 首段命中 |
 | ⑧ metadata | `装载 AOT 元数据 X 失败(metadata type not match)` | 改 AOT 代码后必须 GenerateContent+BuildAll 重产远程 metadata |
 | ⑨ 组件丢失 | 棋盘缺失/按钮死/零日志 | 热更视图组件不进 prefab/场景,经 HotViewBinder AOT 桥运行时附加(架构纪律) |
+| ⑩ 断网空降级 | 断网冷启动进不去:`入口类型不可用` | 内置兜底组 HotUpdate_Builtin(随包)+ 装载层失败自动固化切内置(LoadWithFallbackAsync);**切换点绝不只在 catalog 阶段**(Addressables 吞失败/下载失败在 LoadAsset 期) |
 | 设备缓存 | 改内容后行为不变、服务器无请求 | UnityWebRequest 磁盘缓存,卸载重装才是彻底清场 |
 
 ## 红线(提交前核对)
 
 - ServerData/`firebase-hosting/public/*/Android/` 内容不入库(gitignore 已配);编辑器 profile 变量 RemoteHostURL 保持开发值;RemoteServerUrl 仓库保持 staging 分支(#if 双值,生产 URL 只在发布注入的 BOX_REMOTE_PRODUCTION 分支)。
+- 内置兜底:生成物 `Assets/BuiltinHotUpdate/`(含 .meta)不入库(gitignore 已配);**组资产 `AssetGroups/HotUpdate_Builtin.asset` + Schema 资产必须入库**(与 HotUpdate_Local 同套路,丢组 = 内置打包失效 = 断网裸奔);content_state.bin 变化随包入库。
 - 发布 AAB:PrepareV11 前 `export BOX_REMOTE_URL=production`(与 BOX_KEYSTORE_PASS 同 env 范式,17 文档 §6);不设 = staging(dev 包),BuildV11 收尾自动移除符号,无残留。
 - 代码注释必须中文;commit 中文 `type(模块): 描述`;只提交本次相关文件(水排序线文件不混入)。
 - 正式上架 AAB 不走本 skill(走 build-android-aab:签名 + BOX_KEYSTORE_PASS 注入 + jarsigner 验证 + BOX_REMOTE_URL 注入)。

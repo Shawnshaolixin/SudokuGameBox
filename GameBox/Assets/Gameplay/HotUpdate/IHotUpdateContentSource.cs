@@ -14,7 +14,10 @@ namespace Box.Gameplay.HotUpdate
     /// </summary>
     public interface IHotUpdateContentSource
     {
-        /// <summary>检查并应用远程 catalog 更新;无更新或成功返回 true,网络失败返回 false。</summary>
+        /// <summary>
+        /// 检查并应用远程 catalog 更新。true = 远程可用(继续远程装载);false = 远程不可用
+        /// (实现方已自动切内置兜底源,调用方应继续走装载链,由内置 location 兜底或最终降级)。
+        /// </summary>
         UniTask<bool> TryUpdateCatalogAsync();
 
         /// <summary>加载热更程序集 dll 字节(按程序集名,无资源返回 null)。</summary>
@@ -25,6 +28,12 @@ namespace Box.Gameplay.HotUpdate
 
         /// <summary>加载远程模块清单 JSON;无资源返回 null。</summary>
         UniTask<string> LoadOverridesJsonAsync();
+
+        /// <summary>
+        /// 通知源切换内置兜底(由编排层在总超时后触发;源内 catalog 失败自切为双保险)。
+        /// 无内置副本语义的实现(如测试 mock)可为空实现。
+        /// </summary>
+        void UseBuiltinFallback();
 
         /// <summary>清理内容缓存(Assembly.Load 失败时调用,下轮启动重试)。</summary>
         UniTask ClearCacheAsync();
@@ -56,6 +65,15 @@ namespace Box.Gameplay.HotUpdate
         public const string DllAddressPrefix = "HotUpdate/Dll/";
         public const string MetadataAddressPrefix = "HotUpdate/Metadata/";
         public const string OverridesAddress = "HotUpdate/module_overrides";
+
+        // ===== 内置兜底地址(2026-09-03 断网空降级修复):BuiltinHotUpdate 本地组随主包内置,=====
+        // 与远程内容同源同批(strip 产物副本);catalog 网络检查失败 → 自动切内置源继续装载,
+        // 断网/远程不可达时玩法代码仍可装载(真"包内版本兜底",v1.1 剥离后不再裸奔)。
+        public const string BuiltinDllAddressPrefix = "BuiltinHotUpdate/Dll/";
+        public const string BuiltinMetadataAddressPrefix = "BuiltinHotUpdate/Metadata/";
+
+        /// <summary>是否切到内置兜底源(进程内一次性:网络失败后本进程不再尝试远程)。</summary>
+        public bool UseBuiltinContent { get; private set; }
 
         /// <summary>
         /// 远程加载路径的 profile 变量名(与编辑器 Remote.LoadPath="{RemoteHostURL}/[BuildTarget]" 对应)。
@@ -94,7 +112,13 @@ namespace Box.Gameplay.HotUpdate
                 location.InternalId.Replace(RemoteHostVariableName, RemoteServerUrl);
         }
 
-        /// <summary>catalog 更新失败/异常一律视为"无更新可用",调用方继续走包内版本。</summary>
+        /// <summary>
+        /// catalog 更新(网络等待 5s 上限,内聚于此 —— 超时与失败同语义)。
+        /// 返回 true = 远程就绪(继续远程装载);false = 远程不可用,已自动切内置兜底源
+        /// (UseBuiltinContent=true),调用方继续尝试装载(内置 location 零网络)。
+        /// 2026-09-03 前语义为"false = 无更新,调用方降级包内版本" —— 修复断网空降级缺陷后,
+        /// 调用方(HotUpdateService)不再因 false 放弃,而是走内置源兜底(见 RunAsync 注释)。
+        /// </summary>
         public async UniTask<bool> TryUpdateCatalogAsync()
         {
             try
@@ -102,23 +126,65 @@ namespace Box.Gameplay.HotUpdate
                 // 确保远程地址改写已生效(构造函数已装,此处兜底防外部覆盖)
                 Addressables.InternalIdTransformFunc = location =>
                     location.InternalId.Replace(RemoteHostVariableName, RemoteServerUrl);
-                var catalogs = await AwaitHandleAsync(Addressables.CheckForCatalogUpdates());
+                var catalogs = await AwaitHandleAsync(Addressables.CheckForCatalogUpdates())
+                    .Timeout(TimeSpan.FromSeconds(5));
                 if (catalogs == null || catalogs.Count == 0) return true;
-                await AwaitHandleAsync(Addressables.UpdateCatalogs(catalogs));
+                await AwaitHandleAsync(Addressables.UpdateCatalogs(catalogs))
+                    .Timeout(TimeSpan.FromSeconds(5));
                 return true;
             }
             catch (Exception e)
             {
-                Debug.LogWarning($"[HotUpdate] catalog 检查失败(降级包内版本): {e.Message}");
+                // 远程不可达(断网/服务器停/超时)→ 切内置兜底源,本进程不再尝试远程
+                UseBuiltinContent = true;
+                Debug.LogWarning($"[HotUpdate] catalog 检查失败,切内置兜底源继续装载: {e.Message}");
                 return false;
             }
         }
 
+        /// <summary>
+        /// 加载热更 dll:内置兜底态直接走本地组;否则先试远程,**远程失败(任何原因)自动固化切内置再试一次**。
+        /// </summary>
         public async UniTask<byte[]> LoadDllAsync(string assemblyName) =>
-            await LoadTextAssetBytesAsync(DllAddressPrefix + assemblyName);
+            await LoadWithFallbackAsync(DllAddressPrefix, BuiltinDllAddressPrefix, assemblyName);
 
+        /// <summary>
+        /// 加载 AOT 元数据:同上。Consistent 模式要求与包内剥离 AOT 一致 → 切换一旦发生即整链固化内置,
+        /// 杜绝远程/内置混载(两者理论上同批,但混载无必要且引入一致性风险)。
+        /// </summary>
         public async UniTask<byte[]> LoadMetadataAsync(string assemblyName) =>
-            await LoadTextAssetBytesAsync(MetadataAddressPrefix + assemblyName);
+            await LoadWithFallbackAsync(MetadataAddressPrefix, BuiltinMetadataAddressPrefix, assemblyName);
+
+        /// <summary>
+        /// 双地址装载(2026-09-03 二次修复核心):切换点**后置到装载层**。
+        /// catalog 阶段的成败判定不可靠 —— ①Addressables 把远程 hash 下载失败静默吞成"无更新"(CheckCatalogsOperation
+        /// 仅当全部失败才报错,部分失败/吞失败均静默放行);②catalog 检查/更新成功但 bundle 实际下载失败(SSL/断网/服务器坏)
+        /// 时错误发生在 LoadAsset 阶段,catalog 阶段无从感知。因此:任何一次首选源装载失败 → 切内置再试,
+        /// 失败即固化 UseBuiltinContent(本进程后续装载全走本地,零网络),内置也没有才返回 null 由编排层降级。
+        /// </summary>
+        async UniTask<byte[]> LoadWithFallbackAsync(string primaryPrefix, string builtinPrefix, string assetName)
+        {
+            var bytes = await LoadTextAssetBytesAsync((UseBuiltinContent ? builtinPrefix : primaryPrefix) + assetName);
+            if (bytes != null || UseBuiltinContent) return bytes;
+            SwitchToBuiltin(assetName); // 首选源失败(远程不可达/内容缺失/吞失败) → 固化切内置
+            return await LoadTextAssetBytesAsync(builtinPrefix + assetName);
+        }
+
+        /// <summary>固化切内置兜底源(幂等;切换点:catalog 阶段预切换 + 装载层失败兜切换,双保险)。</summary>
+        void SwitchToBuiltin(string assetName)
+        {
+            if (UseBuiltinContent) return;
+            UseBuiltinContent = true;
+            Debug.LogWarning($"[HotUpdate] 装载 {assetName} 失败,固化切内置兜底源(后续零网络)");
+        }
+
+        /// <summary>显式切内置兜底源(编排层总超时兜底;置位后本进程后续装载全走本地,零网络)。</summary>
+        public void UseBuiltinFallback()
+        {
+            if (UseBuiltinContent) return;
+            UseBuiltinContent = true;
+            Debug.LogWarning("[HotUpdate] catalog 更新总超时,切内置兜底源继续装载");
+        }
 
         public async UniTask<string> LoadOverridesJsonAsync()
         {
