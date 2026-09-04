@@ -59,7 +59,8 @@ crashlytics-build.properties
 # content_state.bin 必须入库（Phase 9 9-4:丢失则无法做 Content Update 增量更新,故显式放行;
 # 实际产物在 [BuildTarget] 子目录:AddressableAssetsData/Android/）
 !GameBox/Assets/AddressableAssetsData/Android/addressables_content_state.bin
-# Addressables 构建自动生成的 link.xml(地址资源类型 preserve 白名单,每次构建重写,生成物不入库)
+# Addressables 构建自动生成的 link.xml(地址资源类型 preserve 白名单,每次构建重写,生成物不入库;
+# 合并 main 1ce15db 时两侧独立提交同一条规则,此处保留一份)
 GameBox/Assets/AddressableAssetsData/link.xml
 GameBox/Assets/AddressableAssetsData/link.xml.meta
 # 远程内容构建产物(Phase 9 9-4:ServerData 为 Remote.BuildPath 输出,红线 9 不入库)
@@ -123,10 +124,24 @@ GameBox/Assets/GeneratedLocalRepo.meta
 # 编辑器崩溃恢复目录
 GameBox/Assets/_Recovery/
 GameBox/Assets/_Recovery.meta
+# HybridCLR 生成产物(AOTGenericReferences/link.xml,编辑器 Generate 生成,可重建)
+GameBox/Assets/HybridCLRGenerate/
+GameBox/Assets/HybridCLRGenerate.meta
+# HybridCLR 构建中间产物(热更 DLL/剥离 AOT DLL/il2cpp 工程/第三方仓库克隆,体积大且可重建)
+GameBox/HybridCLRData/
 # External Dependency Manager 解析产物(Firebase aar,构建时自动生成)
 GameBox/Assets/Plugins/Android/FirebaseApp.androidlib/
 GameBox/Assets/Plugins/Android/FirebaseCrashlytics.androidlib/
 GameBox/Assets/Plugins/Android/*.androidlib.meta
+# Phase 9 热更构建产物(内置/远程热更 DLL 与元数据拷贝,HydridCLR 构建时生成,可重建)
+GameBox/Assets/BuiltinHotUpdate/
+GameBox/Assets/BuiltinHotUpdate.meta
+GameBox/Assets/RemoteContent/
+GameBox/Assets/RemoteContent.meta
+# Addressables 构建输出与热更部署产物(ServerData 为默认 LocalBuildPath;部署目录为拷贝/上传用,均可重建)
+GameBox/ServerData/
+_deploy_remote/
+firebase-hosting/
 
 # HybridCLR 生成目录(Phase 9 9-1:Install 注入的 il2cpp 运行时 + GenerateAll 产物,可重跑生成,不入库)
 GameBox/HybridCLRData/
