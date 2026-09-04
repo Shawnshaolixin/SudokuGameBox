@@ -41,6 +41,9 @@ public static class WaterSortViewSetup
     const string PrefabAddress = "UI/WaterSortView";
     const string LevelsAddress = "WaterSort/Levels/regular_levels.json";
 
+    const int ReverifyTimeLimitMs = 2000; // 逐关复证限时:离线批处理无 UX 约束,2s 吸收生成/复证
+                                           // 两时点的墙钟抖动(400ms 复证曾现 #50 假超时,见 VerifyLevelsJson)
+
     const int DemoLevelCount = 12;   // M1.3 demo 题库(开发期冒烟用)
     const int FullLevelCount = 100;  // M1.5 首批正式题库(≥100 关,WS-03;数量即内容形态,切换即重写)
     const int SeedBase = 0x5757;     // 关号种子基(稳定复现;demo 包与最终题库同管线同种子域)
@@ -59,6 +62,13 @@ public static class WaterSortViewSetup
     /// <summary>首批正式题库 100 关(CLI -executeMethod 无参入口;统计见日志,分布可复核)。</summary>
     [MenuItem("Box/WaterSort/Build View Prefab + Levels(100 full)")]
     public static void BuildFull100() => BuildInternal(FullLevelCount);
+
+    /// <summary>
+    /// M2.2 题库重生成入口:档位表 M2.1 定版后强制重生成 100 关(数量未变幂等判定会跳过,故走 force),
+    /// 同种子域(0x5757)可复现;日志含吞吐/尝试统计(M2.2 验收证据,见 docs/19 附录 A.4)。
+    /// </summary>
+    [MenuItem("Box/WaterSort/Build Levels(100 full, M2.2 强制重生成)")]
+    public static void BuildFull100Regen() => BuildInternal(FullLevelCount, forceLevels: true);
 
     /// <summary>
     /// M2.1 难度代理校准数据任务(WS-03 AC「出包前题库采样校准」正式跑数;CLI 无参入口):
@@ -115,13 +125,13 @@ public static class WaterSortViewSetup
                   $"max={r.MaxSteps} avg={r.AvgSteps:F1} 耗时={r.TotalMs}ms");
     }
 
-    static void BuildInternal(int levelCount)
+    static void BuildInternal(int levelCount, bool forceLevels = false)
     {
         EnsureFolders();
         BuildPrefab();
         EnsureGroup();
         RegisterPrefabEntry();
-        GenerateLevelsJson(levelCount);
+        GenerateLevelsJson(levelCount, forceLevels);
         RegisterLevelsEntry();
         EnsureModuleEntry(); // 清单接入(幂等):大厅 More Games 入口新增「水排序」
         AssetDatabase.SaveAssets();
@@ -324,22 +334,34 @@ public static class WaterSortViewSetup
 
     // ---- ② 关卡 JSON(数量变化才重写;同种子确定性,重复执行内容一致) ----
 
-    static void GenerateLevelsJson(int levelCount)
+    static void GenerateLevelsJson(int levelCount, bool force = false)
     {
-        // 幂等判定:文件缺失或关数与目标不一致 → 重生成(数量 = 内容形态,见 M1.3/M1.5 交接)
-        if (File.Exists(LevelsJsonPath) && LoadLevelsCount() == levelCount) return;
+        // 幂等判定:文件缺失或关数与目标不一致 → 重生成(数量 = 内容形态,见 M1.3/M1.5 交接);
+        // force(M2.2)绕过:档位表定版后数量未变但规格窗已改,旧题需按新窗重落档
+        if (!force && File.Exists(LevelsJsonPath) && LoadLevelsCount() == levelCount) return;
 
         var pack = new WaterSortLevelPack();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        long attemptsTotal = 0;
+        int maxAttempts = 0;
         for (int i = 1; i <= levelCount; i++)
         {
-            var level = GenerateOne(i);
+            var level = GenerateOne(i, out int attempts);
+            attemptsTotal += attempts;
+            maxAttempts = System.Math.Max(maxAttempts, attempts);
             if (level == null)
             {
-                Debug.LogError($"[WaterSortSetup] 第 {i} 关生成失败(40 次重洗全不中档),终止");
+                Debug.LogError($"[WaterSortSetup] 第 {i} 关生成失败(50 次种子平移全不中档),终止");
                 return;
             }
             pack.levels.Add(level);
         }
+        sw.Stop();
+        // 吞吐统计(M2.2 NFR 实测记录;关/分 = 100 / (总耗时分))
+        double totalSec = sw.ElapsedMilliseconds / 1000.0;
+        Debug.Log($"[WaterSortSetup] 题库生成吞吐: {levelCount} 关 / {totalSec:F1}s = " +
+                  $"{levelCount / (totalSec / 60.0):F1} 关/分;均 {sw.ElapsedMilliseconds / (double)levelCount:F0}ms/关; " +
+                  $"总散射尝试 {attemptsTotal}(均 {attemptsTotal / (double)levelCount:F0}/关,单关最多 {maxAttempts})");
         // UTF-8 无 BOM(JsonUtility 原生字段名,与运行时反序列化一一对应)
         File.WriteAllText(LevelsJsonPath, JsonUtility.ToJson(pack, true));
         AssetDatabase.ImportAsset(LevelsJsonPath); // 生成为 TextAsset 资产(Addressables 可入库)
@@ -374,16 +396,21 @@ public static class WaterSortViewSetup
         return "  === 题库分布 ===\n" + sb.ToString().TrimEnd();
     }
 
-    /// <summary>按关号生成一关:默认规格 + 固定种子;种子失败则就近平移重试(最多 49 次)。</summary>
-    static WaterSortLevelData GenerateOne(int levelNo)
+    /// <summary>
+    /// 按关号生成一关:默认规格 + 固定种子;种子失败则就近平移重试(最多 49 次)。
+    /// attempts 输出实际散射尝试次数(M2.2 吞吐留档:r.Succeeded 为 false 时 = 50 全耗)。
+    /// </summary>
+    static WaterSortLevelData GenerateOne(int levelNo, out int attempts)
     {
         var spec = WaterSortGenDefaults.SpecForIndex(levelNo);
         for (int k = 0; k < 50; k++)
         {
             var r = WaterSortLevelGen.Generate(spec, SeedBase + levelNo * 7919 + k);
+            attempts = k + 1;
             if (!r.Succeeded) continue;
             return WaterSortLevelCodec.Encode(r.Board, levelNo, spec.Difficulty, r.MeasuredSteps);
         }
+        attempts = 50;
         return null;
     }
 
@@ -400,6 +427,100 @@ public static class WaterSortViewSetup
         {
             Debug.LogWarning("[WaterSortSetup] 现有题库读取失败,将重生成: " + e.Message);
             return -1;
+        }
+    }
+
+    /// <summary>
+    /// M2.2 逐关验收工具(CLI 无参入口):JSON 反序列化 → 逐关 TryDecode → SolveAny 复证可解
+    /// (限时 2s,见 ReverifyTimeLimitMs——400ms 对墙钟抖动敏感曾现假超时)
+    /// → 断言 measuredSteps/colors 落在 SpecForIndex 档窗内(档位表 M2.1 定版后数据一致性背向校验)。
+    /// 输出按难度分段的步数统计 + 失败清单;任一关失败即 LogError(CLI 批处理日志可抓),全绿则
+    /// Debug.Log 输出验收摘要(供 M2 验收留档:100 关全可解 + 无档窗越界)。
+    /// </summary>
+    [MenuItem("Box/WaterSort/Verify Levels Pack(逐关验证)")]
+    public static void VerifyLevelsJson()
+    {
+        if (!File.Exists(LevelsJsonPath))
+        {
+            Debug.LogError("[WaterSortSetup] 题库 JSON 缺失,请先生成: " + LevelsJsonPath);
+            return;
+        }
+        var pack = JsonUtility.FromJson<WaterSortLevelPack>(File.ReadAllText(LevelsJsonPath));
+        if (pack == null || pack.levels == null || pack.levels.Count == 0)
+        {
+            Debug.LogError("[WaterSortSetup] 题库 JSON 为空或损坏,无法验收");
+            return;
+        }
+        var sb = new System.Text.StringBuilder();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        int[] count = new int[3], windowFail = new int[3], solveFail = new int[3], colorFail = new int[3];
+        int[] min = { int.MaxValue, int.MaxValue, int.MaxValue };
+        int[] max = new int[3];
+        long[] sum = new long[3];
+        var failures = new System.Collections.Generic.List<string>();
+        long solveMsTotal = 0;
+        foreach (var l in pack.levels)
+        {
+            int d = (int)l.difficulty;
+            var spec = WaterSortGenDefaults.SpecForIndex(l.id);
+            // 档窗自洽:难度标签必须与 SpecForIndex 一致(标签由规格决定,漂移即生成管线断裂)
+            if (spec.Difficulty != l.difficulty)
+            {
+                failures.Add($"#{l.id} 难度标签 {l.difficulty} 与档窗 {spec.Difficulty} 不一致");
+                continue;
+            }
+            if (l.colors < spec.MinColors || l.colors > spec.MaxColors)
+            {
+                colorFail[d]++;
+                failures.Add($"#{l.id} 色数 {l.colors} 越档窗 [{spec.MinColors},{spec.MaxColors}]");
+                continue;
+            }
+            if (l.measuredSteps < spec.MinSteps || l.measuredSteps > spec.MaxSteps)
+            {
+                windowFail[d]++;
+                failures.Add($"#{l.id} 落档步数 {l.measuredSteps} 越档窗 [{spec.MinSteps},{spec.MaxSteps}]");
+                continue;
+            }
+            count[d]++;
+            min[d] = System.Math.Min(min[d], l.measuredSteps);
+            max[d] = System.Math.Max(max[d], l.measuredSteps);
+            sum[d] += l.measuredSteps;
+            // 复证可解:同引擎重解——DFS 遍历序确定性,但 400ms 截断对墙钟抖动敏感(#50 首跑即现
+            // TimedOut 假失败:生成期限内完成、复证期同限时越线),故放宽至 2s(离线批处理无 UX 时限);
+            // 仍超时 = 真异常(窗内 ≤34 步的题 2s 找不出解,判数据损坏)。
+            if (!WaterSortLevelCodec.TryDecode(l, out var board))
+            {
+                solveFail[d]++;
+                failures.Add($"#{l.id} 解码失败(tubes 形状不符)");
+                continue;
+            }
+            var solveSw = System.Diagnostics.Stopwatch.StartNew();
+            var res = WaterSortSolver.SolveAny(board, ReverifyTimeLimitMs);
+            solveSw.Stop();
+            solveMsTotal += solveSw.ElapsedMilliseconds;
+            if (!res.Solved || res.TimedOut)
+            {
+                solveFail[d]++;
+                failures.Add($"#{l.id} 复证不可解(TimedOut={res.TimedOut},Solved={res.Solved})");
+            }
+        }
+        sw.Stop();
+        sb.AppendLine("=== M2.2 逐关验收 ===");
+        for (int d = 0; d < 3; d++)
+        {
+            if (count[d] == 0) continue;
+            var name = ((WaterSortDifficulty)d).ToString();
+            sb.AppendLine($"  [{name}] {count[d]} 关全过解码+复证可解,步数 {min[d]}~{max[d]}" +
+                          $"(均值 {sum[d] / (double)count[d]:0.0});越窗 {windowFail[d]} 色数越档 {colorFail[d]}");
+        }
+        if (failures.Count == 0)
+        {
+            Debug.Log($"[WaterSortSetup] 验收通过: {pack.levels.Count} 关逐关解码 + 复证可解 + 档窗自洽,全绿" +
+                      $"(复证耗时 {solveMsTotal}ms,验收总耗时 {sw.ElapsedMilliseconds}ms)\n" + sb.ToString().TrimEnd());
+        }
+        else
+        {
+            Debug.LogError($"[WaterSortSetup] 验收失败 {failures.Count} 项:\n{string.Join("\n", failures)}");
         }
     }
 
