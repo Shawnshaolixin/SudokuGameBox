@@ -1,7 +1,11 @@
 {
     "name": "Box.HotUpdate.Core",
     "rootNamespace": "Box.HotUpdate.Core",
-    "references": [],
+    "references": [
+        "Box.Services.Abstractions",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

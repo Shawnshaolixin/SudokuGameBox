@@ -158,6 +158,12 @@ namespace Box.Services
             { "watersort.ad.double", "观看完整广告,首通金币奖励翻倍(每关最多 {0} 次)" },
             { "watersort.btn.double", "翻倍奖励" }, // 结算翻倍按钮(仅首通结算显示)
             { "watersort.btn.doubled", "已翻倍" },  // 翻倍完成后按钮文案(禁用态)
+
+            // 新手引导(M3.3,WS-14):首次 3 步(点击倒水/同色聚合/卡关求助)+ 跳过;步数走 WaterSortConfig
+            { "watersort.tutorial.pour", "点选一根试管,再点另一根,把水倒过去" },
+            { "watersort.tutorial.merge", "把相同颜色的水倒到一起,它们会叠起来" },
+            { "watersort.tutorial.hint", "卡住了?点「提示」,它会帮你走一步" },
+            { "watersort.tutorial.skip", "跳过引导" },
         };
 
         static readonly Dictionary<string, string> _en = new Dictionary<string, string>
@@ -261,6 +267,12 @@ namespace Box.Services
             { "watersort.ad.double", "Watch a full ad to double your first-win coins (up to {0} per level)" },
             { "watersort.btn.double", "Double Reward" },
             { "watersort.btn.doubled", "Doubled" },
+
+            // Onboarding (M3.3, WS-14): 3 first-run steps (tap-to-pour / same-color merge / stuck hint) + skip
+            { "watersort.tutorial.pour", "Tap a tube, then tap another to pour the water." },
+            { "watersort.tutorial.merge", "Pour matching colors onto each other to stack them." },
+            { "watersort.tutorial.hint", "Stuck? Tap Hint to take one step." },
+            { "watersort.tutorial.skip", "Skip" },
         };
     }
 }

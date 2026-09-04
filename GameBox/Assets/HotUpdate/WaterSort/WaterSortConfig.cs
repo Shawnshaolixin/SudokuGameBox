@@ -23,6 +23,10 @@ namespace Box.HotUpdate.WaterSort
         // 结算翻倍(WS-12 第三点位):仅首通奖励可翻倍——看完激励视频按首通奖励额再加发一份(合计 2×)
         public static int RewardDoubleLimitPerLevel = 1; // 每关可翻倍次数(StartLevel 复位)
 
+        // 新手引导(WS-14,M3.3):首次进入常规第 1 关时播 ≤N 步(点击倒水/同色聚合/卡关求助);
+        // 引导期零广告(过关计数豁免 + 提示演示免费,见 WaterSortView 引导区注释);0 = 不开引导
+        public static int OnboardingStepCount = 3;
+
         // 首通奖励(WS-08):仅首通发放(重玩/已解锁关卡通关不发),随关号线性递增至封顶
         public static int FirstWinRewardBase = 20;      // 第 1 关奖励
         public static int FirstWinRewardStep = 4;       // 每关递增步长

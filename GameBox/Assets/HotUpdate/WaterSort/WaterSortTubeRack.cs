@@ -42,6 +42,13 @@ namespace Box.HotUpdate.WaterSort
         /// <summary>绑定会话(视图在会话就绪后调用一次;盘面以 Refresh 为准,无需重复设置)。</summary>
         public void SetSession(WaterSortSession session) => _session = session;
 
+        /// <summary>指定序号的试管根节点(Refresh 后有效,序 = 当前盘面管序)——引导第 2 步高亮定位用。</summary>
+        public RectTransform Tube(int index)
+        {
+            if (_self == null || index < 0 || index >= transform.childCount) return null;
+            return (RectTransform)transform.GetChild(index);
+        }
+
         /// <summary>按盘面重建全部试管(倒水/撤销/重开/换关后由视图调用)。</summary>
         public void Refresh()
         {

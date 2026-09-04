@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using Box.HotUpdate.Core.Onboarding;
 using Box.ModuleFramework;
 using Box.Services;
 using Box.UI;
@@ -79,6 +81,9 @@ namespace Box.HotUpdate.WaterSort
         int _dailySeed;                          // 本局每日挑战归属日期种子(开局取;结算按此落完成,防跨零点错记)
         WaterSortTubeRack _rack;     // 试管区渲染与点击(OnCreate 挂到 TubeArea;随视图销毁)
         int _totalLevels;            // 题库总量(结算面板「下一关」放行判定:仅推进且有后关才可点)
+        TutorialFlow _tut;           // 新手引导流程(M3.3,WS-14;null=未开播/已收尾,见「新手引导」区)
+        int _tutNonMergePours;       // S2 放行计数:无聚合演示对时连续普通倒水次数(见 TutorialS2GracePours)
+        int _tutPairA = -1, _tutPairB = -1; // 当前盘「同色聚合」演示对(试管索引;-1=无,随盘面刷新重扫)
 
         protected override void Awake()
         {
@@ -163,6 +168,7 @@ namespace Box.HotUpdate.WaterSort
                 // OnHide 仅由「本视图被 Pop」触发(见类头退出纪律):关闭即离开模块 → 复位模块状态,
                 // 否则 Loader 认为模块仍在运行,玩家无法再次进入(watersort 卡 Active)。
                 _leaving = true;
+                CancelTutorial(); // 退模块必摘引导(状态保留 InProgress,重进第 1 关续播)
                 if (_session != null && _session.IsInLevel) LogLevelAbandon(); // 对局中直接离开:埋点弃局
                 ModuleLoader.Instance?.ExitAsync(WaterSortModule.ModuleId).Forget();
             }
@@ -182,6 +188,7 @@ namespace Box.HotUpdate.WaterSort
             if (_dailyPanel != null) _dailyPanel.gameObject.SetActive(p == Panel.Daily);
             if (_gamePanel != null) _gamePanel.gameObject.SetActive(p == Panel.Game);
             if (_settlePanel != null) _settlePanel.gameObject.SetActive(p == Panel.Settle);
+            if (p != Panel.Game) CancelTutorial(); // 引导只在对局面板存在(离开 = 中断,状态保留下次续播)
         }
 
         // ---- 选关面板 ---- //
@@ -356,6 +363,7 @@ namespace Box.HotUpdate.WaterSort
             ShowPanel(Panel.Game);
             ApplyLanguage(); // 标题切「第 N 关」文案
             RefreshTubeArea();
+            MaybeStartTutorial(); // 常规第 1 关首次/中断重进:开播新手引导(WS-14)
         }
 
         void OnBackToSelect()
@@ -397,13 +405,20 @@ namespace Box.HotUpdate.WaterSort
                 _stepText.text = L10n.Format("watersort.step", _session.MoveCount);
             UpdateCoinLabel();       // 玩法内无全局金币事件(盒内暂无钱包组件),随每次盘面刷新就近同步
             SyncConsumeButtons();    // 上限/余额变化驱动提示与加管按钮禁用态(花钱点位不允许再点)
+            TutorialAfterBoardRefresh(); // 引导 S2 聚合演示对随盘面漂移:刷新后重扫重定位(M3.3)
         }
 
-        /// <summary>试管点击裁决:合法→会话推进(BoardChanged 驱动本区刷新);非法→源管抖动,选中保留可再试目标。</summary>
+        /// <summary>试管点击裁决:合法→会话推进(BoardChanged 驱动本区刷新);非法→源管抖动,选中保留可再试目标。
+        /// 引导局(M3.3)额外上报「是否同色聚合倒水」供第 2 步步进(判据与 Session 规则同源:非空 dst 顶层同色)。</summary>
         void OnPourRequested(int src, int dst)
         {
             if (_session == null || !_session.IsInLevel) return; // 面板切换竞态兜底
-            if (!_session.TryPour(src, dst)) _rack?.ShakeTube(src);
+            bool merging = false;
+            var b = _session.Board;
+            if (b != null && b.TopCount(src) > 0 && b.TopCount(dst) > 0
+                && b.TopColor(src) == b.TopColor(dst)) merging = true;
+            if (_session.TryPour(src, dst)) TutorialOnPourSucceeded(merging);
+            else _rack?.ShakeTube(src);
         }
 
         /// <summary>
@@ -415,6 +430,7 @@ namespace Box.HotUpdate.WaterSort
         void OnHint()
         {
             if (_session == null || !_session.IsInLevel) return; // 结算/选关面板按钮不可达,双保险
+            if (TutorialHintActive) { DoTutorialHintDemo(); return; } // 引导第 3 步:走免费演示(不扣币/不弹广告)
             if (_session.HintsUsed >= WaterSortConfig.HintLimitPerLevel) return;
             var save = ServiceLocator.Save;
             if (save != null && save.Coins >= WaterSortConfig.HintPriceCoins)
@@ -530,7 +546,9 @@ namespace Box.HotUpdate.WaterSort
             if (_session == null) return;
             // 过关计数(M3.2 全局频控,WS-12):常规/每日首解瞬间统一上报;展示只发生在结算 Hub 出口
             // (LeaveToHubAfterSettle)——连关/重开只计数不插屏,计数与展示解耦(数独侧同构)。
-            ServiceLocator.Ads?.NotifyLevelCompleted();
+            // 引导期解关 = 已会玩:整段引导提前收尾(Done),本局不上报过关计数(WS-14 引导期间零广告)。
+            if (_tut is { IsActive: true }) _tut.Finish();
+            else ServiceLocator.Ads?.NotifyLevelCompleted();
             if (_session.IsDaily)
             {
                 // 每日挑战(WS-09):不发首通奖、不推进常规解锁,只落「今日完成」(Streak 由 WaterSortDailyStore
@@ -790,6 +808,169 @@ namespace Box.HotUpdate.WaterSort
             var btn = FindInCard(path)?.GetComponent<BoxButton>();
             if (btn != null) btn.OnClick(handler);
         }
+
+        // ---- 新手引导(M3.3,WS-14;通用件在 Box.HotUpdate.Core.Onboarding,10 文档 §16.7 9.5 可复用) ----
+
+        /// <summary>引导状态分区键 gameId(OnboardingStore → box.onboarding.watersort,盒级共享分区)。</summary>
+        const string TutorialGameId = "watersort";
+        /// <summary>S2(同色聚合)无聚合对可演示时,连续 N 次普通成功倒水即放行进下一步(防盘面无可示对时卡教学)。</summary>
+        const int TutorialS2GracePours = 3;
+
+        /// <summary>开局落点(StartGame 尾部):常规(非每日)第 1 关 + 引导未收尾 → 开播 ≤N 步;收尾(Done/Skipped)
+        /// 或配置 0 步 → 不再播。中途离开对局面板/退模块时 CancelTutorial 保留 InProgress,重进第 1 关从头续播。
+        /// 引导期零广告(WS-14):过关计数豁免见 OnLevelSolved,提示演示免费见 DoTutorialHintDemo。</summary>
+        void MaybeStartTutorial()
+        {
+            if (_session == null || _session.IsDaily || _session.LevelId != 1
+                || OnboardingStore.IsFinished(TutorialGameId)) return;
+            var steps = new List<TutorialStepDef>
+            {
+                // S1 点击倒水:高亮整个试管区,任意一次成功倒水即过(TutorialOnPourSucceeded)
+                new TutorialStepDef("watersort.tutorial.pour", TubeAreaScreenRect),
+                // S2 同色聚合:动态目标 = 盘面当前可演示的「同色聚合」对包围盒(RescanTutorialPair 每刷重扫)
+                new TutorialStepDef("watersort.tutorial.merge", TutorialMergeScreenRect),
+                // S3 卡关求助:高亮提示按钮,点击走免费演示(DoTutorialHintDemo)
+                new TutorialStepDef("watersort.tutorial.hint", HintButtonScreenRect),
+            };
+            int n = Mathf.Clamp(WaterSortConfig.OnboardingStepCount, 0, steps.Count);
+            if (n <= 0) // 运营配置 0 步 = 不开引导:直接置 Done,避免每局白查
+            {
+                OnboardingStore.Set(TutorialGameId, OnboardingStatus.Done);
+                return;
+            }
+            _tutNonMergePours = 0;
+            _tut = TutorialFlow.Start(TutorialGameId, steps.GetRange(0, n), "watersort.tutorial.skip",
+                OnTutorialStepShown, OnTutorialEnded);
+            if (_tut != null) RescanTutorialPair(); // S1 步进后即切 S2,第一帧目标就要准
+        }
+
+        /// <summary>离开引导局(返回选关/每日主页/退模块):摘掩码,状态保留 InProgress —— 不弹「是否跳过」,
+        /// 也不静默吞掉引导(重进第 1 关从头再播;完成/跳过不走此路径)。</summary>
+        void CancelTutorial()
+        {
+            _tut?.Cancel();
+            _tut = null;
+        }
+
+        /// <summary>引导局成功倒水驱动(S1/S2 步进,OnPourRequested 成功分支调用):
+        /// S1 任意成功倒水 → 切 S2;S2 同色聚合倒水 = 规则实体演示 → 切 S3;
+        /// 无聚合可演示时连续普通倒水达 TutorialS2GracePours 次也放行(防教学卡死)。</summary>
+        void TutorialOnPourSucceeded(bool merging)
+        {
+            if (_tut == null || !_tut.IsActive) return;
+            if (_tut.StepIndex == 0)
+            {
+                RescanTutorialPair(); // 新盘面先扫聚合对,S2 首帧高亮即正确
+                _tut.Advance();
+                return;
+            }
+            if (_tut.StepIndex == 1)
+            {
+                if (merging) _tut.Advance(); // 真聚合倒水 = 教学达成
+                else if (++_tutNonMergePours >= TutorialS2GracePours) _tut.Advance();
+            }
+        }
+
+        /// <summary>盘面刷新接缝(RefreshTubeArea 尾部):S2 在场时重扫「同色聚合」对并重定位孔洞
+        /// (演示对随盘面漂移,静态矩形会指错;S1/S3 目标本身静态,无需刷新)。</summary>
+        void TutorialAfterBoardRefresh()
+        {
+            if (_tut == null || !_tut.IsActive || _tut.StepIndex != 1) return;
+            RescanTutorialPair();
+            _tut.RefreshTarget();
+        }
+
+        /// <summary>扫当前盘任一同色聚合合法移动(判据与 Session 同源:源顶层色 = 非空目标顶层色)。
+        /// 取第一对即可(演示语义,不追求最优);无对 → 双索引置 -1(S2 目标退回整个试管区)。</summary>
+        void RescanTutorialPair()
+        {
+            _tutPairA = _tutPairB = -1;
+            var b = _session?.Board;
+            if (b == null || b.IsSolved()) return;
+            foreach (var m in b.LegalMoves())
+            {
+                if (b.TopCount(m.Dst) > 0 && b.TopColor(m.Src) == b.TopColor(m.Dst))
+                {
+                    _tutPairA = m.Src;
+                    _tutPairB = m.Dst;
+                    return;
+                }
+            }
+        }
+
+        /// <summary>S2 高亮目标:聚合对两试管包围盒(屏幕像素矩形);对不存在/试管未重建 → 退回整个试管区
+        /// (泛引导不指错:玩家任意倒水也能继续)。</summary>
+        Rect TutorialMergeScreenRect()
+        {
+            var a = _rack != null && _tutPairA >= 0 ? _rack.Tube(_tutPairA) : null;
+            var b = _rack != null && _tutPairB >= 0 ? _rack.Tube(_tutPairB) : null;
+            if (a == null || b == null) return TubeAreaScreenRect();
+            var ra = ScreenRectOf(a);
+            var rb = ScreenRectOf(b);
+            return ra.width > 0f && rb.width > 0f ? UnionRect(ra, rb) : TubeAreaScreenRect();
+        }
+
+        Rect TubeAreaScreenRect() => ScreenRectOf(FindInCard("GamePanel/TubeArea") as RectTransform);
+        Rect HintButtonScreenRect() => ScreenRectOf(FindInCard("GamePanel/BottomBar/HintButton") as RectTransform);
+
+        /// <summary>S3 在场判定:引导激活且处于第 3 步(HintButton 高亮中)→ 提示点击走免费演示。</summary>
+        bool TutorialHintActive => _tut is { IsActive: true } && _tut.StepIndex == 2;
+
+        /// <summary>
+        /// 「卡关求助」演示(M3.3):真执行一次提示(落子后 BoardChanged 链自行刷新试管区,教学立即可见),
+        /// 但免费 —— 不扣金币、不弹激励确认(引导期零广告,WS-14);占用一次本关提示配额(与正常提示同额,
+        /// 引导一生只播一次,代价 = 首关提示余 2/3 次,见 WaterSortConfig.HintLimitPerLevel)。
+        /// 死角无法演示(CanHint 失败)时不误导,直接收尾引导。
+        /// </summary>
+        void DoTutorialHintDemo()
+        {
+            if (_tut == null) return;
+            if (_session == null || !_session.IsInLevel || !_session.CanHint())
+            {
+                _tut.Finish();
+                return;
+            }
+            _session.TryHint(); // 演示期必有解(上一步已 CanHint 预检);失败静默(超时边缘防御,不可达)
+            _tut.Finish();
+        }
+
+        /// <summary>步骤展示埋点(04 文档 §5 tutorial_step;step_index 从 1 起,运营侧直读)。
+        /// 跳过事件在 OnTutorialEnded 补发(接口仅单键值对,拆分上报)。</summary>
+        void OnTutorialStepShown(int stepIndex)
+            => ServiceLocator.Analytics?.LogEvent("watersort.tutorial_step", "step_index", stepIndex + 1);
+
+        /// <summary>引导收尾回调(完成/跳过都经此):跳过补 skipped 埋点;统一置空引用
+        /// (Done/Skipped 落盘由 TutorialFlow 内部完成,视图只管退出引导态)。</summary>
+        void OnTutorialEnded(bool finished)
+        {
+            if (!finished)
+                ServiceLocator.Analytics?.LogEvent("watersort.tutorial_step", "skipped", 1);
+            _tut = null;
+        }
+
+        /// <summary>控件 → 屏幕像素矩形(ScreenSpaceOverlay 下世界坐标即屏幕像素;TutorialMask.LocalizeRect 同系换算)。
+        /// 节点缺失/未激活(画布外)返回空矩形 → 掩码不挖洞只显示气泡(空安全降级,见 TutorialMask.ShowStep)。</summary>
+        static Rect ScreenRectOf(RectTransform rt)
+        {
+            if (rt == null) return default;
+            var corners = new Vector3[4];
+            rt.GetWorldCorners(corners);
+            float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+            for (int i = 0; i < 4; i++)
+            {
+                if (corners[i].x < minX) minX = corners[i].x;
+                if (corners[i].y < minY) minY = corners[i].y;
+                if (corners[i].x > maxX) maxX = corners[i].x;
+                if (corners[i].y > maxY) maxY = corners[i].y;
+            }
+            return new Rect(minX, minY, maxX - minX, maxY - minY);
+        }
+
+        /// <summary>两矩形包围盒(合并;S2 演示对 → 覆盖两试管的单个高亮窗)。</summary>
+        static Rect UnionRect(Rect a, Rect b)
+            => new Rect(Mathf.Min(a.xMin, b.xMin), Mathf.Min(a.yMin, b.yMin),
+                Mathf.Max(a.xMax, b.xMax) - Mathf.Min(a.xMin, b.xMin),
+                Mathf.Max(a.yMax, b.yMax) - Mathf.Min(a.yMin, b.yMin));
 
         void LogLevelAbandon() { } // M1 埋点占位:弃局(watersort.level_abandon)字典随 M1.4 落地
     }
