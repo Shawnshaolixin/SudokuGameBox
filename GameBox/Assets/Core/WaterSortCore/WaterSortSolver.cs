@@ -26,6 +26,12 @@ namespace WaterSort.Core
     {
         private const int MaxDepth = 256; // 求解深度上限(洗牌 80 步的题最优解远小于此)
 
+        /// <summary>
+        /// SolveAny 首解深度帽(默认 100):无状态 DFS 漫游到帽深"恰好走完"的解是垃圾长解,
+        /// 不能当难度信号——校准(Calib)与生成落档据此排除,只认 1 ≤ 步数 &lt; cap 的实解(M2.1 口径)。
+        /// </summary>
+        public const int AnyBoundCap = 100;
+
         /// <summary>IDA* 求解,找最优解,timeLimitMs 超时保护。</summary>
         public static WaterSortSolveResult SolveOptimal(WaterSortBoard start, int timeLimitMs)
         {
@@ -127,7 +133,7 @@ namespace WaterSort.Core
         /// 用途:生成器"可解性验证/高色数难度代理深度"与运行期提示(首解第一步,≤400ms)。
         /// 不适用场景:死局会烧满限时,不能用于最优验证(见 SolveOptimal)。
         /// </summary>
-        public static WaterSortSolveResult SolveAny(WaterSortBoard start, int timeLimitMs, int boundCap = 100)
+        public static WaterSortSolveResult SolveAny(WaterSortBoard start, int timeLimitMs, int boundCap = AnyBoundCap)
         {
             var sw = Stopwatch.StartNew();
             var result = new WaterSortSolveResult { Solution = new List<WaterSortMove>() };

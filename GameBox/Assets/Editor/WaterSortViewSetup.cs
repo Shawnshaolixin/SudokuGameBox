@@ -60,6 +60,61 @@ public static class WaterSortViewSetup
     [MenuItem("Box/WaterSort/Build View Prefab + Levels(100 full)")]
     public static void BuildFull100() => BuildInternal(FullLevelCount);
 
+    /// <summary>
+    /// M2.1 难度代理校准数据任务(WS-03 AC「出包前题库采样校准」正式跑数;CLI 无参入口):
+    /// 按色数 3~10 采样「散射首块可测实解板」的实测深度——3 色取 IDA* 精确最优、≥4 色取 SolveAny
+    /// 首解深度(代理),每色独立种子(0xC4A1 + 色数*7919),同参数可复现;
+    /// 口径(M2.1):只统计可测实解(1 ≤ 步数 &lt; AnyBoundCap=100),预解/封顶漫游解/超时换题重散并
+    /// 单独计数(与生成器窗口过滤等价)→ 每色最多 MaxAttempts=40 次散射/样本;
+    /// 输出 min/P10/P50/P90/max/avg + 命中率表供对照 SpecForIndex 步窗定档(纯计算,零资产写入)。
+    /// 样本量:3~6 色 200 全量;7~10 色命中率 ~3% 且超时占比随色数升,200 样本任务时长失控,
+    /// 由 CalibrateDifficultyTail 降档批次承接(本方法跑 3~6 即可)。
+    /// </summary>
+    [MenuItem("Box/WaterSort/Calibrate Difficulty Proxy(M2 采样)")]
+    public static void CalibrateDifficultyM2()
+    {
+        const int samples = 200;       // 全量色数样本量(3~6 色用;高色数走 Tail 批次)
+        const int seedBase = 0xC4A1;
+        Debug.Log("[WaterSortCalib] ===== 难度代理校准采样开始(3~6 色 200 样本,实解口径,同种子可复现) =====");
+        for (int colors = 3; colors <= 6; colors++)
+        {
+            // 3 色用精确最优(≤3 色 IDA* 实时,Spike 实测);≥4 色用 SolveAny 首解深度代理
+            var r = colors <= 3
+                ? WaterSortCalib.SampleOptimalSteps(colors, seedBase + colors * 7919, samples)
+                : WaterSortCalib.SampleProxyDepth(colors, seedBase + colors * 7919, samples);
+            LogCalibRow(r, colors <= 3 ? "最优" : "代理");
+        }
+        Debug.Log("[WaterSortCalib] ===== 主批次采样完成,高色数判读见 Tail 批次 =====");
+    }
+
+    /// <summary>
+    /// M2.1 难度代理校准·高色数尾部批次(7~10 色):口径与主批次全同,仅样本量按色数降档——
+    /// 高色数单散射实解命中率 ~3% 上下、超时(400ms 快筛)占比随色数上升,200 样本全量预算失控
+    /// (3~6 色 200 已由主批次定稿)。40~100 实解样本的分位误差 ≪ 步窗宽度(15~30),足够定档。
+    /// 每色行独立种子、逐行落日志即留档,可断点续跑(单行前缀与主批次同种子同口径可衔接判读)。
+    /// </summary>
+    [MenuItem("Box/WaterSort/Calibrate Difficulty Proxy(Tail 7-10)")]
+    public static void CalibrateDifficultyTail()
+    {
+        // 样本量表:索引=色数(3~6 由主批次承接,本方法只跑 7~10)
+        int[] samplesByColor = { 0, 0, 0, 200, 200, 200, 200, 100, 80, 60, 50 };
+        const int seedBase = 0xC4A1;
+        Debug.Log("[WaterSortCalib] ===== 尾部批次采样开始(7~10 色,样本降档 100/80/60/50,同种子可复现) =====");
+        for (int colors = 7; colors <= 10; colors++)
+            LogCalibRow(WaterSortCalib.SampleProxyDepth(colors, seedBase + colors * 7919, samplesByColor[colors]), "代理");
+        Debug.Log("[WaterSortCalib] ===== 尾部批次采样完成,与主批次行合并判读定档 =====");
+    }
+
+    /// <summary>校准结果单色行日志(主/尾批次共用格式,逐行留档可断点续跑)。</summary>
+    static void LogCalibRow(WaterSortCalibResult r, string modeLabel)
+    {
+        Debug.Log($"[WaterSortCalib] {r.Colors}色 {modeLabel} " +
+                  $"实解={r.Solved}/{r.Samples} 未解={r.Unsolved} 试散={r.ScattersTried} " +
+                  $"封顶={r.CapHits} 预解={r.PreSolved} 超时={r.Timeouts} 命中率={r.RealHitRate:P1} " +
+                  $"min={r.MinSteps} p10={r.P10} p25={r.P25} p50={r.P50} p75={r.P75} p90={r.P90} " +
+                  $"max={r.MaxSteps} avg={r.AvgSteps:F1} 耗时={r.TotalMs}ms");
+    }
+
     static void BuildInternal(int levelCount)
     {
         EnsureFolders();
