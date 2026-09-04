@@ -11,7 +11,8 @@ using WaterSort.Core;
 
 /// <summary>
 /// 水排序玩法资源生成器(M1.3):主视图 prefab + 独立 Addressables 组 Game_WaterSort + 首批关卡 JSON。
-/// CLI 无头执行:unity run GameBox -- -executeMethod WaterSortViewSetup.Build(默认 12 关 demo 包)
+/// CLI 无头执行:unity run GameBox -- -executeMethod WaterSortViewSetup.Build(12 关 demo 包)
+/// 或 -executeMethod WaterSortViewSetup.BuildFull100(100 关正式题库,M1.5)
 /// 幂等:prefab/条目/关卡 JSON 已存在且参数一致 → 仅自愈(挂桥/地址校准),可反复执行。
 ///
 /// ① 新建 Modules/WaterSort/Prefabs/WaterSortView.prefab —— 热更视图不进 prefab 序列化(20 文档 §4):
@@ -40,7 +41,8 @@ public static class WaterSortViewSetup
     const string PrefabAddress = "UI/WaterSortView";
     const string LevelsAddress = "WaterSort/Levels/regular_levels.json";
 
-    const int DemoLevelCount = 12;   // M1.3 demo 题库(M1.5 以 Build100 整批重生成)
+    const int DemoLevelCount = 12;   // M1.3 demo 题库(开发期冒烟用)
+    const int FullLevelCount = 100;  // M1.5 首批正式题库(≥100 关,WS-03;数量即内容形态,切换即重写)
     const int SeedBase = 0x5757;     // 关号种子基(稳定复现;demo 包与最终题库同管线同种子域)
 
     // 占位配色(与运行时 WaterSortTubeRack 色板无关;文本/背景用,表现后置 AIGC 替换)
@@ -53,6 +55,10 @@ public static class WaterSortViewSetup
 
     /// <summary>M1.5 全量入口:整批重生成 N 关(数量变化即覆盖重写,同种子可复现)。</summary>
     public static void BuildFull(int count) => BuildInternal(count);
+
+    /// <summary>首批正式题库 100 关(CLI -executeMethod 无参入口;统计见日志,分布可复核)。</summary>
+    [MenuItem("Box/WaterSort/Build View Prefab + Levels(100 full)")]
+    public static void BuildFull100() => BuildInternal(FullLevelCount);
 
     static void BuildInternal(int levelCount)
     {
@@ -282,7 +288,35 @@ public static class WaterSortViewSetup
         // UTF-8 无 BOM(JsonUtility 原生字段名,与运行时反序列化一一对应)
         File.WriteAllText(LevelsJsonPath, JsonUtility.ToJson(pack, true));
         AssetDatabase.ImportAsset(LevelsJsonPath); // 生成为 TextAsset 资产(Addressables 可入库)
-        Debug.Log($"[WaterSortSetup] 题库已{(File.Exists(LevelsJsonPath) ? "重" : "")}生成: {levelCount} 关 → {LevelsJsonPath}");
+        Debug.Log($"[WaterSortSetup] 题库已{(File.Exists(LevelsJsonPath) ? "重" : "")}生成: {levelCount} 关 → {LevelsJsonPath}\n"
+            + BuildPackSummary(pack));
+    }
+
+    /// <summary>
+    /// 题库统计行(验收留档/难度抽查参考;每关步数 = 落档实测值:≤3 色 IDA* 精确最优 / ≥4 色 SolveAny 首解深度)。
+    /// 按难度分段汇总数量与步数窗(分段编排见 WaterSortGenDefaults.SpecForIndex)。
+    /// </summary>
+    static string BuildPackSummary(WaterSortLevelPack pack)
+    {
+        if (pack == null || pack.levels == null || pack.levels.Count == 0) return "(空题库)";
+        var sb = new System.Text.StringBuilder();
+        for (int d = 0; d < 3; d++)
+        {
+            int count = 0, min = int.MaxValue, max = 0;
+            long sum = 0;
+            foreach (var l in pack.levels)
+            {
+                if ((int)l.difficulty != d) continue;
+                count++;
+                if (l.measuredSteps < min) min = l.measuredSteps;
+                if (l.measuredSteps > max) max = l.measuredSteps;
+                sum += l.measuredSteps;
+            }
+            if (count == 0) continue;
+            var name = ((WaterSortDifficulty)d).ToString();
+            sb.AppendLine($"  [{name}] {count} 关,步数 {min}~{max}(均值 {sum / (double)count:0.0})");
+        }
+        return "  === 题库分布 ===\n" + sb.ToString().TrimEnd();
     }
 
     /// <summary>按关号生成一关:默认规格 + 固定种子;种子失败则就近平移重试(最多 49 次)。</summary>
