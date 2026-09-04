@@ -78,6 +78,7 @@ namespace Box.Gameplay.Tests
             public void Initialize() { }
             public void SetRemoveAds(bool removed) => IsAdsRemoved = removed;
             public void ShowRewardedAd(Action<bool> onReward) => onReward?.Invoke(true);
+            public void NotifyLevelCompleted() { } // M3.2 频控计数接口:本用例只验展示开关,计数无关
             public void ShowInterstitial()
             {
                 if (IsAdsRemoved) return; // 去广告零广告(与 AdMobAdsService 一致)

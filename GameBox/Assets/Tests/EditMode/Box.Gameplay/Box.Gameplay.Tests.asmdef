@@ -5,6 +5,7 @@
         "Box.Gameplay",
         "Box.ModuleFramework",
         "Box.Services.Abstractions",
+        "Box.Services.Ads",
         "Box.UI",
         "UniTask",
         "UnityEngine.TestRunner",
