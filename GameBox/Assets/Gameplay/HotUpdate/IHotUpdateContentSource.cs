@@ -3,7 +3,9 @@ using System.Reflection;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using UnityEngine.Networking;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceLocations;
 
 namespace Box.Gameplay.HotUpdate
 {
@@ -17,6 +19,8 @@ namespace Box.Gameplay.HotUpdate
         /// <summary>
         /// 检查并应用远程 catalog 更新。true = 远程可用(继续远程装载);false = 远程不可用
         /// (实现方已自动切内置兜底源,调用方应继续走装载链,由内置 location 兜底或最终降级)。
+        /// 2026-09-04 版本化部署:实现方需先解析版本指针 index.json(RemoteContentIndex)决定
+        /// 本次 catalog 走哪个版本目录,解析失败沿用上次持久化版本,再走共享旧路径,详见实现。
         /// </summary>
         UniTask<bool> TryUpdateCatalogAsync();
 
@@ -59,6 +63,9 @@ namespace Box.Gameplay.HotUpdate
     /// Addressables 内容源(9-3 默认实现)。
     /// 地址约定(v1.1 资源组 HotUpdate_Local,9-4 配置):HotUpdate/Dll/{程序集名}、HotUpdate/Metadata/{程序集名}、HotUpdate/module_overrides。
     /// 资源缺失时 Addressables 句柄失败 → 捕获 → null(触发调用方降级),不阻塞启动。
+    /// 2026-09-04 版本化部署(Phase 10-2 前置,布局见 tools/deploy_firebase.ps1 头注释与 20 文档 §11):
+    /// 启动先拉 {RemoteServerUrl}/index.json 解析当前版本目录名,再经 InternalIdTransformFunc 把
+    /// catalog 指向 {RemoteServerUrl}/{version}/Android/、bundle 指向共享 {RemoteServerUrl}/Android/。
     /// </summary>
     public sealed class AddressablesHotUpdateSource : IHotUpdateContentSource
     {
@@ -86,12 +93,17 @@ namespace Box.Gameplay.HotUpdate
         /// 远程内容服务器地址。双通道 Firebase Hosting 布局(2026-09-02 拍板,见 tools/deploy_firebase.ps1):
         ///   https://sudokugamebox.web.app/staging    ← 开发/真机验证(dev APK 指这里,本常量)
         ///   https://sudokugamebox.web.app/production ← 上架内容(发布构建注入,仓库保持 staging/dev 值,红线 9)
-        /// 每个通道下目录结构相同:Android/(Addressables 契约目录,catalog 内 id 烘焙为 /Android/) + manifest/(预留)。
-        /// 内容先上 staging → 真机验收 → 验收通过后 deploy_firebase.ps1 -Env production 提升。
+        /// 2026-09-04 版本化部署后每通道内布局:
+        ///   index.json                    ← 版本指针(每次发布/回滚改写,客户端启动解析)
+        ///   Android/                      ← 共享层:bundle(内容寻址,全版本共享) + 旧客户端兼容 catalog(固定名双写)
+        ///   {version}/Android/            ← 各版本 catalog 独立目录(回滚=指针指回,互不覆盖)
+        ///   _history/{时间戳}/            ← 部署前自动归档的旧 catalog(防御性备份)
+        /// 内容先上 staging → 真机验收 → 验收通过后 deploy_firebase.ps1 -Channel production 提升;
+        /// 回滚 = -RollbackTo &lt;版本&gt;(只改指针,秒级生效,无需重新构建)。
         /// 离网/局域网联调回退:改回 "http://192.168.1.100:8000"(deploy_remote.ps1 起本机服务)——真机坑:光猫按网段隔离
         /// (手机 192.168.1.x / 电脑 192.168.0.x 不通),需给电脑 WLAN 加同段别名 IP:netsh interface ipv4 add address
         /// "WLAN" 192.168.1.100 255.255.255.0 store=persistent;改回 http 后真机须卸载重装(UnityWebRequest 缓存)。
-        /// 缓存头(firebase.json):.bin/.hash no-cache(每次启动拿最新),bundle 内容寻址 immutable。
+        /// 缓存头(firebase.json):index.json 与 .bin/.hash no-cache(每次启动拿最新),bundle 内容寻址 immutable。
         /// </summary>
 #if BOX_REMOTE_PRODUCTION
         // 生产通道:符号由 BuildScript.PrepareV11 依环境变量 BOX_REMOTE_URL 注入(与 BOX_KEYSTORE_PASS 同款范式),
@@ -101,19 +113,70 @@ namespace Box.Gameplay.HotUpdate
         public const string RemoteServerUrl = "https://sudokugamebox.web.app/staging";
 #endif
 
+        /// <summary>版本指针文件名(通道根下;deploy_firebase.ps1 发布/回滚时生成或改写)。</summary>
+        public const string IndexFileName = "index.json";
+
+        /// <summary>版本指针拉取超时(秒)。外层 RunAsync 对 catalog 阶段整体套 5s 总超时,这里留余量。</summary>
+        public const int IndexTimeoutSeconds = 2;
+
+        /// <summary>
+        /// 上次成功解析的版本持久化键。指针拉取失败(断网/指针丢失)时沿用,保证已发布版本切换后
+        /// 弱网设备不至于失联;从未成功解析过则无持久化值 → 走共享旧路径。
+        /// </summary>
+        public const string VersionPrefsKey = "Box.HotUpdate.LastRemoteContentVersion";
+
+        /// <summary>
+        /// 本次会话使用的远程内容版本(=服务器版本目录名)。null = 指针未解析成功(断网/首次启动即失败)
+        /// → catalog 走共享旧路径(部署脚本对旧客户端的兼容目录)。会话内只写:解析成功时更新,
+        /// 版本目录不可达时回退重试前清空(不消持久化值,下次启动重新解析指针)。
+        /// </summary>
+        public string CurrentRemoteVersion { get; private set; }
+
         /// <summary>
         /// Addressables 2.x 无 SetProfileVariable(1.x API 已移除),远程 URL 改写走
-        /// InternalIdTransformFunc 钩子:每次解析资源 id 时把 {RemoteHostURL} 占位符替换为实际服务器地址。
+        /// InternalIdTransformFunc 钩子:每次解析资源 id 时把 RemoteHostURL 占位符替换为实际服务器地址。
         /// 必须在任何远程请求前设置(构造函数即装,覆盖 catalog 与 bundle 全部远程加载)。
+        /// 2026-09-04 版本化:委托绑定实例方法,按文件类型与 CurrentRemoteVersion 动态拼路径
+        /// (见 BuildRemoteBasePath)——指针解析完成后无需重装钩子,新版本即对后续请求生效。
         /// </summary>
         public AddressablesHotUpdateSource()
         {
-            Addressables.InternalIdTransformFunc = location =>
-                location.InternalId.Replace(RemoteHostVariableName, RemoteServerUrl);
+            Addressables.InternalIdTransformFunc = TransformInternalId;
+        }
+
+        /// <summary>
+        /// 远程 id 改写入口(InternalIdTransformFunc 委托目标)。internalId 形如
+        /// "RemoteHostURL/Android/catalog_1.0.bin"(构建期烘焙,{RemoteHostURL} 占位符以裸名出现,
+        /// 见 RemoteHostVariableName 注释),替换后成为完整 https URL。
+        /// 参数须为 IResourceLocation(Addressables 2.8 委托签名;具体类 ResourceLocation 的
+        /// InternalId 为显式接口实现,经具体类不可访问 —— 编译错误修复,勿改回)。
+        /// </summary>
+        string TransformInternalId(IResourceLocation location) =>
+            location.InternalId.Replace(RemoteHostVariableName,
+                BuildRemoteBasePath(RemoteServerUrl, CurrentRemoteVersion, location.InternalId));
+
+        /// <summary>
+        /// 按文件类型拼装远程基地址(纯函数,EditMode 可测)。
+        /// 版本化规则(2026-09-04,与 tools/deploy_firebase.ps1 布局一一对应):
+        ///   · catalog 文件(.bin/.hash 结尾)→ {服务器}/{版本}:每版本独立目录,回滚=指针指回旧版本;
+        ///   · bundle(.bundle 结尾)         → {服务器}:落共享 Android/ 目录,URL 永不变化 → 设备
+        ///     UnityWebRequest 缓存跨版本命中,版本切换只需重下几 KB 的 catalog;
+        ///   · 版本未知(null/空)            → 一律 {服务器}(共享旧路径,旧客户端兼容目录)。
+        /// </summary>
+        public static string BuildRemoteBasePath(string serverUrl, string version, string internalId)
+        {
+            bool isCatalogFile = internalId.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)
+                              || internalId.EndsWith(".hash", StringComparison.OrdinalIgnoreCase);
+            return isCatalogFile && !string.IsNullOrEmpty(version)
+                ? serverUrl + "/" + version
+                : serverUrl;
         }
 
         /// <summary>
         /// catalog 更新(网络等待 5s 上限,内聚于此 —— 超时与失败同语义)。
+        /// 流程(2026-09-04 版本化部署):①解析版本指针 index.json(失败沿用上次持久化版本,不中断);
+        /// ②按当前版本目录检查/更新 catalog;③版本目录不可达时(指针落后/目录被清/网络抖动)会话内
+        /// 清空版本回退共享旧路径重试一次——双路径都失败才切内置兜底源(UseBuiltinContent=true)。
         /// 返回 true = 远程就绪(继续远程装载);false = 远程不可用,已自动切内置兜底源
         /// (UseBuiltinContent=true),调用方继续尝试装载(内置 location 零网络)。
         /// 2026-09-03 前语义为"false = 无更新,调用方降级包内版本" —— 修复断网空降级缺陷后,
@@ -123,22 +186,102 @@ namespace Box.Gameplay.HotUpdate
         {
             try
             {
-                // 确保远程地址改写已生效(构造函数已装,此处兜底防外部覆盖)
-                Addressables.InternalIdTransformFunc = location =>
-                    location.InternalId.Replace(RemoteHostVariableName, RemoteServerUrl);
-                var catalogs = await AwaitHandleAsync(Addressables.CheckForCatalogUpdates())
-                    .Timeout(TimeSpan.FromSeconds(5));
-                if (catalogs == null || catalogs.Count == 0) return true;
-                await AwaitHandleAsync(Addressables.UpdateCatalogs(catalogs))
-                    .Timeout(TimeSpan.FromSeconds(5));
-                return true;
+                await ResolveRemoteVersionAsync();
+                // 确保远程地址改写已生效(构造函数已装,此处兜底防外部覆盖;委托读实例当前版本状态)
+                Addressables.InternalIdTransformFunc = TransformInternalId;
+                return await CheckAndUpdateCatalogAsync();
             }
             catch (Exception e)
             {
-                // 远程不可达(断网/服务器停/超时)→ 切内置兜底源,本进程不再尝试远程
+                // 版本化目录不可达 → 会话内清除版本,回退共享旧路径再试一次(双保险;
+                // 不清持久化值——下次启动会重新解析指针,拿到服务器真正的当前版本)
+                if (!string.IsNullOrEmpty(CurrentRemoteVersion))
+                {
+                    Debug.LogWarning($"[HotUpdate] 版本 {CurrentRemoteVersion} 的 catalog 检查失败({e.Message}),回退共享旧路径重试");
+                    CurrentRemoteVersion = null;
+                    try { return await CheckAndUpdateCatalogAsync(); }
+                    catch (Exception legacyError) { e = legacyError; }
+                }
+                // 双路径都不可达(断网/服务器停/超时)→ 切内置兜底源,本进程不再尝试远程
                 UseBuiltinContent = true;
                 Debug.LogWarning($"[HotUpdate] catalog 检查失败,切内置兜底源继续装载: {e.Message}");
                 return false;
+            }
+        }
+
+        /// <summary>catalog 检查+更新单次尝试(各 5s 上限);true=远程 catalog 就绪(含"无更新")。</summary>
+        static async UniTask<bool> CheckAndUpdateCatalogAsync()
+        {
+            var catalogs = await AwaitHandleAsync(Addressables.CheckForCatalogUpdates())
+                .Timeout(TimeSpan.FromSeconds(5));
+            if (catalogs == null || catalogs.Count == 0) return true;
+            await AwaitHandleAsync(Addressables.UpdateCatalogs(catalogs))
+                .Timeout(TimeSpan.FromSeconds(5));
+            return true;
+        }
+
+        /// <summary>
+        /// 解析远程内容版本指针:拉取 {RemoteServerUrl}/index.json 取当前版本目录名并持久化。
+        /// 失败(断网/404/格式无效)不抛出——沿用上次持久化版本(PlayerPrefs,VersionPrefsKey);
+        /// 从未成功过则为 null → 后续 catalog 走共享旧路径(旧客户端兼容目录仍在部署)。
+        /// </summary>
+        async UniTask ResolveRemoteVersionAsync()
+        {
+            var json = await FetchTextAsync(RemoteServerUrl + "/" + IndexFileName, IndexTimeoutSeconds);
+            if (!string.IsNullOrEmpty(json) && TryParseIndexJson(json, out var index))
+            {
+                CurrentRemoteVersion = index.version;
+                PlayerPrefs.SetString(VersionPrefsKey, index.version); // 断网启动时下次仍可用上次已知版本
+                Debug.Log($"[HotUpdate] 远程内容版本指针: {index.version}(catalogHash={index.catalogHash})");
+                return;
+            }
+            CurrentRemoteVersion = PlayerPrefs.GetString(VersionPrefsKey, null);
+            if (CurrentRemoteVersion != null)
+                Debug.LogWarning($"[HotUpdate] 版本指针不可用,沿用上次已知版本 {CurrentRemoteVersion}");
+            else
+                Debug.LogWarning("[HotUpdate] 版本指针不可用且无历史版本,catalog 走共享旧路径");
+        }
+
+        /// <summary>
+        /// 解析 index.json(JsonUtility);无效(空输入/非法 JSON/version 缺失或为空)返回 false 且 index=null
+        /// ——调用方拿到 true 才有可用指针对象,半成品对象(JsonUtility 对缺字段 JSON 返回非 null 空对象)不外泄。
+        /// </summary>
+        public static bool TryParseIndexJson(string json, out RemoteContentIndex index)
+        {
+            index = null;
+            if (string.IsNullOrEmpty(json)) return false;
+            RemoteContentIndex parsed;
+            try
+            {
+                parsed = JsonUtility.FromJson<RemoteContentIndex>(json);
+            }
+            catch (Exception)
+            {
+                return false; // 非法 JSON(JsonUtility 多数情况下返回空对象而非抛异常,此处防御性兜底)
+            }
+            if (parsed == null || string.IsNullOrEmpty(parsed.version))
+            {
+                return false; // 无版本目录名 = 无效指针(版本化路径无从拼起)
+            }
+            index = parsed;
+            return true;
+        }
+
+        /// <summary>简单 GET 文本(启动期一次性指针拉取,不走 Addressables);任何失败返回 null(已打日志)。</summary>
+        static async UniTask<string> FetchTextAsync(string url, int timeoutSeconds)
+        {
+            using (var req = UnityWebRequest.Get(url))
+            {
+                req.timeout = timeoutSeconds;
+                var op = req.SendWebRequest();
+                while (!op.isDone) await UniTask.Yield(); // 轮询等待(一次性拉取,不值得引入 UniTask.WebRequest 扩展依赖)
+                // 结果读 req 本体(异步操作对象上无 result/error/downloadHandler —— 编译修复,勿改回)
+                if (req.result != UnityWebRequest.Result.Success)
+                {
+                    Debug.LogWarning($"[HotUpdate] GET {url} 失败: {req.error}");
+                    return null;
+                }
+                return req.downloadHandler.text;
             }
         }
 
