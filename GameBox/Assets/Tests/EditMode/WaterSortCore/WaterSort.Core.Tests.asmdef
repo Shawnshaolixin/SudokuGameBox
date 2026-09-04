@@ -1,7 +1,8 @@
 {
-    "name": "Box.WaterSortSpike",
-    "rootNamespace": "Box.WaterSortSpike",
+    "name": "WaterSort.Core.Tests",
+    "rootNamespace": "WaterSort.Core.Tests",
     "references": [
+        "WaterSort.Core",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

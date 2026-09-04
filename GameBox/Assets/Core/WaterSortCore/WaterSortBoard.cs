@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Box.WaterSortSpike
+namespace WaterSort.Core
 {
     /// <summary>一次倒水操作:源管 Src → 目标管 Dst,Count = 实际倒出滴数。</summary>
     public readonly struct WaterSortMove
@@ -25,6 +25,7 @@ namespace Box.WaterSortSpike
     /// 倒水规则:一次倒入源管顶部整个同色连续块(受目标管剩余容量限制,可部分倒出);
     /// 满管(4 滴同色)禁止倒入空管(经典规则,避免无意义移动)。
     /// 过关判定:所有非空管均已同色聚合(允许空管存在)。
+    /// 注:由 Spike(Box.WaterSortSpike)迁移正式化(M1.1),规则行为零改动、仅换命名空间。
     /// </summary>
     public sealed class WaterSortBoard
     {
@@ -49,7 +50,7 @@ namespace Box.WaterSortSpike
         }
 
         /// <summary>
-        /// 从管配置直接构造(测试/生成器用)。每管数组长度 ≤ Capacity,值 0=空,1..Colors=颜色。
+        /// 从管配置直接构造(测试/生成器/关卡反序列化用)。每管数组长度 ≤ Capacity,值 0=空,1..Colors=颜色。
         /// 注意:链式构造会把每管预置为"颜色满管",填充前必须清空,否则未写满的位置残留初值。
         /// </summary>
         public WaterSortBoard(int colors, int emptyTubes, params int[][] tubes) : this(colors, emptyTubes)

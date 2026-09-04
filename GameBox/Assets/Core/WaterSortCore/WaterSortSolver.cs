@@ -2,23 +2,25 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace Box.WaterSortSpike
+namespace WaterSort.Core
 {
     /// <summary>求解结果。</summary>
     public sealed class WaterSortSolveResult
     {
         public bool Solved;                    // 是否找到解
-        public int Steps;                      // 最优步数(限时内找到;失败为 0)
+        public int Steps;                      // 步数(最优解找到时=最优步数;失败为 0)
         public bool TimedOut;                  // 是否因超时终止
         public long ElapsedMs;                 // 实际耗时
         public List<WaterSortMove> Solution;   // 解路径(未解决为空)
     }
 
     /// <summary>
-    /// 水排序求解器(Spike 版):IDA* 求最优解(限时保护)+ BFS 精确最短步数(小规模对照)。
+    /// 水排序求解器(正式版,由 Spike 迁移正式化 M1.1):
+    /// IDA* 求最优解(≤3 色实时可用)+ SolveAny 任意解(全色数 ≤400ms 快筛)。
     /// 启发式 h = ceil(Σ 每管无序滴数 / 2):"无序滴" = 不在底部同色连续块内的滴,
     /// 一次移动最多让 2 滴归位,该下界保守可采纳。
     /// 剪枝:禁止"立即逆转"上一步——这两步相互抵消,最优解必可去掉,不丢最优性。
+    /// BFS 精确对照已移出产品面(仅测试 oracle 用),见 Spike 结论:最优解仅 ≤3 色实时可用。
     /// </summary>
     public static class WaterSortSolver
     {
@@ -122,7 +124,8 @@ namespace Box.WaterSortSpike
 
         /// <summary>
         /// 快速求解(不保证最优):一次性 bound 冲上限找任意解。
-        /// 用途:生成器批量验证"可解性"——最优解(全 bound 迭代)对死局会烧满限时,这里不适用。
+        /// 用途:生成器"可解性验证/高色数难度代理深度"与运行期提示(首解第一步,≤400ms)。
+        /// 不适用场景:死局会烧满限时,不能用于最优验证(见 SolveOptimal)。
         /// </summary>
         public static WaterSortSolveResult SolveAny(WaterSortBoard start, int timeLimitMs, int boundCap = 100)
         {
@@ -140,31 +143,6 @@ namespace Box.WaterSortSpike
             result.TimedOut = timedOut;
             result.ElapsedMs = sw.ElapsedMilliseconds;
             return result;
-        }
-
-        /// <summary>BFS 精确最短步数(小规模对照用;状态爆炸前仅用于 ≤4 色)。</summary>
-        public static int SolveBfs(WaterSortBoard start)
-        {
-            var visited = new HashSet<string> { start.EncodeKey() };
-            var queue = new Queue<WaterSortBoard>();
-            queue.Enqueue(start);
-            int steps = 0;
-            while (queue.Count > 0)
-            {
-                int level = queue.Count;
-                for (int i = 0; i < level; i++)
-                {
-                    var cur = queue.Dequeue();
-                    if (cur.IsSolved()) return steps;
-                    foreach (var m in cur.LegalMoves())
-                    {
-                        var next = cur.Apply(m);
-                        if (visited.Add(next.EncodeKey())) queue.Enqueue(next);
-                    }
-                }
-                steps++;
-            }
-            return -1; // 不可解(反向洗牌生成的题不会发生)
         }
     }
 }
