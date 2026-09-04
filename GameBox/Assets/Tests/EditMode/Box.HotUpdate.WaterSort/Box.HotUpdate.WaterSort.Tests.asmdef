@@ -4,6 +4,7 @@
     "references": [
         "Box.HotUpdate.WaterSort",
         "Box.ModuleFramework",
+        "Box.Services.Abstractions",
         "WaterSort.Core",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
