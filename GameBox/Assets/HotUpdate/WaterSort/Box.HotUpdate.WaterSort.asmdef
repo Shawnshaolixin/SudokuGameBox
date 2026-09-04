@@ -1,0 +1,22 @@
+{
+    "name": "Box.HotUpdate.WaterSort",
+    "rootNamespace": "Box.HotUpdate.WaterSort",
+    "references": [
+        "Box.HotUpdate.Core",
+        "Box.ModuleFramework",
+        "Box.Services.Abstractions",
+        "Box.UI",
+        "WaterSort.Core",
+        "UniTask",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
