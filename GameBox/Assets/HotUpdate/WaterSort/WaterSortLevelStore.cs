@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Box.Services;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -8,18 +7,8 @@ using WaterSort.Core;
 namespace Box.HotUpdate.WaterSort
 {
     /// <summary>
-    /// 常规题库包(JSON 文件顶层包装:JsonUtility 不支持裸数组,故外包一层)。
-    /// 生成器(M1.5/数据任务)与运行时共用本结构,id 即关号(1 起,升序连续,见 WaterSortProgressStore 约定)。
-    /// </summary>
-    [Serializable]
-    public sealed class WaterSortLevelPack
-    {
-        /// <summary>关卡列表(id 升序;运行时按 id 线性查找,量级 ≤ 数百)。</summary>
-        public List<WaterSortLevelData> levels = new List<WaterSortLevelData>();
-    }
-
-    /// <summary>
     /// 常规题库加载(TextAsset 进 Game_WaterSort 组,地址 WS-20 约定 WaterSort/Levels/regular_levels.json)。
+    /// 包结构 WaterSortLevelPack 定义在 WaterSort.Core(生成工具/运行时/测试共用,JsonUtility 不支持裸数组)。
     /// IAssetService 为回调式(热更侧禁止直连 Addressables,11 文档 §3.3),用 UniTaskCompletionSource 桥接;
     /// 包体积小(≤ 数百 KB)一次加载常驻缓存,重复进入零加载。
     /// 失败/损坏返回 null,界面 toast 提示(常规关缺失属构建期错误,理论上不出现)。

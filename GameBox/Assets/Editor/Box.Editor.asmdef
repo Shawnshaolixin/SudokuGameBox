@@ -12,7 +12,8 @@
         "Unity.InputSystem",
         "Unity.Addressables",
         "Unity.Addressables.Editor",
-        "HybridCLR.Editor"
+        "HybridCLR.Editor",
+        "WaterSort.Core"
     ],
     "includePlatforms": [
         "Editor"

@@ -18,12 +18,14 @@ namespace Box.HotUpdate.WaterSort
     ///
     /// Prefab 节点契约(M1.3 生成器严格按此命名;缺失节点一律空安全降级):
     ///   SelectPanel/Title                    TMP 标题
-    ///   SelectPanel/ItemTemplate            选关按钮模板:BoxButton + Label(TMP)+ Lock(锁定遮罩)
+    ///   SelectPanel/ItemTemplate            选关按钮模板:BoxButton + Label(TMP)(只渲染可玩关,无锁定态)
     ///   SelectPanel/LevelScroll/Viewport/Content  选关网格容器(克隆 ItemTemplate 进 Content,代码铺 5 列)
     ///   SelectPanel/HubButton               回大厅弹窗(MoreGames;按钮 = Pop 本视图 → OnHide 退模块)
     ///   GamePanel/TopBar/BackButton         返回选关(放弃本局进度,会话仍可再开局)
+    ///   GamePanel/TopBar/GameTitle          关卡标题「第 N 关 · 难度」(StartGame 置文案)
     ///   GamePanel/TopBar/CoinLabel          TMP 金币余额(M1.4 双通道后随变更刷新)
-    ///   GamePanel/TubeArea                  试管容器(M1.3 WaterSortTubeRack 代码绘制 + 点击交互)
+    ///   GamePanel/StepText                  TMP 步数(每次盘面刷新同步)
+    ///   GamePanel/TubeArea                  试管容器(本视图 AddComponent WaterSortTubeRack 代码绘制+点击)
     ///   GamePanel/BottomBar/UndoButton | RestartButton   免费操作(本版已接)
     ///   GamePanel/BottomBar/HintButton | ExtraTubeButton 金币/激励点位(M1.4 接配置后启用)
     ///   SettlePanel/Title | ResultText | NextButton | RetryButton | HubButton
@@ -45,8 +47,9 @@ namespace Box.HotUpdate.WaterSort
 
         Transform _selectPanel, _gamePanel, _settlePanel;
         Transform _itemTemplate, _content;
-        TextMeshProUGUI _resultText;
+        TextMeshProUGUI _resultText, _stepText;
         BoxButton _nextButton, _undoButton, _restartButton;
+        WaterSortTubeRack _rack;     // 试管区渲染与点击(OnCreate 挂到 TubeArea;随视图销毁)
         int _totalLevels;            // 题库总量(结算面板「下一关」放行判定:仅推进且有后关才可点)
 
         protected override void Awake()
@@ -64,9 +67,16 @@ namespace Box.HotUpdate.WaterSort
             _content = FindInCard("SelectPanel/LevelScroll/Viewport/Content");
             _itemTemplate = FindInCard("SelectPanel/ItemTemplate");
             _resultText = FindInCard("SettlePanel/ResultText")?.GetComponent<TextMeshProUGUI>();
+            _stepText = FindInCard("GamePanel/StepText")?.GetComponent<TextMeshProUGUI>();
             _nextButton = FindInCard("SettlePanel/NextButton")?.GetComponent<BoxButton>();
             _undoButton = FindInCard("GamePanel/BottomBar/UndoButton")?.GetComponent<BoxButton>();
             _restartButton = FindInCard("GamePanel/BottomBar/RestartButton")?.GetComponent<BoxButton>();
+
+            // 试管架:运行期挂到 TubeArea(热更组件不进 prefab 序列化,20 文档 §4 纪律同源)
+            var tubeArea = FindInCard("GamePanel/TubeArea");
+            if (tubeArea != null && tubeArea.GetComponent<WaterSortTubeRack>() == null)
+                _rack = tubeArea.gameObject.AddComponent<WaterSortTubeRack>();
+            if (_rack != null) _rack.PourRequested += OnPourRequested;
 
             Bind("SelectPanel/HubButton", LeaveToHub);
             Bind("GamePanel/TopBar/BackButton", OnBackToSelect);
@@ -83,6 +93,7 @@ namespace Box.HotUpdate.WaterSort
             _session = WaterSortSession.Instance; // 模块 OnEnter 先建会话再推本视图,恒非空
             _pack = null;                          // 新会话旧题库失效(重新走缓存加载,代价近零)
             SubscribeSession();
+            if (_rack != null) _rack.SetSession(_session); // 试管架与会话绑定(本视图生命周期内不变)
             ApplyLanguage();
             if (_session != null && _session.IsDaily)
             {
@@ -130,6 +141,8 @@ namespace Box.HotUpdate.WaterSort
         {
             ClearItems();
             _pack = await WaterSortLevelStore.LoadPackAsync();
+            // 等待期间视图可能已被 Pop 销毁/退模块(异步续体访问已销毁节点会抛 MissingReference)
+            if (this == null || _leaving) return;
             if (_pack == null || _pack.levels == null || _pack.levels.Count == 0)
             {
                 ShowToast("watersort.toast.noLevels"); // 题库缺失属构建期错误,运行时不该出现
@@ -213,8 +226,25 @@ namespace Box.HotUpdate.WaterSort
             RefreshTubeArea();
         }
 
-        /// <summary>试管区刷新唯一接缝:倒水/撤销/重开后调用。M1.3 在此装配 WaterSortTubeRack 渲染。</summary>
-        void RefreshTubeArea() { }
+        /// <summary>
+        /// 试管区刷新唯一接缝:倒水/撤销/重开/换关后调用——
+        /// 先摘选中再按盘面重建试管,同步步数文本(非法倒水抖动路径不经此方法,选中保留可再试)。
+        /// </summary>
+        void RefreshTubeArea()
+        {
+            if (_rack == null) return; // 无试管架(prefab 缺 TubeArea)时静默跳过,行为不崩
+            _rack.ClearSelection();    // 提交型重建统一摘选中(盘面已变,残留高亮无意义)
+            _rack.Refresh();
+            if (_stepText != null && _session != null)
+                _stepText.text = L10n.Format("watersort.step", _session.MoveCount);
+        }
+
+        /// <summary>试管点击裁决:合法→会话推进(BoardChanged 驱动本区刷新);非法→源管抖动,选中保留可再试目标。</summary>
+        void OnPourRequested(int src, int dst)
+        {
+            if (_session == null || !_session.IsInLevel) return; // 面板切换竞态兜底
+            if (!_session.TryPour(src, dst)) _rack?.ShakeTube(src);
+        }
 
         // ---- 结算面板 ---- //
 
@@ -284,6 +314,10 @@ namespace Box.HotUpdate.WaterSort
         void ApplyLanguage()
         {
             SetText("SelectPanel/Title", L10n.Get("watersort.select.title"));
+            // 对局标题「第 N 关 · 难度」:仅对局中显示,StartGame/换关均先经 ApplyLanguage 到位
+            if (_session != null && _session.IsInLevel)
+                SetText("GamePanel/TopBar/GameTitle", L10n.Format("watersort.level.title",
+                    _session.LevelId, DifficultyText(_session.Difficulty)));
             SetText("GamePanel/TopBar/CoinLabel", CoinText()); // M1.4 金币变更订阅前,入场先刷一次
             SetText("SettlePanel/Title", L10n.Get("watersort.settle.title"));
             SetLabel("SelectPanel/HubButton", L10n.Get("game.back")); // 复用既有键(返回)

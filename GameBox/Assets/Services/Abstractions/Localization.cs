@@ -125,6 +125,19 @@ namespace Box.Services
             { "settlement.hints", "  提示 {0}" },
             { "settlement.next", "再来一局" }, // 结算按钮(2026-08-29 Bug 清单:按钮文案英语化)
             { "settlement.home", "返回菜单" },
+
+            // 水排序(第二玩法,19 文档)
+            { "watersort.select.title", "选择关卡" },
+            { "watersort.level.title", "第 {0} 关 · {1}" }, // 对局标题(难度复用 diff.* 文案)
+            { "watersort.coins", "金币 {0}" },
+            { "watersort.step", "步数 {0}" },
+            { "watersort.settle.title", "过关成功" },
+            { "watersort.settle.result", "步数 {0} · {1}" }, // 结算:步数与难度(难度复用 diff.*)
+            { "watersort.btn.restart", "重开" },
+            { "watersort.btn.retry", "重试" },
+            { "watersort.btn.next", "下一关" },
+            { "watersort.toast.noLevels", "关卡包缺失,请稍后重进" }, // 题库加载失败(构建期错误兜底)
+            { "watersort.toast.badLevel", "关卡数据异常" }, // 越界/损坏条目
         };
 
         static readonly Dictionary<string, string> _en = new Dictionary<string, string>
@@ -195,6 +208,19 @@ namespace Box.Services
             { "settlement.hints", "   Hints {0}" },
             { "settlement.next", "Next" },
             { "settlement.home", "Menu" },
+
+            // Water Sort (2nd mode, doc 19)
+            { "watersort.select.title", "Select Level" },
+            { "watersort.level.title", "Level {0} · {1}" },
+            { "watersort.coins", "Coins {0}" },
+            { "watersort.step", "Moves {0}" },
+            { "watersort.settle.title", "Level Cleared!" },
+            { "watersort.settle.result", "Moves {0} · {1}" },
+            { "watersort.btn.restart", "Restart" },
+            { "watersort.btn.retry", "Retry" },
+            { "watersort.btn.next", "Next" },
+            { "watersort.toast.noLevels", "Level pack missing. Re-enter later." },
+            { "watersort.toast.badLevel", "Level data error" },
         };
     }
 }

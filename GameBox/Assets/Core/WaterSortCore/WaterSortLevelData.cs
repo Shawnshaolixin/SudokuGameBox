@@ -28,6 +28,18 @@ namespace WaterSort.Core
         public int[] tubes;               // 扁平滴值:colors × Capacity,管主序、每管 0=底部 3=顶部
     }
 
+    /// <summary>
+    /// 题库包(JSON 文件顶层包装:JsonUtility 不支持裸数组,故外包一层)。
+    /// 生成工具(编辑器/CLI -executeMethod)与运行时加载共用本结构;
+    /// levels id 即关号,1 起升序连续(WaterSortProgressStore 的连续解锁推导依赖此约定)。
+    /// </summary>
+    [Serializable]
+    public sealed class WaterSortLevelPack
+    {
+        public System.Collections.Generic.List<WaterSortLevelData> levels =
+            new System.Collections.Generic.List<WaterSortLevelData>();
+    }
+
     /// <summary>关卡数据编解码(纯逻辑,零引擎依赖)。</summary>
     public static class WaterSortLevelCodec
     {
