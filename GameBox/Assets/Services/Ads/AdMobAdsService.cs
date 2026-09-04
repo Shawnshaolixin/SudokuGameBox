@@ -11,7 +11,8 @@ namespace Box.Services
 {
     /// <summary>
     /// 广告真实现（Phase 7 7-1）：Google AdMob v11（Next-Gen API）+ UMP 同意流程 + 插屏频控。
-    /// 职责：初始化（含 UMP 同意表单）、激励视频、插屏（频控：前 3 局不弹 / 局间隔 4~6 分钟随机）、
+    /// 职责：初始化（含 UMP 同意表单）、激励视频、插屏（频控：前 3 局不弹 / 局间隔 4~6 分钟随机，
+    /// M3.2 起过关计数 NotifyLevelCompleted 与展示判定解耦，频控跨玩法全局共享）、
     /// 去广告状态恢复与持久化（D-7 存档分区 box.commerce，15 号文档 §2）。
     /// 注意：本文件在 #if SUDOKU_ADMOB 下编译——需先导入 google_mobile_ads v11.x .unitypackage，
     /// 再通过 Editor 菜单「Box/商业化/应用 AdMob+IAP 编译符号」写入该符号（Phase7AdMobSetup.cs）。
@@ -214,8 +215,16 @@ namespace Box.Services
         }
 
         /// <summary>
-        /// 展示插屏（一局结束时的候选点）。频控判定在展示前完成：
-        /// 去广告零插屏 → 前 3 局不弹 → 距上次间隔 4~6 分钟。
+        /// 每完成一局（过关）通知（M3.2 接口）。频控计数与展示解耦：
+        /// 玩法层过关瞬间调用（数独/水排序任一玩法都累计，全局共享），连关路径也照常计数；
+        /// 展示判定只发生在「过关 → 返回选关/大厅」类局间出口（ShowInterstitial 调用点）。
+        /// </summary>
+        public void NotifyLevelCompleted() => _frequency.NotifyLevelCompleted();
+
+        /// <summary>
+        /// 展示插屏（局间出口候选点，连关路径不调用）。频控判定在展示前完成：
+        /// 去广告零插屏 → 前 3 局不弹 → 距上次间隔 4~6 分钟（参数表见 AdFrequencySettings）。
+        /// 计数不在本方法自增——由玩法层 NotifyLevelCompleted 上报（计数与展示解耦，WS-12）。
         /// 展示成功后将下次允许时间记录为 now + 随机 4~6 分钟。
         /// </summary>
         public void ShowInterstitial()
@@ -226,7 +235,6 @@ namespace Box.Services
                 return;
             }
 
-            _frequency.OnLevelEnded(); // 每局结束计数（频控用）
             if (!_frequency.CanShowInterstitial())
             {
                 Debug.Log("[AdMob] 插屏频控未通过（前 3 局保护或未到间隔）");

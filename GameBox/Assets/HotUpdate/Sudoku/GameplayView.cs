@@ -197,18 +197,23 @@ namespace Box.HotUpdate.Sudoku
                     await UniTask.DelayFrame(1); // 防御:弹窗展示失败(资源缺失/路由占用)时 Action 不变,放行帧防同帧死循环(watchdog 断点)
             }
 
-            // 局间插屏候选点(Phase 7 7-1):结算弹窗关闭后展示,不打断结算阅读。
-            // 频控在 AdsService 内部(去广告零广告 / 前 3 局不弹 / 局间隔 4~6 分钟),桩实现同样生效。
-            ServiceLocator.Ads?.ShowInterstitial();
+            // 过关计数(M3.2 频控全局化,WS-12):数独/水排序任一玩法过关都累计(全局共享,
+            // 「前 N 局保护」按真实完成局数计)。计数与展示解耦——连关路径也照常上报,
+            // 是否展示插屏由下面的局间出口(非 Next 分支)单独判定。
+            ServiceLocator.Ads?.NotifyLevelCompleted();
 
             if (result.Action == SettlementAction.Next)
             {
+                // 连关路径:只计数不插屏(WS-12 连关不插屏,不打断连续对局节奏)
                 StartGame(GameContext.IsDaily
                     ? PuzzleFactory.CreateDaily(GameContext.DailySeed)
                     : PuzzleFactory.Create(GameContext.Difficulty));
             }
             else
             {
+                // 过关 → 回菜单:局间插屏候选点(结算弹窗关闭后展示,不打断结算阅读)。
+                // 频控在 AdsService 内部(去广告零广告 / 前 3 局不弹 / 局间隔 4~6 分钟),桩实现同样生效。
+                ServiceLocator.Ads?.ShowInterstitial();
                 await ExitToMainMenuAsync();
             }
         }

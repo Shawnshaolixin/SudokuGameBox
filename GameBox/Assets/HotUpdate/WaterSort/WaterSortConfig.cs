@@ -20,6 +20,9 @@ namespace Box.HotUpdate.WaterSort
         public static int ExtraTubePriceCoins = 40;     // 单价(币/次)
         public static int ExtraTubeLimitPerLevel = 2;   // 每关可购次数
 
+        // 结算翻倍(WS-12 第三点位):仅首通奖励可翻倍——看完激励视频按首通奖励额再加发一份(合计 2×)
+        public static int RewardDoubleLimitPerLevel = 1; // 每关可翻倍次数(StartLevel 复位)
+
         // 首通奖励(WS-08):仅首通发放(重玩/已解锁关卡通关不发),随关号线性递增至封顶
         public static int FirstWinRewardBase = 20;      // 第 1 关奖励
         public static int FirstWinRewardStep = 4;       // 每关递增步长

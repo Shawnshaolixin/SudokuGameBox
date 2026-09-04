@@ -34,6 +34,9 @@ namespace Box.HotUpdate.WaterSort
         /// <summary>本关已购额外空瓶次数(上限在 WaterSortConfig;Undo 加管会回退本计数——管已移除,可再购新管)。</summary>
         public int ExtraTubesUsed { get; private set; }
 
+        /// <summary>本关已翻倍次数(上限在 WaterSortConfig.RewardDoubleLimitPerLevel;结算激励点位,StartLevel 复位)。</summary>
+        public int RewardDoublesUsed { get; private set; }
+
         /// <summary>盘面变更(倒水/撤销/重开/加管成功后)——视图刷新试管区与步数。 </summary>
         public event Action BoardChanged;
 
@@ -71,6 +74,7 @@ namespace Box.HotUpdate.WaterSort
             MoveCount = 0;
             HintsUsed = 0;
             ExtraTubesUsed = 0;
+            RewardDoublesUsed = 0;
             _history.Clear();
             _solvedNotified = false;
             IsInLevel = true;
@@ -117,10 +121,23 @@ namespace Box.HotUpdate.WaterSort
         }
 
         /// <summary>
+        /// 提示可达性预检(M3.1 激励链路用):当前盘是否有首解第一步,无副作用不落子。
+        /// 金币不足走激励视频前先预检——死局下广告发放层拿不到提示(TryHint 会失败),
+        /// 玩家白看广告是差评点,故弹确认框前先挡掉。
+        /// </summary>
+        public bool CanHint()
+        {
+            if (!IsInLevel || Board == null || Board.IsSolved()) return false;
+            var r = WaterSortSolver.SolveAny(Board, WaterSortConfig.HintSolveTimeLimitMs);
+            return r.Solved && r.Solution != null && r.Solution.Count > 0;
+        }
+
+        /// <summary>
         /// 提示(WS-06):对当前盘求首解并自动走出第一步(SolveAny ≤400ms 预算,Spike 全色数性能背书,
         /// 低端机真机复测留 M3)。成功才计次;失败(死局/超时)返回 false,视图不扣币并引导撤销
         /// —— 玩家自走路径可能走进"无解死角"(合法但不聪明的倒水),此时提示不可用是诚实反馈。
         /// 撤销提示 = 普通倒水撤销(盘面/步数回退),金币与计数不退(消费型动作)。
+        /// 双通道共用发放层(M3.1):金币直购与激励视频回奖都经本方法落子+计数,扣币与否在视图调用点。
         /// </summary>
         public bool TryHint()
         {
@@ -156,6 +173,17 @@ namespace Box.HotUpdate.WaterSort
             Board = new WaterSortBoard(src.Colors, src.TubeCount - src.Colors + 1, tubes); // 空管数 +1 → 末支新管自然为空
             ExtraTubesUsed++;
             BoardChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>翻倍是否可用(未达每关上限;上限在 WaterSortConfig)。</summary>
+        public bool CanDoubleReward => RewardDoublesUsed < WaterSortConfig.RewardDoubleLimitPerLevel;
+
+        /// <summary>结算翻倍记账(WS-12,激励发放回调内):计一次;达上限返回 false(视图按钮同步禁用)。</summary>
+        public bool TryMarkRewardDoubled()
+        {
+            if (RewardDoublesUsed >= WaterSortConfig.RewardDoubleLimitPerLevel) return false;
+            RewardDoublesUsed++;
             return true;
         }
     }

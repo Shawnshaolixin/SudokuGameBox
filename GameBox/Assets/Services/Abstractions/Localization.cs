@@ -151,6 +151,13 @@ namespace Box.Services
             { "watersort.daily.streak", "已连续 {0} 天" }, // 连续完成天数(Streak)
             { "watersort.daily.play", "开始挑战" }, // 今日未完成时按钮
             { "watersort.daily.replay", "再玩一次" }, // 今日已完成时按钮(重玩不重复落完成/不发奖)
+
+            // 激励视频三点位(M3.1,WS-12/13):确认面板消息 + 结算翻倍按钮;按钮文案复用 hint.ad.confirm/cancel
+            { "watersort.ad.hint", "金币不足,看广告免费获得 1 次提示(每关最多 {0} 次)" },
+            { "watersort.ad.tube", "金币不足,看广告免费获得 1 支空瓶(每关最多 {0} 次)" },
+            { "watersort.ad.double", "观看完整广告,首通金币奖励翻倍(每关最多 {0} 次)" },
+            { "watersort.btn.double", "翻倍奖励" }, // 结算翻倍按钮(仅首通结算显示)
+            { "watersort.btn.doubled", "已翻倍" },  // 翻倍完成后按钮文案(禁用态)
         };
 
         static readonly Dictionary<string, string> _en = new Dictionary<string, string>
@@ -247,6 +254,13 @@ namespace Box.Services
             { "watersort.daily.streak", "{0}-day streak" },
             { "watersort.daily.play", "Start" },
             { "watersort.daily.replay", "Play again" },
+
+            // Rewarded-video points (M3.1, WS-12/13); buttons reuse hint.ad.confirm/cancel
+            { "watersort.ad.hint", "Low on coins? Watch an ad for a free hint (up to {0} per level)" },
+            { "watersort.ad.tube", "Low on coins? Watch an ad for a free empty tube (up to {0} per level)" },
+            { "watersort.ad.double", "Watch a full ad to double your first-win coins (up to {0} per level)" },
+            { "watersort.btn.double", "Double Reward" },
+            { "watersort.btn.doubled", "Doubled" },
         };
     }
 }

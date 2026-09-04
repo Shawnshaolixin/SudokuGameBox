@@ -28,8 +28,10 @@ namespace Box.HotUpdate.WaterSort
     ///   GamePanel/StepText                  TMP 步数(每次盘面刷新同步)
     ///   GamePanel/TubeArea                  试管容器(本视图 AddComponent WaterSortTubeRack 代码绘制+点击)
     ///   GamePanel/BottomBar/UndoButton | RestartButton   免费操作(本版已接)
-    ///   GamePanel/BottomBar/HintButton | ExtraTubeButton 金币直购提示/加空瓶(M1.4 已接;激励视频分支 M3 复用同钮)
-    ///   SettlePanel/Title | ResultText | RewardText | NextButton | RetryButton | HubButton(RewardText 仅首通结算显示)
+    ///   GamePanel/BottomBar/HintButton | ExtraTubeButton 道具双通道钮(M1.4 金币直购;M3.1 加激励分支复用同钮)
+    ///   SettlePanel/Title | ResultText | RewardText | DoubleButton | NextButton | RetryButton | HubButton
+    ///                     (RewardText+DoubleButton 仅首通结算显示:奖励行左、翻倍钮右,同一行)
+    ///   AdPanel/Card/MessageText | ConfirmButton | CancelButton  激励确认面板(M3.1 内嵌,见退出纪律)
     ///   DailyPanel/Title | StateText | StreakText | PlayButton | BackButton  每日主页(M2.3;完成态/Streak/重玩)
     ///
     /// 每日挑战(M2.3)模式语义:视图内模式 = 会话标记(WaterSortSession.IsDaily);选关页「每日挑战」
@@ -38,11 +40,16 @@ namespace Box.HotUpdate.WaterSort
     /// 再换回常规会话。对局/结算共用面板,差异全部收敛在:标题文案、完成落盘(每日 → dailyDoneSeeds,
     /// 常规 → firstWinLevels+发币)、Next 放行(每日恒禁)。
     ///
-    /// 退出纪律(与 WaterSortModule.OnExit 配合):本视图是模块压入 Router 的唯一自属视图,M1 内模块
-    /// 不会在其上再压 Router 弹窗(结算/选关都是面板切换),故 OnHide 只会在「真的被 Pop」时触发
-    /// (主动 HubButton 或返回键)——即用户离开模块的唯一信号 → ExitAsync 复位模块状态(防卡 Active)。
-    /// ⚠️ M2 若需在本视图之上压 Router 弹窗(如每日奖励),须按 DifficultySelectView 的
-    /// StackCount!=0 被盖守卫模式复检,防被盖时误退。
+    /// 道具双通道(M3.1,WS-08/12):提示/空瓶按钮点击 → 金币充足 = 金币直购(M1 行为,成功才扣币);
+    /// 金币不足 = 激励确认面板(消息说明用途/上限)→ 确认后去广告用户伪视频直发(IsAdsRemoved,
+    /// WS-13)或看完整激励视频 → 免费发放。发放层共用 Session 方法(计数/盘面效果),扣币与否在调用点;
+    /// 结算翻倍(第三点位)同样经确认面板,奖励再发一份(GrantCoins 同层入账)。
+    ///
+    /// 退出纪律(与 WaterSortModule.OnExit 配合):本视图是模块压入 Router 的唯一自属视图,对局/选关/
+    /// 结算都是面板切换不压 Router 弹窗(M3.1 激励确认 = 玩法内嵌 AdPanel 子树,刻意不用 Router:
+    /// PushAsync 覆盖下层会 HideAsync 触发本视图 OnHide = 退模块,故激励面板零路由生命周期,
+    /// 遮罩拦点击、关闭只翻自身)。OnHide 只会在「真的被 Pop」时触发(主动 HubButton 或返回键)
+    /// ——即用户离开模块的唯一信号 → ExitAsync 复位模块状态(防卡 Active)。
     /// </summary>
     public sealed class WaterSortView : UIView
     {
@@ -57,9 +64,15 @@ namespace Box.HotUpdate.WaterSort
         Transform _itemTemplate, _content;
         TextMeshProUGUI _resultText, _stepText;
         BoxButton _nextButton, _undoButton, _restartButton;
-        BoxButton _hintButton, _extraTubeButton; // 金币消费点(见 OnHint/OnAddExtraTube)
+        BoxButton _hintButton, _extraTubeButton; // 双通道道具钮(金币直购 | 激励兜底,见 OnHint/OnAddExtraTube)
+        BoxButton _doubleButton;                 // 结算翻倍钮(激励点位,见 OnDoubleReward)
         TextMeshProUGUI _rewardText;             // 结算首通奖励行(仅首通过关时 SetActive + 文案)
         TextMeshProUGUI _coinLabel;              // 对局顶栏金币余额(随消费/发奖就近刷新)
+        int _rewardAmount;                       // 本次首通奖励额(M3.1 翻倍源;翻倍后按 2× 累计,非首通结算恒 0)
+        Transform _adPanel;                      // 内嵌激励确认面板(WS-12;不进 Router,见类头退出纪律)
+        TextMeshProUGUI _adMessage;              // 面板消息(点位文案 + 次数上限参数)
+        Action _adGrant;                         // 确认后的发放动作(点位闭包注入;取消/面板关闭即置空)
+        string _adPoint;                         // 当前点位名(激励完成埋点 placement,04 文档 §5)
         TextMeshProUGUI _dailyStateText, _dailyStreakText; // 每日主页:今日状态 + 连续天数
         BoxButton _dailyPlayButton;              // 每日主页:开始/再玩今日挑战(题库就绪才可点)
         WaterSortDailyPack _dailyPack;           // 本次会话每日题库缓存(主页/开局同源取关)
@@ -89,8 +102,11 @@ namespace Box.HotUpdate.WaterSort
             _restartButton = FindInCard("GamePanel/BottomBar/RestartButton")?.GetComponent<BoxButton>();
             _hintButton = FindInCard("GamePanel/BottomBar/HintButton")?.GetComponent<BoxButton>();
             _extraTubeButton = FindInCard("GamePanel/BottomBar/ExtraTubeButton")?.GetComponent<BoxButton>();
+            _doubleButton = FindInCard("SettlePanel/DoubleButton")?.GetComponent<BoxButton>();
             _rewardText = FindInCard("SettlePanel/RewardText")?.GetComponent<TextMeshProUGUI>();
             _coinLabel = FindInCard("GamePanel/TopBar/CoinLabel")?.GetComponent<TextMeshProUGUI>();
+            _adPanel = FindInCard("AdPanel");
+            _adMessage = FindInCard("AdPanel/Card/MessageText")?.GetComponent<TextMeshProUGUI>();
             _dailyStateText = FindInCard("DailyPanel/StateText")?.GetComponent<TextMeshProUGUI>();
             _dailyStreakText = FindInCard("DailyPanel/StreakText")?.GetComponent<TextMeshProUGUI>();
             _dailyPlayButton = FindInCard("DailyPanel/PlayButton")?.GetComponent<BoxButton>();
@@ -105,14 +121,18 @@ namespace Box.HotUpdate.WaterSort
             Bind("SelectPanel/DailyButton", OnOpenDailyHome); // 每日入口(仅常规选关态可达)
             Bind("DailyPanel/BackButton", OnDailyBackToSelect);
             Bind("GamePanel/TopBar/BackButton", OnBackToSelect);
-            Bind("SettlePanel/HubButton", LeaveToHub);
+            // 结算 Hub 与选关 Hub 分开绑定(M3.2):过关后回大厅是唯一插屏候选出口(见 LeaveToHubAfterSettle)
+            Bind("SettlePanel/HubButton", LeaveToHubAfterSettle);
             Bind("SettlePanel/RetryButton", OnRetry);
             if (_nextButton != null) _nextButton.OnClick(OnNextLevel);
             if (_undoButton != null) _undoButton.OnClick(OnUndo);
             if (_restartButton != null) _restartButton.OnClick(OnRestart);
             if (_hintButton != null) _hintButton.OnClick(OnHint);
             if (_extraTubeButton != null) _extraTubeButton.OnClick(OnAddExtraTube);
+            if (_doubleButton != null) _doubleButton.OnClick(OnDoubleReward);
             if (_dailyPlayButton != null) _dailyPlayButton.OnClick(OnDailyPlay);
+            Bind("AdPanel/Card/ConfirmButton", OnAdConfirm); // 激励确认:关闭面板 → 伪视频直发/真激励
+            Bind("AdPanel/Card/CancelButton", OnAdCancel);   // 取消:只关面板(不发放)
             return UniTask.CompletedTask;
         }
 
@@ -387,38 +407,120 @@ namespace Box.HotUpdate.WaterSort
         }
 
         /// <summary>
-        /// 提示(金币直购,WS-06):单价/每关上限走 WaterSortConfig。成功才扣币 —— 会话求解失败
-        /// (玩家走入无解死角/超时)返回 false 时不收费,仅 toast 引导撤销。扣币后余额/按钮态立即刷新。
+        /// 提示(双通道,WS-06/08/12):金币充足 → 金币直购(M1 行为,成功才扣币 —— 求解失败即玩家走入
+        /// 无解死角,不向死局收币);金币不足 → 激励链路(确认面板 → 去广告直发/看完整视频 → 免费发放)。
+        /// 发放层共用 Session.TryHint(落子+计数),扣币与否在调用点;每关上限读 WaterSortConfig,
+        /// 金币与激励同额共限不另立字段(防刷)。
         /// </summary>
         void OnHint()
         {
             if (_session == null || !_session.IsInLevel) return; // 结算/选关面板按钮不可达,双保险
             if (_session.HintsUsed >= WaterSortConfig.HintLimitPerLevel) return;
-            if ((ServiceLocator.Save?.Coins ?? 0) < WaterSortConfig.HintPriceCoins)
+            var save = ServiceLocator.Save;
+            if (save != null && save.Coins >= WaterSortConfig.HintPriceCoins)
             {
-                ShowToast("watersort.toast.noCoins");
+                if (!_session.TryHint())
+                {
+                    ShowToast("watersort.toast.hintFail"); // 无可解续路:诚实提示引导撤销,不向死局收币
+                    return;
+                }
+                TrySpendCoins("hint", WaterSortConfig.HintPriceCoins);
                 return;
             }
-            if (!_session.TryHint())
+            // 激励通道:弹确认面板前先预检可解(死局看广告 = 白看;CanHint 只解不落子,无副作用)
+            if (!_session.CanHint())
             {
-                ShowToast("watersort.toast.hintFail"); // 无可解续路:诚实提示引导撤销,不向死局收币
+                ShowToast("watersort.toast.hintFail");
                 return;
             }
-            TrySpendCoins("hint", WaterSortConfig.HintPriceCoins);
+            ShowAdPanel("watersort.ad.hint", WaterSortConfig.HintLimitPerLevel, "hint",
+                () => GrantFreeAction(_session.TryHint));
         }
 
-        /// <summary>额外空瓶(金币直购,WS-06/13):+1 支空管(每关上限走配置);同上成功才扣币。</summary>
+        /// <summary>
+        /// 额外空瓶(双通道,WS-06/13):+1 支空管(每关上限走配置);金币直购同 M1 成功才扣币;
+        /// 金币不足走激励链路。加管恒成功(上限内),无需预检。
+        /// </summary>
         void OnAddExtraTube()
         {
             if (_session == null || !_session.IsInLevel) return;
             if (_session.ExtraTubesUsed >= WaterSortConfig.ExtraTubeLimitPerLevel) return;
-            if ((ServiceLocator.Save?.Coins ?? 0) < WaterSortConfig.ExtraTubePriceCoins)
+            var save = ServiceLocator.Save;
+            if (save != null && save.Coins >= WaterSortConfig.ExtraTubePriceCoins)
             {
-                ShowToast("watersort.toast.noCoins");
+                if (!_session.TryAddExtraTube()) return; // 上限内恒成功;失败静默(防御,理论不可达)
+                TrySpendCoins("extra_tube", WaterSortConfig.ExtraTubePriceCoins);
                 return;
             }
-            if (!_session.TryAddExtraTube()) return; // 上限内恒成功;失败静默(防御,理论不可达)
-            TrySpendCoins("extra_tube", WaterSortConfig.ExtraTubePriceCoins);
+            ShowAdPanel("watersort.ad.tube", WaterSortConfig.ExtraTubeLimitPerLevel, "extra_tube",
+                () => GrantFreeAction(_session.TryAddExtraTube));
+        }
+
+        /// <summary>激励免费发放(M3.1):执行发放动作(金币购同款 Session 方法,仅不扣币);失败即 toast(观看期
+        /// 盘面不可变,失败仅超时边缘防御)。动作内部会经 BoardChanged 链刷新按钮态。</summary>
+        void GrantFreeAction(Func<bool> grant)
+        {
+            if (grant != null && !grant()) ShowToast("watersort.toast.hintFail");
+            SyncConsumeButtons(); // 防御性兜底:发放成功路径已由 RefreshTubeArea 链刷新,失败路径补一次
+        }
+
+        // ---- 激励确认面板(M3.1 内嵌 AdPanel;UIRouter 覆盖会触发本视图 OnHide=退模块,故不走 Router 栈) ----
+
+        /// <summary>弹出激励确认面板:注入点位消息/上限/发放回调。发放只发生在确认(OnAdConfirm)后。</summary>
+        void ShowAdPanel(string messageKey, int arg, string point, Action grant)
+        {
+            if (_adPanel == null) // prefab 缺 AdPanel(编辑期/资源异常):跳过确认直接发放,不卡流程
+            {
+                grant?.Invoke();
+                return;
+            }
+            _adGrant = grant;
+            _adPoint = point;
+            if (_adMessage != null) _adMessage.text = L10n.Format(messageKey, arg);
+            _adPanel.gameObject.SetActive(true); // 遮罩拦点击:面板弹出期间下层按钮不可达
+        }
+
+        void HideAdPanel()
+        {
+            if (_adPanel != null) _adPanel.gameObject.SetActive(false);
+        }
+
+        void OnAdConfirm()
+        {
+            HideAdPanel();
+            var grant = _adGrant;
+            var point = _adPoint;
+            _adGrant = null; // 先清再发:发放动作可能再弹面板(理论不可达),防重入残留
+            _adPoint = null;
+            if (grant == null) return;
+            var ads = ServiceLocator.Ads;
+            if (ads == null) return;
+            if (ads.IsAdsRemoved)
+            {
+                // 去广告(WS-13):激励直接发放,伪视频秒完成(不展示真广告)
+                grant();
+                LogAdReward(point);
+                return;
+            }
+            ads.ShowRewardedAd(watched =>
+            {
+                if (!watched) return; // 中途关闭/未就绪:不发放
+                LogAdReward(point);
+                grant();               // 完整观看 → 发放(发放层 = 各点位 Session 方法,见调用点注释)
+            });
+        }
+
+        void OnAdCancel()
+        {
+            HideAdPanel();
+            _adGrant = null; // 取消不发放,防残留回调误触发
+            _adPoint = null;
+        }
+
+        /// <summary>激励完成埋点(04 文档 §5 ad_reward 字典:placement 点位)。</summary>
+        void LogAdReward(string placement)
+        {
+            ServiceLocator.Analytics?.LogEvent("watersort.ad_reward", "placement", placement);
         }
 
         // ---- 结算面板 ---- //
@@ -426,6 +528,9 @@ namespace Box.HotUpdate.WaterSort
         void OnLevelSolved()
         {
             if (_session == null) return;
+            // 过关计数(M3.2 全局频控,WS-12):常规/每日首解瞬间统一上报;展示只发生在结算 Hub 出口
+            // (LeaveToHubAfterSettle)——连关/重开只计数不插屏,计数与展示解耦(数独侧同构)。
+            ServiceLocator.Ads?.NotifyLevelCompleted();
             if (_session.IsDaily)
             {
                 // 每日挑战(WS-09):不发首通奖、不推进常规解锁,只落「今日完成」(Streak 由 WaterSortDailyStore
@@ -435,7 +540,7 @@ namespace Box.HotUpdate.WaterSort
                 if (_resultText != null)
                     _resultText.text = L10n.Format("watersort.settle.result",
                         _session.MoveCount, DifficultyText(_session.Difficulty));
-                if (_rewardText != null) _rewardText.gameObject.SetActive(false); // 每日挑战无首通奖励行
+                HideRewardRow(); // 每日挑战无首通奖励行(翻倍钮随之隐藏,WS-12 翻倍只对首通奖)
                 UpdateCoinLabel();
                 if (_nextButton != null) _nextButton.SetInteractable(false); // 每日仅一关:不提供「下一关」
                 return;
@@ -453,15 +558,55 @@ namespace Box.HotUpdate.WaterSort
             if (_resultText != null)
                 _resultText.text = L10n.Format("watersort.settle.result",
                     _session.MoveCount, DifficultyText(_session.Difficulty));
+            _rewardAmount = reward; // M3.1 翻倍源(翻倍后按 2× 累计重设;重玩恒 0 → 整行隐藏)
             if (_rewardText != null)
             {
                 // 首通显示奖励行;重玩整行隐藏(发奖理由清晰,防误导性重复奖励展示)
                 _rewardText.text = reward > 0 ? L10n.Format("watersort.settle.reward", reward) : "";
                 _rewardText.gameObject.SetActive(reward > 0);
             }
+            if (_doubleButton != null) _doubleButton.gameObject.SetActive(reward > 0); // 翻倍钮与奖励行同显
+            SetDoubleButtonState();
             UpdateCoinLabel(); // 发奖即刷新(顶栏在结算面板不可见,回对局时已是最新)
             bool nextUnlocked = firstWin && _session.LevelId < _totalLevels; // 有后关且本次推进才可点
             if (_nextButton != null) _nextButton.SetInteractable(nextUnlocked);
+        }
+
+        /// <summary>首通奖励行整行隐藏(每日结算/重玩结算;翻倍钮随行隐藏)。</summary>
+        void HideRewardRow()
+        {
+            _rewardAmount = 0;
+            if (_rewardText != null) _rewardText.gameObject.SetActive(false);
+            if (_doubleButton != null) _doubleButton.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// 结算翻倍(WS-12 第三点位):看完激励视频后按本关首通奖励额再加发一份(合计 2×,GrantCoins 同层
+        /// 入账;去广告用户伪视频直发)。每关上限读配置(StartLevel 复位);翻倍后按钮禁用+文案「已翻倍」,
+        /// 奖励行文本按 2× 累计重设(玩家所见即所得)。
+        /// </summary>
+        void OnDoubleReward()
+        {
+            if (_session == null || _rewardAmount <= 0 || !_session.CanDoubleReward) return;
+            ShowAdPanel("watersort.ad.double", WaterSortConfig.RewardDoubleLimitPerLevel, "double", () =>
+            {
+                if (!_session.TryMarkRewardDoubled()) return; // 达上限(理论不可达,按钮已禁):不重复发
+                GrantCoins(_rewardAmount); // 再加发一份 → 合计 2× 首通额
+                _rewardAmount *= 2;
+                if (_rewardText != null)
+                    _rewardText.text = L10n.Format("watersort.settle.reward", _rewardAmount);
+                SetDoubleButtonState();
+            });
+        }
+
+        /// <summary>翻倍钮可用态/文案:首通奖励可翻倍 → 「翻倍奖励」可点;已翻倍 → 「已翻倍」禁用。</summary>
+        void SetDoubleButtonState()
+        {
+            if (_doubleButton == null) return;
+            bool available = _session != null && _rewardAmount > 0 && _session.CanDoubleReward;
+            _doubleButton.SetInteractable(available);
+            SetLabel("SettlePanel/DoubleButton",
+                available ? L10n.Get("watersort.btn.double") : L10n.Get("watersort.btn.doubled"));
         }
 
         void OnNextLevel()
@@ -494,6 +639,19 @@ namespace Box.HotUpdate.WaterSort
             if (_leaving) return;
             var router = UIService.Instance?.Router;
             if (router != null) router.PopAsync().Forget();
+        }
+
+        /// <summary>
+        /// 结算面板 → 回大厅(M3.2 过关后局间出口):插屏展示候选点。
+        /// 过关计数已在 OnLevelSolved 上报(NotifyLevelCompleted),此处只做展示判定——
+        /// 频控在 AdsService 内部(去广告零广告 / 前 3 局保护 / 局间隔 4~6 分钟)。
+        /// 不展示插屏的路径:连关(Next)/重开(Retry)连续玩法、对局中返回(BackButton)、
+        /// 选关页回大厅(未完成新对局,SelectPanel/HubButton 仍直连 LeaveToHub)。
+        /// </summary>
+        void LeaveToHubAfterSettle()
+        {
+            ServiceLocator.Ads?.ShowInterstitial();
+            LeaveToHub();
         }
 
         // ---- 会话订阅/文案 ---- //
@@ -539,6 +697,10 @@ namespace Box.HotUpdate.WaterSort
             SetLabel("SettlePanel/RetryButton", L10n.Get("watersort.btn.retry"));
             SetLabel("SettlePanel/HubButton", L10n.Get("settlement.home")); // 复用既有键(返回菜单)
             SetLabel("SettlePanel/NextButton", L10n.Get("watersort.btn.next"));
+            SetDoubleButtonState(); // 翻倍钮文案(翻倍前/已翻倍态;未进首通结算时行已隐藏,无碍)
+            // 激励确认面板按钮(M3.1):复用既有「看广告/取消」键(跨玩法通用文案,字库免新增)
+            SetLabel("AdPanel/Card/ConfirmButton", L10n.Get("hint.ad.confirm"));
+            SetLabel("AdPanel/Card/CancelButton", L10n.Get("hint.ad.cancel"));
         }
 
         string CoinText()
@@ -580,22 +742,20 @@ namespace Box.HotUpdate.WaterSort
         }
 
         /// <summary>
-        /// 提示/加管按钮可用态:局内 + 未达每关上限 + 余额充足。
-        /// 余额只在消费点变化(盒内无其他货币来源/消耗),上限只在 StartLevel/Undo(加管)变化,
-        /// 因此 RefreshTubeArea(盘面变更统一接缝)与本类扣币点调用即覆盖全部变化路径。
+        /// 提示/加管按钮可用态:局内 + 未达每关上限(M3.1 双通道起不再查余额 —— 余额不足也可点,
+        /// 点击走激励链路免费发放;金币够则金币直购,分发在 OnHint/OnAddExtraTube 内)。
+        /// 上限只在 StartLevel/Undo(加管)变化,因此 RefreshTubeArea(盘面变更统一接缝)与本类
+        /// 扣币/发放点调用即覆盖全部变化路径。
         /// </summary>
         void SyncConsumeButtons()
         {
             bool inLevel = _session != null && _session.IsInLevel;
-            long coins = ServiceLocator.Save != null ? ServiceLocator.Save.Coins : 0;
             if (_hintButton != null)
                 _hintButton.SetInteractable(inLevel
-                    && _session.HintsUsed < WaterSortConfig.HintLimitPerLevel
-                    && coins >= WaterSortConfig.HintPriceCoins);
+                    && _session.HintsUsed < WaterSortConfig.HintLimitPerLevel);
             if (_extraTubeButton != null)
                 _extraTubeButton.SetInteractable(inLevel
-                    && _session.ExtraTubesUsed < WaterSortConfig.ExtraTubeLimitPerLevel
-                    && coins >= WaterSortConfig.ExtraTubePriceCoins);
+                    && _session.ExtraTubesUsed < WaterSortConfig.ExtraTubeLimitPerLevel);
         }
 
         string DifficultyText(WaterSortDifficulty d)

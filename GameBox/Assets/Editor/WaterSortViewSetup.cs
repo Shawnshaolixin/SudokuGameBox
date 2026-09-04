@@ -157,6 +157,7 @@ public static class WaterSortViewSetup
         EnsureBinder(); // 新建后首次运行也会走自愈路径(此时必命中,保持行为单一路径)
         EnsureM14Nodes(); // M1.4:增量节点补建 + 几何校准(幂等,见下)
         EnsureM23DailyNodes(); // M2.3:每日入口按钮 + 每日主页面板(幂等,见下)
+        EnsureM31Nodes(); // M3.1:结算翻倍钮 + 激励确认面板(内嵌 AdPanel,不压 Router,幂等)
     }
 
     /// <summary>根挂/校准 HotViewBinder(幂等):LoadPrefabContents 原地改,保 GUID。</summary>
@@ -354,6 +355,68 @@ public static class WaterSortViewSetup
             {
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
                 Debug.Log("[WaterSortSetup] M2.3 每日挑战节点补建完成(DailyButton + DailyPanel)");
+            }
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>
+    /// M3.1 幂等补建激励点位节点(WS-12/13;契约见 WaterSortView 类头):
+    /// ① SettlePanel/DoubleButton —— 结算翻倍钮(仅首通结算显示);RewardText 左移缩宽,
+    ///    与右侧翻倍钮并成一行(旧几何 (0,2) 760x56 随本版一次性迁移);
+    /// ② AdPanel 整棵子树 —— 玩法内嵌激励确认面板(全屏遮罩 + 卡片:消息 + 看广告/取消两钮)。
+    ///    刻意不进 Router 栈:UIRouter 覆盖下层会触发其 OnHide,而水排序 OnHide=退模块(防被盖误退,
+    ///    见 WaterSortView 类头退出纪律);内嵌面板零路由生命周期 —— 遮罩拦点击,关闭只翻自身。
+    /// </summary>
+    static void EnsureM31Nodes()
+    {
+        var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        bool dirty = false;
+        try
+        {
+            // ① 结算翻倍行:RewardText(左列,文字右边界 80)与 DoubleButton(右列,左边界 170)同行不叠;
+            //    整行仅首通结算显示/隐藏由 WaterSortView.OnLevelSolved 控制(重玩与每日结算隐藏)
+            var settle = root.transform.Find("SettlePanel");
+            if (settle != null)
+            {
+                var reward = settle.Find("RewardText");
+                if (reward != null)
+                {
+                    var rt = (RectTransform)reward;
+                    var targetPos = new Vector2(-170, 2);
+                    var targetSize = new Vector2(500, 56);
+                    if (NotSame(rt.anchoredPosition, targetPos)) { rt.anchoredPosition = targetPos; dirty = true; }
+                    if (NotSame(rt.sizeDelta, targetSize)) { rt.sizeDelta = targetSize; dirty = true; }
+                }
+                if (settle.Find("DoubleButton") == null)
+                {
+                    NewButton(settle, "DoubleButton", "", new Vector2(330, 2), new Vector2(320, 88), true);
+                    dirty = true;
+                }
+            }
+            // ② 内嵌激励确认面板(根下最后兄弟 → 恒盖其它面板;行为在 WaterSortView.ShowAdPanel)
+            if (root.transform.Find("AdPanel") == null)
+            {
+                var overlay = NewNode(root.transform, "AdPanel", Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0));
+                Stretch(overlay);
+                var img = overlay.gameObject.AddComponent<Image>();
+                img.color = new Color(0, 0, 0, 0.55f);
+                img.raycastTarget = true; // 遮罩拦截点击:面板弹出期间下层按钮不可达
+                var card = NewNode(overlay, "Card", Vector2.zero, new Vector2(860, 440),
+                    new Color(0.10f, 0.14f, 0.18f, 0.98f));
+                NewText(card, "MessageText", "", new Vector2(0, 70), new Vector2(740, 210), 42, false);
+                NewButton(card, "ConfirmButton", "", new Vector2(-215, -155), new Vector2(360, 104), true);
+                NewButton(card, "CancelButton", "", new Vector2(215, -155), new Vector2(360, 104), true);
+                overlay.gameObject.SetActive(false); // 初始隐藏(ShowAdPanel 弹出)
+                dirty = true;
+            }
+            if (dirty)
+            {
+                PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+                Debug.Log("[WaterSortSetup] M3.1 激励点位节点补建完成(DoubleButton + AdPanel)");
             }
         }
         finally

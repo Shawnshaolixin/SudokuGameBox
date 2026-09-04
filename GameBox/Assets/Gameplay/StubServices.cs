@@ -8,13 +8,16 @@ namespace Box.Gameplay
     /// 广告桩实现:未接入 AdMob 时使用。
     /// 模拟激励视频「直接看完并发放奖励」,方便你在不装任何 SDK 的情况下先跑通流程。
     /// 保留"接口 + 桩 + 真实现 + #if 开关"设计(10 文档 Phase 2-2):真实现(AdMob/Firebase/IAP)Phase 7 接入。
+    /// 插屏频控(M3.2)与真实现共用同一 AdFrequencyController(box.ads.* 键,构造时自动迁移旧
+    /// sudoku.ads.* 键):计数(NotifyLevelCompleted)与展示判定行为与 AdMobAdsService 一致——
+    /// 桩不简化频控规则,只简化「真实展示」本身。
+    /// 去广告键仍为桩本地 PlayerPrefs(开发用;真实现去广告走 D-7 box.commerce 存档分区)。
     /// </summary>
     public sealed class AdsServiceStub : IAdsService
     {
         private const string KeyAdsRemoved = "sudoku.ads.removed";
 
-        /// <summary>对局计数键(频控:新用户前 3 局不弹插屏;桩与真实现共用同键,迁移无缝)。</summary>
-        private const string KeyGamesPlayed = "sudoku.ads.gamesPlayed";
+        private readonly AdFrequencyController _frequency = new AdFrequencyController();
 
         public bool IsInitialized => true;
         public bool IsRewardedReady => true;
@@ -43,16 +46,20 @@ namespace Box.Gameplay
             onReward?.Invoke(true);
         }
 
-        /// <summary>桩插屏:不真正弹窗,按 04 文档频控规则做简化计数(新用户前 3 局不弹)。</summary>
+        /// <summary>过关计数(与真实现共用频控控制器,行为一致;去广告只挡展示不挡计数)。</summary>
+        public void NotifyLevelCompleted() => _frequency.NotifyLevelCompleted();
+
+        /// <summary>桩插屏:不真正弹窗,但与真实现走同一频控判定(前 N 局保护/局间隔),命中才模拟展示。</summary>
         public void ShowInterstitial()
         {
             if (IsAdsRemoved) return; // 去广告零广告
-            int games = PlayerPrefs.GetInt(KeyGamesPlayed, 0);
-            games += 1;
-            PlayerPrefs.SetInt(KeyGamesPlayed, games);
-            PlayerPrefs.Save();
-            if (games < 3) return; // 新用户前 3 局不弹插屏
-            Debug.Log("[AdsStub] 模拟插屏展示(接入 AdMob 后由真实现做完整频控:局间隔 4~6 分钟)");
+            if (!_frequency.CanShowInterstitial())
+            {
+                Debug.Log("[AdsStub] 插屏频控未通过(前 3 局保护或未到间隔),跳过");
+                return;
+            }
+            Debug.Log("[AdsStub] 模拟插屏展示(接入 AdMob 后由真实现接完整展示链路)");
+            _frequency.OnInterstitialShown();
         }
     }
 

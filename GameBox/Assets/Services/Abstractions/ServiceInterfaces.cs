@@ -22,11 +22,18 @@ namespace Box.Services
         /// <summary>展示激励视频;回调参数 true 表示玩家看完并应发放奖励。</summary>
         void ShowRewardedAd(Action<bool> onReward);
 
-        /// <summary>展示插屏广告(时机由玩法层在局间/自然停顿点调用)。</summary>
+        /// <summary>
+        /// 每完成一局(过关)通知(频控计数,与展示解耦)。全局共享(M3.2,WS-12):
+        /// 数独/水排序任一玩法过关都累计,「新用户前 N 局保护」按此计数——连关路径只计数、
+        /// 不在连关时展示插屏(展示只在 ShowInterstitial 的局间出口调用点)。
+        /// </summary>
+        void NotifyLevelCompleted();
+
+        /// <summary>展示插屏广告(时机由玩法层在「过关 → 返回关卡选择/大厅」类局间出口调用;连关不调用)。</summary>
         /// <remarks>
-        /// 频控规则(04 文档 §广告频控,真实现内部执行):
+        /// 频控规则(04 文档 §广告频控,真实现内部执行,参数默认表见 AdFrequencySettings):
         /// 1. 已购去广告 → 零广告;
-        /// 2. 新用户前 3 局不弹插屏;
+        /// 2. 新用户前 N 局不弹插屏(N 默认 3);
         /// 3. 插屏局间至少间隔 4~6 分钟(取随机值,避免可预测节奏)。
         /// </remarks>
         void ShowInterstitial();
