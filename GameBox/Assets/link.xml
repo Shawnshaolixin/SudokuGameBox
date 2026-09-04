@@ -8,6 +8,12 @@
     <assembly fullname="Box.HotUpdate.Sudoku" preserve="all" />
 
     <!--
+        M1.4(19 文档 WS-20):水排序入口类型保留,防 IL2CPP 裁剪 —— 同上,入口经 entryType
+        字符串反射,无静态引用。随包 AOT(v1.0 语义)与热更解释执行共用同一 link.xml。
+    -->
+    <assembly fullname="Box.HotUpdate.WaterSort" preserve="all" />
+
+    <!--
         Phase 9 9-4 真机闭环踩坑:HybridCLR.RuntimeApi 必须保留!
         HotUpdateService 用 Type.GetType("HybridCLR.RuntimeApi") 反射探测运行时存在性,
         无静态引用 → IL2CPP 链接裁剪掉 → 真机判定 v1.0 语义 → 热更链路静默跳过。

@@ -1,4 +1,5 @@
 using System.IO;
+using Box.ModuleFramework;
 using Box.UI;
 using TMPro;
 using UnityEditor;
@@ -23,6 +24,8 @@ using WaterSort.Core;
 ///    与运行期加载结构 WaterSortLevelPack 同源(JsonUtility 反序列化直读)。
 /// ③ 全部入新建组 Game_WaterSort(PRD WS-20 组名;prefab 地址 UI/WaterSortView = WaterSortModule.
 ///    MainViewAddress;JSON 地址 WaterSort/Levels/regular_levels.json = WaterSortLevelStore.LevelsAddress)。
+/// ④ 幂等补建 M1.4 节点(底栏四钮布局/结算奖励行,几何校准重复执行零写入)+ 模块清单接入
+///    (id=watersort → WaterSortModule,Phase45ModuleSetup.AddEntry 幂等,13 文档步骤 3)。
 /// </summary>
 public static class WaterSortViewSetup
 {
@@ -59,6 +62,7 @@ public static class WaterSortViewSetup
         RegisterPrefabEntry();
         GenerateLevelsJson(levelCount);
         RegisterLevelsEntry();
+        EnsureModuleEntry(); // 清单接入(幂等):大厅 More Games 入口新增「水排序」
         AssetDatabase.SaveAssets();
         Debug.Log($"[WaterSortSetup] 资源就绪: prefab + Game_WaterSort 组 + {levelCount} 关题库");
     }
@@ -75,6 +79,7 @@ public static class WaterSortViewSetup
             Debug.Log("[WaterSortSetup] 已新建 prefab: " + PrefabPath);
         }
         EnsureBinder(); // 新建后首次运行也会走自愈路径(此时必命中,保持行为单一路径)
+        EnsureM14Nodes(); // M1.4:增量节点补建 + 几何校准(幂等,见下)
     }
 
     /// <summary>根挂/校准 HotViewBinder(幂等):LoadPrefabContents 原地改,保 GUID。</summary>
@@ -158,6 +163,102 @@ public static class WaterSortViewSetup
         game.gameObject.SetActive(false);
         settle.gameObject.SetActive(false);
         return root;
+    }
+
+    // ---- ①b M1.4 增量节点与清单接入(幂等:缺则建、几何漂移才校准;重复执行零写入) ----
+
+    /// <summary>底栏按钮几何契约(M1.3 两钮 → M1.4 四钮;位置/宽度与 WaterSortView 类头契约同步)。</summary>
+    struct BarButtonSpec
+    {
+        public string Name;
+        public Vector2 Pos;
+        public Vector2 Size;
+    }
+
+    static readonly BarButtonSpec[] BarButtons =
+    {
+        new BarButtonSpec { Name = "UndoButton",      Pos = new Vector2(-405, 0), Size = new Vector2(206, 96) },
+        new BarButtonSpec { Name = "HintButton",      Pos = new Vector2(-135, 0), Size = new Vector2(206, 96) },
+        new BarButtonSpec { Name = "ExtraTubeButton", Pos = new Vector2(135, 0),  Size = new Vector2(206, 96) },
+        new BarButtonSpec { Name = "RestartButton",   Pos = new Vector2(405, 0),  Size = new Vector2(206, 96) },
+    };
+
+    /// <summary>
+    /// M1.4 幂等补建:底栏「提示/空瓶」两钮 + 结算奖励行 RewardText;既有钮按几何契约校准
+    /// (两钮 → 四钮布局一次性迁移,Label 随钮宽收缩;重复执行比对一致即零写盘)。
+    /// 热更视图不序列化进 prefab,本区域只补纯 AOT 节点容器(与 BuildRootTree 同构),行为全在 WaterSortView。
+    /// </summary>
+    static void EnsureM14Nodes()
+    {
+        var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        bool dirty = false;
+        try
+        {
+            var bottom = root.transform.Find("GamePanel/BottomBar");
+            if (bottom != null)
+            {
+                foreach (var b in BarButtons)
+                {
+                    var t = bottom.Find(b.Name);
+                    if (t == null)
+                    {
+                        NewButton(bottom, b.Name, "", b.Pos, b.Size, true); // 与 M1.3 按钮同构(Accent + BoxButton + Label)
+                        dirty = true;
+                        continue;
+                    }
+                    // 已存在(M1.3 两钮 / 布局漂移):校准几何与 Label 留边
+                    var rt = (RectTransform)t;
+                    if (NotSame(rt.anchoredPosition, b.Pos)) { rt.anchoredPosition = b.Pos; dirty = true; }
+                    if (NotSame(rt.sizeDelta, b.Size)) { rt.sizeDelta = b.Size; dirty = true; }
+                    var label = t.Find("Label");
+                    var labelSize = b.Size - new Vector2(24, 16); // NewButton 的文案留边口径
+                    if (label != null && NotSame(((RectTransform)label).sizeDelta, labelSize))
+                    {
+                        ((RectTransform)label).sizeDelta = labelSize;
+                        dirty = true;
+                    }
+                }
+            }
+            var settle = root.transform.Find("SettlePanel");
+            if (settle != null && settle.Find("RewardText") == null)
+            {
+                // 奖励行夹在 ResultText 与 NextButton 间的留白带;运行时按首通 SetActive(见 WaterSortView.OnLevelSolved)
+                NewText(settle, "RewardText", "", new Vector2(0, 2), new Vector2(760, 56), 44, false);
+                dirty = true;
+            }
+            if (dirty)
+            {
+                PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+                Debug.Log("[WaterSortSetup] M1.4 节点补建完成(底栏四钮 + 结算奖励行)");
+            }
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    static bool NotSame(Vector2 a, Vector2 b)
+    {
+        // 0.05 单位容差:防重复执行对等效几何产生无谓写盘(prefab 内容漂移比对)
+        return Mathf.Abs(a.x - b.x) > 0.05f || Mathf.Abs(a.y - b.y) > 0.05f;
+    }
+
+    /// <summary>
+    /// 模块清单接入(13 文档步骤 3,幂等):入口 id="watersort" → WaterSortModule(弹窗模式,无场景)。
+    /// 清单资产由 Phase4.5 生成并入库(Resources/Config/ModuleCatalog.asset);缺失时提示先行,不静默新建防双写。
+    /// </summary>
+    static void EnsureModuleEntry()
+    {
+        var catalog = AssetDatabase.LoadAssetAtPath<ModuleCatalog>("Assets/Resources/Config/ModuleCatalog.asset");
+        if (catalog == null)
+        {
+            Debug.LogWarning("[WaterSortSetup] ModuleCatalog.asset 缺失:请先执行 Phase45ModuleSetup.Build");
+            return;
+        }
+        // entryScene 为 v1.1 单场景化后废弃字段,传空串;大厅排序在数独(0)之后
+        Phase45ModuleSetup.AddEntry(catalog, "watersort",
+            "Box.HotUpdate.WaterSort.WaterSortModule", "", "水排序", 1);
     }
 
     // ---- ② 关卡 JSON(数量变化才重写;同种子确定性,重复执行内容一致) ----

@@ -136,6 +136,11 @@ namespace Box.Services
             { "watersort.btn.restart", "重开" },
             { "watersort.btn.retry", "重试" },
             { "watersort.btn.next", "下一关" },
+            { "watersort.btn.hint", "提示" }, // M1.4 金币消费点(单价/上限见 WaterSortConfig)
+            { "watersort.btn.tube", "空瓶" }, // 额外空瓶(金币购买 +1 支空管)
+            { "watersort.settle.reward", "金币 +{0}" }, // 首通奖励行(结算,仅首通显示)
+            { "watersort.toast.noCoins", "金币不足" },
+            { "watersort.toast.hintFail", "暂无可提示的走法,试试撤销" }, // 求解失败(死局/超时)不扣币
             { "watersort.toast.noLevels", "关卡包缺失,请稍后重进" }, // 题库加载失败(构建期错误兜底)
             { "watersort.toast.badLevel", "关卡数据异常" }, // 越界/损坏条目
         };
@@ -219,6 +224,11 @@ namespace Box.Services
             { "watersort.btn.restart", "Restart" },
             { "watersort.btn.retry", "Retry" },
             { "watersort.btn.next", "Next" },
+            { "watersort.btn.hint", "Hint" },
+            { "watersort.btn.tube", "Extra" },
+            { "watersort.settle.reward", "+{0} Coins" },
+            { "watersort.toast.noCoins", "Not enough coins" },
+            { "watersort.toast.hintFail", "No hint available. Try Undo." },
             { "watersort.toast.noLevels", "Level pack missing. Re-enter later." },
             { "watersort.toast.badLevel", "Level data error" },
         };

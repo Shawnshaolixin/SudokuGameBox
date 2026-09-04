@@ -27,8 +27,8 @@ namespace Box.HotUpdate.WaterSort
     ///   GamePanel/StepText                  TMP 步数(每次盘面刷新同步)
     ///   GamePanel/TubeArea                  试管容器(本视图 AddComponent WaterSortTubeRack 代码绘制+点击)
     ///   GamePanel/BottomBar/UndoButton | RestartButton   免费操作(本版已接)
-    ///   GamePanel/BottomBar/HintButton | ExtraTubeButton 金币/激励点位(M1.4 接配置后启用)
-    ///   SettlePanel/Title | ResultText | NextButton | RetryButton | HubButton
+    ///   GamePanel/BottomBar/HintButton | ExtraTubeButton 金币直购提示/加空瓶(M1.4 已接;激励视频分支 M3 复用同钮)
+    ///   SettlePanel/Title | ResultText | RewardText | NextButton | RetryButton | HubButton(RewardText 仅首通结算显示)
     ///
     /// 退出纪律(与 WaterSortModule.OnExit 配合):本视图是模块压入 Router 的唯一自属视图,M1 内模块
     /// 不会在其上再压 Router 弹窗(结算/选关都是面板切换),故 OnHide 只会在「真的被 Pop」时触发
@@ -49,6 +49,9 @@ namespace Box.HotUpdate.WaterSort
         Transform _itemTemplate, _content;
         TextMeshProUGUI _resultText, _stepText;
         BoxButton _nextButton, _undoButton, _restartButton;
+        BoxButton _hintButton, _extraTubeButton; // 金币消费点(见 OnHint/OnAddExtraTube)
+        TextMeshProUGUI _rewardText;             // 结算首通奖励行(仅首通过关时 SetActive + 文案)
+        TextMeshProUGUI _coinLabel;              // 对局顶栏金币余额(随消费/发奖就近刷新)
         WaterSortTubeRack _rack;     // 试管区渲染与点击(OnCreate 挂到 TubeArea;随视图销毁)
         int _totalLevels;            // 题库总量(结算面板「下一关」放行判定:仅推进且有后关才可点)
 
@@ -71,6 +74,10 @@ namespace Box.HotUpdate.WaterSort
             _nextButton = FindInCard("SettlePanel/NextButton")?.GetComponent<BoxButton>();
             _undoButton = FindInCard("GamePanel/BottomBar/UndoButton")?.GetComponent<BoxButton>();
             _restartButton = FindInCard("GamePanel/BottomBar/RestartButton")?.GetComponent<BoxButton>();
+            _hintButton = FindInCard("GamePanel/BottomBar/HintButton")?.GetComponent<BoxButton>();
+            _extraTubeButton = FindInCard("GamePanel/BottomBar/ExtraTubeButton")?.GetComponent<BoxButton>();
+            _rewardText = FindInCard("SettlePanel/RewardText")?.GetComponent<TextMeshProUGUI>();
+            _coinLabel = FindInCard("GamePanel/TopBar/CoinLabel")?.GetComponent<TextMeshProUGUI>();
 
             // 试管架:运行期挂到 TubeArea(热更组件不进 prefab 序列化,20 文档 §4 纪律同源)
             var tubeArea = FindInCard("GamePanel/TubeArea");
@@ -85,6 +92,8 @@ namespace Box.HotUpdate.WaterSort
             if (_nextButton != null) _nextButton.OnClick(OnNextLevel);
             if (_undoButton != null) _undoButton.OnClick(OnUndo);
             if (_restartButton != null) _restartButton.OnClick(OnRestart);
+            if (_hintButton != null) _hintButton.OnClick(OnHint);
+            if (_extraTubeButton != null) _extraTubeButton.OnClick(OnAddExtraTube);
             return UniTask.CompletedTask;
         }
 
@@ -237,6 +246,8 @@ namespace Box.HotUpdate.WaterSort
             _rack.Refresh();
             if (_stepText != null && _session != null)
                 _stepText.text = L10n.Format("watersort.step", _session.MoveCount);
+            UpdateCoinLabel();       // 玩法内无全局金币事件(盒内暂无钱包组件),随每次盘面刷新就近同步
+            SyncConsumeButtons();    // 上限/余额变化驱动提示与加管按钮禁用态(花钱点位不允许再点)
         }
 
         /// <summary>试管点击裁决:合法→会话推进(BoardChanged 驱动本区刷新);非法→源管抖动,选中保留可再试目标。</summary>
@@ -246,17 +257,66 @@ namespace Box.HotUpdate.WaterSort
             if (!_session.TryPour(src, dst)) _rack?.ShakeTube(src);
         }
 
+        /// <summary>
+        /// 提示(金币直购,WS-06):单价/每关上限走 WaterSortConfig。成功才扣币 —— 会话求解失败
+        /// (玩家走入无解死角/超时)返回 false 时不收费,仅 toast 引导撤销。扣币后余额/按钮态立即刷新。
+        /// </summary>
+        void OnHint()
+        {
+            if (_session == null || !_session.IsInLevel) return; // 结算/选关面板按钮不可达,双保险
+            if (_session.HintsUsed >= WaterSortConfig.HintLimitPerLevel) return;
+            if ((ServiceLocator.Save?.Coins ?? 0) < WaterSortConfig.HintPriceCoins)
+            {
+                ShowToast("watersort.toast.noCoins");
+                return;
+            }
+            if (!_session.TryHint())
+            {
+                ShowToast("watersort.toast.hintFail"); // 无可解续路:诚实提示引导撤销,不向死局收币
+                return;
+            }
+            TrySpendCoins("hint", WaterSortConfig.HintPriceCoins);
+        }
+
+        /// <summary>额外空瓶(金币直购,WS-06/13):+1 支空管(每关上限走配置);同上成功才扣币。</summary>
+        void OnAddExtraTube()
+        {
+            if (_session == null || !_session.IsInLevel) return;
+            if (_session.ExtraTubesUsed >= WaterSortConfig.ExtraTubeLimitPerLevel) return;
+            if ((ServiceLocator.Save?.Coins ?? 0) < WaterSortConfig.ExtraTubePriceCoins)
+            {
+                ShowToast("watersort.toast.noCoins");
+                return;
+            }
+            if (!_session.TryAddExtraTube()) return; // 上限内恒成功;失败静默(防御,理论不可达)
+            TrySpendCoins("extra_tube", WaterSortConfig.ExtraTubePriceCoins);
+        }
+
         // ---- 结算面板 ---- //
 
         void OnLevelSolved()
         {
             if (_session == null) return;
-            // 首通推进(WS-04:解锁只认首通;重玩不推进)。金币发放 M1.4 接配置与 box.coins,此处仅解锁。
+            // 首通推进(WS-04:解锁只认首通;重玩不推进)+ 首通发奖(WS-08:奖励曲线在 WaterSortConfig,
+            // 仅首通入账 box.coins,重玩/已解锁关卡不发——解耦 RecordFirstWin 返回值复用为推进与发奖的共同信号)。
             bool firstWin = WaterSortProgressStore.RecordFirstWin(_session.LevelId);
+            int reward = 0;
+            if (firstWin)
+            {
+                reward = WaterSortConfig.FirstWinReward(_session.LevelId);
+                if (reward > 0) GrantCoins(reward);
+            }
             ShowPanel(Panel.Settle);
             if (_resultText != null)
                 _resultText.text = L10n.Format("watersort.settle.result",
                     _session.MoveCount, DifficultyText(_session.Difficulty));
+            if (_rewardText != null)
+            {
+                // 首通显示奖励行;重玩整行隐藏(发奖理由清晰,防误导性重复奖励展示)
+                _rewardText.text = reward > 0 ? L10n.Format("watersort.settle.reward", reward) : "";
+                _rewardText.gameObject.SetActive(reward > 0);
+            }
+            UpdateCoinLabel(); // 发奖即刷新(顶栏在结算面板不可见,回对局时已是最新)
             bool nextUnlocked = firstWin && _session.LevelId < _totalLevels; // 有后关且本次推进才可点
             if (_nextButton != null) _nextButton.SetInteractable(nextUnlocked);
         }
@@ -318,12 +378,14 @@ namespace Box.HotUpdate.WaterSort
             if (_session != null && _session.IsInLevel)
                 SetText("GamePanel/TopBar/GameTitle", L10n.Format("watersort.level.title",
                     _session.LevelId, DifficultyText(_session.Difficulty)));
-            SetText("GamePanel/TopBar/CoinLabel", CoinText()); // M1.4 金币变更订阅前,入场先刷一次
+            UpdateCoinLabel(); // M1.4:入场/换语言先刷一次(消费点各自刷新,见 TrySpendCoins/GrantCoins)
             SetText("SettlePanel/Title", L10n.Get("watersort.settle.title"));
             SetLabel("SelectPanel/HubButton", L10n.Get("game.back")); // 复用既有键(返回)
             SetLabel("GamePanel/TopBar/BackButton", L10n.Get("game.back"));
             SetLabel("GamePanel/BottomBar/UndoButton", L10n.Get("game.undo"));
             SetLabel("GamePanel/BottomBar/RestartButton", L10n.Get("watersort.btn.restart"));
+            SetLabel("GamePanel/BottomBar/HintButton", L10n.Get("watersort.btn.hint"));
+            SetLabel("GamePanel/BottomBar/ExtraTubeButton", L10n.Get("watersort.btn.tube"));
             SetLabel("SettlePanel/RetryButton", L10n.Get("watersort.btn.retry"));
             SetLabel("SettlePanel/HubButton", L10n.Get("settlement.home")); // 复用既有键(返回菜单)
             SetLabel("SettlePanel/NextButton", L10n.Get("watersort.btn.next"));
@@ -333,6 +395,57 @@ namespace Box.HotUpdate.WaterSort
         {
             long coins = ServiceLocator.Save != null ? ServiceLocator.Save.Coins : 0;
             return L10n.Format("watersort.coins", coins);
+        }
+
+        void UpdateCoinLabel()
+        {
+            if (_coinLabel != null) _coinLabel.text = CoinText();
+        }
+
+        /// <summary>
+        /// 金币扣减(盒内唯一账本 box.coins,ISaveService.Coins;余额充足判定在调用点完成)。
+        /// 玩法内暂无钱包组件与全局余额事件 → 扣完立即刷标签与按钮态;save 未就绪(测试/异常上下文)回 false。
+        /// </summary>
+        bool TrySpendCoins(string reason, int price)
+        {
+            var save = ServiceLocator.Save;
+            if (save == null || save.Coins < price) return false;
+            save.Coins -= price;
+            save.Save(); // box.* 变更需显式落盘(接口契约:仅 SetModule 自动落盘)
+            ServiceLocator.Analytics?.LogEvent("watersort.coin_spend", reason, price); // 埋点 source=玩法+动作
+            UpdateCoinLabel();
+            SyncConsumeButtons();
+            return true;
+        }
+
+        /// <summary>金币入账(首通奖励 WS-08);amount ≤ 0 或服务未就绪跳过。入账后余额即刷。</summary>
+        void GrantCoins(int amount)
+        {
+            var save = ServiceLocator.Save;
+            if (save == null || amount <= 0) return;
+            save.Coins += amount;
+            save.Save();
+            ServiceLocator.Analytics?.LogEvent("watersort.coin_reward", "amount", amount);
+            UpdateCoinLabel();
+        }
+
+        /// <summary>
+        /// 提示/加管按钮可用态:局内 + 未达每关上限 + 余额充足。
+        /// 余额只在消费点变化(盒内无其他货币来源/消耗),上限只在 StartLevel/Undo(加管)变化,
+        /// 因此 RefreshTubeArea(盘面变更统一接缝)与本类扣币点调用即覆盖全部变化路径。
+        /// </summary>
+        void SyncConsumeButtons()
+        {
+            bool inLevel = _session != null && _session.IsInLevel;
+            long coins = ServiceLocator.Save != null ? ServiceLocator.Save.Coins : 0;
+            if (_hintButton != null)
+                _hintButton.SetInteractable(inLevel
+                    && _session.HintsUsed < WaterSortConfig.HintLimitPerLevel
+                    && coins >= WaterSortConfig.HintPriceCoins);
+            if (_extraTubeButton != null)
+                _extraTubeButton.SetInteractable(inLevel
+                    && _session.ExtraTubesUsed < WaterSortConfig.ExtraTubeLimitPerLevel
+                    && coins >= WaterSortConfig.ExtraTubePriceCoins);
         }
 
         string DifficultyText(WaterSortDifficulty d)

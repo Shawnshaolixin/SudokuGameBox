@@ -19,3 +19,9 @@ MonoBehaviour:
     displayName: "\u6570\u72EC"
     enabled: 1
     sortOrder: 0
+  - id: watersort
+    entryType: Box.HotUpdate.WaterSort.WaterSortModule
+    entryScene: 
+    displayName: "\u6C34\u6392\u5E8F"
+    enabled: 1
+    sortOrder: 1
