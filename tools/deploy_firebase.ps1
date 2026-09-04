@@ -17,6 +17,9 @@
 # 前置:已执行 Phase9Publish.BuildAll,ServerData 已产出。
 # 流程纪律:内容先上 staging → 真机验收 → 验收通过再 -Channel production 提升。
 # 注意:改 AOT 白名单代码后必须重跑 GenerateContent+BuildAll 再部署(metadata 一致性,坑⑧)。
+# 回退保险(2026-09-04):每次部署前自动把线上旧 catalog 归档至 public\<Channel>\_history\<时间戳>\,
+#   新内容出问题时:从 _history 拷回 catalog_1.0.bin/.hash 到 public\<Channel>\Android\ → 重新 firebase deploy
+#   即完成回退(bundle 内容寻址且累积保留,无需动;设备端 catalog no-cache,下次冷启动自动生效)。
 # =========================================================
 param(
     [ValidateSet("staging", "production")]
@@ -45,6 +48,22 @@ if (-not (Test-Path (Join-Path $hosting "firebase.json"))) {
 # 注意:目标目录已预创建 → 源必须带通配符"拷内容不拷目录",
 # 否则会把 ServerData\Android 整体嵌进 public\<Channel>\Android\Android(URL 契约 404,2026-09-02 踩过)
 $publicTarget = Join-Path $publicDir $Target
+
+# ---- 回退保险(2026-09-04):部署覆盖前,先把线上当前 catalog 归档到 _history\<时间戳>\ ----
+# 背景:catalog_1.0.bin/.hash 是固定文件名,每次部署直接覆盖,ServerData 又不入库(gitignore 红线 9),
+# 一旦新内容出问题,线上旧 catalog 无处可找,客户端回退就没有原料。
+# 归档后回退 = 把 _history 里的旧 catalog 拷回 Android\ 再 firebase deploy(bundle 是内容寻址且累积保留,无需动)。
+# 客户端侧:catalog .bin/.hash 为 no-cache 缓存头,设备下次冷启动即感知目录变化并重下,无需发版。
+$historyDir = Join-Path $publicDir "_history\$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+foreach ($catalogFile in @("catalog_1.0.bin", "catalog_1.0.hash")) {
+    $existing = Join-Path $publicTarget $catalogFile
+    if (Test-Path $existing) {
+        New-Item -ItemType Directory -Path $historyDir -Force | Out-Null
+        Copy-Item -Force $existing (Join-Path $historyDir $catalogFile)
+        Write-Host "[deploy_firebase] 已归档线上旧 catalog → $historyDir\$catalogFile" -ForegroundColor DarkGray
+    }
+}
+
 if (Test-Path $publicTarget) { Remove-Item -Recurse -Force $publicTarget }
 New-Item -ItemType Directory -Path $publicTarget | Out-Null
 Copy-Item -Recurse -Force (Join-Path $serverData "*") $publicTarget | Out-Null
