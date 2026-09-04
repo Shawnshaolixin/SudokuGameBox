@@ -25,6 +25,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bdb1bbb9d319a994cb6b1887b7e0a06a
+    m_Address: WaterSort/Levels/daily_levels.json
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 68b66f896e1f0094f97398d17cf2c77b, type: 2}
   m_SchemaSet:

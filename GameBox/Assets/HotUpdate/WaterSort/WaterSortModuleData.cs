@@ -16,5 +16,12 @@ namespace Box.HotUpdate.WaterSort
     {
         /// <summary>首通关编号(乱序可;查重/推进逻辑见 ProgressStore)。</summary>
         public List<int> firstWinLevels = new List<int>();
+
+        /// <summary>
+        /// 每日挑战已完成日期种子(yyyyMMdd,乱序可;M2.3 新增)。
+        /// Streak/今日是否完成均由本集合即时推导(WaterSortDailyStore),单一数据源不落派生量;
+        /// 补签/每日最佳步数等增值字段不在 M2 范围,后续扩展走同一集合或另立列表,勿存派生状态。
+        /// </summary>
+        public List<int> dailyDoneSeeds = new List<int>();
     }
 }

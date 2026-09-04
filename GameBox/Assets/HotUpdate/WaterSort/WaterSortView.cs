@@ -18,17 +18,25 @@ namespace Box.HotUpdate.WaterSort
     ///
     /// Prefab 节点契约(M1.3 生成器严格按此命名;缺失节点一律空安全降级):
     ///   SelectPanel/Title                    TMP 标题
+    ///   SelectPanel/DailyButton             每日挑战入口(选中「SelectPanel/ItemTemplate 同级,标题下」)
     ///   SelectPanel/ItemTemplate            选关按钮模板:BoxButton + Label(TMP)(只渲染可玩关,无锁定态)
     ///   SelectPanel/LevelScroll/Viewport/Content  选关网格容器(克隆 ItemTemplate 进 Content,代码铺 5 列)
     ///   SelectPanel/HubButton               回大厅弹窗(MoreGames;按钮 = Pop 本视图 → OnHide 退模块)
-    ///   GamePanel/TopBar/BackButton         返回选关(放弃本局进度,会话仍可再开局)
-    ///   GamePanel/TopBar/GameTitle          关卡标题「第 N 关 · 难度」(StartGame 置文案)
+    ///   GamePanel/TopBar/BackButton         返回(常规=选关 / 每日=每日主页,放弃本局进度)
+    ///   GamePanel/TopBar/GameTitle          关卡标题(常规「第 N 关 · 难度」/ 每日「每日挑战」)
     ///   GamePanel/TopBar/CoinLabel          TMP 金币余额(M1.4 双通道后随变更刷新)
     ///   GamePanel/StepText                  TMP 步数(每次盘面刷新同步)
     ///   GamePanel/TubeArea                  试管容器(本视图 AddComponent WaterSortTubeRack 代码绘制+点击)
     ///   GamePanel/BottomBar/UndoButton | RestartButton   免费操作(本版已接)
     ///   GamePanel/BottomBar/HintButton | ExtraTubeButton 金币直购提示/加空瓶(M1.4 已接;激励视频分支 M3 复用同钮)
     ///   SettlePanel/Title | ResultText | RewardText | NextButton | RetryButton | HubButton(RewardText 仅首通结算显示)
+    ///   DailyPanel/Title | StateText | StreakText | PlayButton | BackButton  每日主页(M2.3;完成态/Streak/重玩)
+    ///
+    /// 每日挑战(M2.3)模式语义:视图内模式 = 会话标记(WaterSortSession.IsDaily);选关页「每日挑战」
+    /// 入口经 Session 实例整体换新(旧实例退订销毁,见 SwitchSession),不弹 Router、不退出模块;
+    /// 模块级入口 args="daily"(WaterSortModule.OnEnter)落同一主页。每日主页 Back 回常规选关 =
+    /// 再换回常规会话。对局/结算共用面板,差异全部收敛在:标题文案、完成落盘(每日 → dailyDoneSeeds,
+    /// 常规 → firstWinLevels+发币)、Next 放行(每日恒禁)。
     ///
     /// 退出纪律(与 WaterSortModule.OnExit 配合):本视图是模块压入 Router 的唯一自属视图,M1 内模块
     /// 不会在其上再压 Router 弹窗(结算/选关都是面板切换),故 OnHide 只会在「真的被 Pop」时触发
@@ -38,20 +46,24 @@ namespace Box.HotUpdate.WaterSort
     /// </summary>
     public sealed class WaterSortView : UIView
     {
-        /// <summary>面板枚举:Select=选关 / Game=对局 / Settle=结算(同视图内切换,不压 Router 栈)。</summary>
-        enum Panel { Select, Game, Settle }
+        /// <summary>面板枚举:Select=选关 / Daily=每日主页 / Game=对局 / Settle=结算(同视图内切换,不压 Router 栈)。</summary>
+        enum Panel { Select, Daily, Game, Settle }
 
         WaterSortSession _session;   // 本视图会话快照(OnShow 取 Instance;OnDestroy 退订后不再引用)
         bool _leaving;               // 退模块流程已启动(防 OnHide 重入重复 ExitAsync)
         WaterSortLevelPack _pack;    // 本次会话题库缓存(选关渲染成功后赋值;选关/下一关同源取关)
 
-        Transform _selectPanel, _gamePanel, _settlePanel;
+        Transform _selectPanel, _dailyPanel, _gamePanel, _settlePanel;
         Transform _itemTemplate, _content;
         TextMeshProUGUI _resultText, _stepText;
         BoxButton _nextButton, _undoButton, _restartButton;
         BoxButton _hintButton, _extraTubeButton; // 金币消费点(见 OnHint/OnAddExtraTube)
         TextMeshProUGUI _rewardText;             // 结算首通奖励行(仅首通过关时 SetActive + 文案)
         TextMeshProUGUI _coinLabel;              // 对局顶栏金币余额(随消费/发奖就近刷新)
+        TextMeshProUGUI _dailyStateText, _dailyStreakText; // 每日主页:今日状态 + 连续天数
+        BoxButton _dailyPlayButton;              // 每日主页:开始/再玩今日挑战(题库就绪才可点)
+        WaterSortDailyPack _dailyPack;           // 本次会话每日题库缓存(主页/开局同源取关)
+        int _dailySeed;                          // 本局每日挑战归属日期种子(开局取;结算按此落完成,防跨零点错记)
         WaterSortTubeRack _rack;     // 试管区渲染与点击(OnCreate 挂到 TubeArea;随视图销毁)
         int _totalLevels;            // 题库总量(结算面板「下一关」放行判定:仅推进且有后关才可点)
 
@@ -65,6 +77,7 @@ namespace Box.HotUpdate.WaterSort
         {
             // 面板与按钮句柄一次取齐;缺失节点静默降级(行为与布局解耦,prefab 缺失不崩)
             _selectPanel = FindInCard("SelectPanel");
+            _dailyPanel = FindInCard("DailyPanel");
             _gamePanel = FindInCard("GamePanel");
             _settlePanel = FindInCard("SettlePanel");
             _content = FindInCard("SelectPanel/LevelScroll/Viewport/Content");
@@ -78,6 +91,9 @@ namespace Box.HotUpdate.WaterSort
             _extraTubeButton = FindInCard("GamePanel/BottomBar/ExtraTubeButton")?.GetComponent<BoxButton>();
             _rewardText = FindInCard("SettlePanel/RewardText")?.GetComponent<TextMeshProUGUI>();
             _coinLabel = FindInCard("GamePanel/TopBar/CoinLabel")?.GetComponent<TextMeshProUGUI>();
+            _dailyStateText = FindInCard("DailyPanel/StateText")?.GetComponent<TextMeshProUGUI>();
+            _dailyStreakText = FindInCard("DailyPanel/StreakText")?.GetComponent<TextMeshProUGUI>();
+            _dailyPlayButton = FindInCard("DailyPanel/PlayButton")?.GetComponent<BoxButton>();
 
             // 试管架:运行期挂到 TubeArea(热更组件不进 prefab 序列化,20 文档 §4 纪律同源)
             var tubeArea = FindInCard("GamePanel/TubeArea");
@@ -86,6 +102,8 @@ namespace Box.HotUpdate.WaterSort
             if (_rack != null) _rack.PourRequested += OnPourRequested;
 
             Bind("SelectPanel/HubButton", LeaveToHub);
+            Bind("SelectPanel/DailyButton", OnOpenDailyHome); // 每日入口(仅常规选关态可达)
+            Bind("DailyPanel/BackButton", OnDailyBackToSelect);
             Bind("GamePanel/TopBar/BackButton", OnBackToSelect);
             Bind("SettlePanel/HubButton", LeaveToHub);
             Bind("SettlePanel/RetryButton", OnRetry);
@@ -94,6 +112,7 @@ namespace Box.HotUpdate.WaterSort
             if (_restartButton != null) _restartButton.OnClick(OnRestart);
             if (_hintButton != null) _hintButton.OnClick(OnHint);
             if (_extraTubeButton != null) _extraTubeButton.OnClick(OnAddExtraTube);
+            if (_dailyPlayButton != null) _dailyPlayButton.OnClick(OnDailyPlay);
             return UniTask.CompletedTask;
         }
 
@@ -106,8 +125,12 @@ namespace Box.HotUpdate.WaterSort
             ApplyLanguage();
             if (_session != null && _session.IsDaily)
             {
-                // 每日挑战入口预留(M2 按日期直取题库关开局);先回落常规选关,防空屏
-                Debug.LogWarning("[WaterSort] 每日挑战 M2 接入,当前回落常规选关");
+                // 模块级每日入口(args="daily",WaterSortModule.OnEnter):直进每日主页
+                // (题库缺失时主页内提示并回落常规选关,见 OpenDailyHome)
+                _dailyPack = null;
+                ShowPanel(Panel.Daily);
+                await RenderDailyHomeAsync();
+                return;
             }
             ShowPanel(Panel.Select);
             await RenderLevelSelect(); // 题库异步加载失败在方法内 toast,保持空列表可重进
@@ -136,6 +159,7 @@ namespace Box.HotUpdate.WaterSort
         void ShowPanel(Panel p)
         {
             if (_selectPanel != null) _selectPanel.gameObject.SetActive(p == Panel.Select);
+            if (_dailyPanel != null) _dailyPanel.gameObject.SetActive(p == Panel.Daily);
             if (_gamePanel != null) _gamePanel.gameObject.SetActive(p == Panel.Game);
             if (_settlePanel != null) _settlePanel.gameObject.SetActive(p == Panel.Settle);
         }
@@ -202,6 +226,103 @@ namespace Box.HotUpdate.WaterSort
             StartGame(level); // 找不到(异常)在 StartGame 内 toast 兜底
         }
 
+        // ---- 每日挑战(M2.3,WS-09) ---- //
+
+        /// <summary>
+        /// 会话整体换新(常规 ↔ 每日):旧会话退订销毁(模块每次进入新建的纪律同源),
+        /// 静态 Instance 指向新会话后重订阅,试管架同步换绑。视图内完成,不弹 Router/不退模块。
+        /// </summary>
+        void SwitchSession(WaterSortSession next)
+        {
+            if (_session == next) return;
+            UnsubscribeSession(); // 先摘旧会话事件
+            _session = next;
+            WaterSortSession.Instance = next; // 模块内其他取 Instance 的路径(理论无)也拿到新会话
+            SubscribeSession();
+            if (_rack != null) _rack.SetSession(_session);
+        }
+
+        /// <summary>选关页「每日挑战」入口:切每日会话 → 每日主页(异步拉题库后落状态文案)。</summary>
+        void OnOpenDailyHome()
+        {
+            if (_session == null || _session.IsDaily) return; // 已在每日态(防重入)
+            SwitchSession(new WaterSortSession(true));
+            _dailyPack = null;
+            ShowPanel(Panel.Daily);
+            RenderDailyHomeAsync().Forget();
+        }
+
+        /// <summary>每日主页「返回」:切回常规会话 → 常规选关(网格重渲染幂等)。</summary>
+        void OnDailyBackToSelect()
+        {
+            if (_session == null || !_session.IsDaily) return; // 仅每日态可回(常规态退出走 Hub)
+            SwitchSession(new WaterSortSession(false));
+            _dailyPack = null;
+            ShowPanel(Panel.Select);
+            RenderLevelSelect().Forget();
+        }
+
+        /// <summary>
+        /// 每日主页渲染(进主页/题库首次就绪各一次):拉每日题库(缓存后常驻,后续近零开销),
+        /// 拉取期间禁点开始钮(防空局);题库缺失/损坏 → toast 并回落常规选关(防空屏)。
+        /// 就绪后按「今日状态/连续天数/按钮文案」落文案(L10n 语言感知)。
+        /// </summary>
+        async UniTask RenderDailyHomeAsync()
+        {
+            if (_dailyPlayButton != null) _dailyPlayButton.SetInteractable(false); // 题库就绪前禁点
+            _dailyPack = await WaterSortDailyLevelStore.LoadPackAsync();
+            if (this == null || _leaving) return; // 等待期视图被 Pop/退模块:续体勿触已销毁节点
+            if (_dailyPack == null || _dailyPack.levels.Count == 0)
+            {
+                ShowToast("watersort.toast.noLevels"); // 每日题库缺失(构建期错误/资产损坏)
+                if (_session != null && _session.IsDaily)
+                {
+                    SwitchSession(new WaterSortSession(false));
+                    ShowPanel(Panel.Select);
+                    RenderLevelSelect().Forget(); // 回落常规(每日功能受损但常规可玩)
+                }
+                return;
+            }
+            ApplyDailyTexts();
+        }
+
+        /// <summary>落每日主页文案:今日是否完成/连续 N 天/开始或再玩(与状态联动)。</summary>
+        void ApplyDailyTexts()
+        {
+            if (_session == null || !_session.IsDaily) return;
+            var now = WaterSortDailyStore.UtcNow();
+            bool done = WaterSortDailyStore.IsDone(WaterSortDailySeed.SeedOf(now));
+            if (_dailyStateText != null)
+                _dailyStateText.text = L10n.Get(done ? "watersort.daily.state.done" : "watersort.daily.state.new");
+            if (_dailyStreakText != null)
+                _dailyStreakText.text = L10n.Format("watersort.daily.streak",
+                    WaterSortDailyStore.Streak(WaterSortDailyStore.Load(), now));
+            if (_dailyPlayButton != null)
+                _dailyPlayButton.SetInteractable(true);
+            SetLabel("DailyPanel/PlayButton",
+                L10n.Get(done ? "watersort.daily.replay" : "watersort.daily.play"));
+        }
+
+        /// <summary>开始/再玩今日挑战:按当前 UTC 日期取关(缺失兜底备用池,GetForSeed 内确定性取)。</summary>
+        void OnDailyPlay()
+        {
+            if (_session == null || !_session.IsDaily) return;
+            if (_dailyPack == null)
+            {
+                RenderDailyHomeAsync().Forget(); // 极端路径(题库缓存被清):重拉一次后由主页状态引导
+                return;
+            }
+            int seed = WaterSortDailySeed.SeedOf(WaterSortDailyStore.UtcNow());
+            var level = WaterSortDailyLevelStore.GetForSeed(_dailyPack, seed, out _);
+            if (level == null)
+            {
+                ShowToast("watersort.toast.noLevels");
+                return;
+            }
+            _dailySeed = seed; // 结算按本局归属日期落完成(跨零点对局不错记)
+            StartGame(level);  // 开局成功切对局;结算/返回语义由会话 IsDaily 收敛
+        }
+
         // ---- 对局面板 ---- //
 
         /// <summary>进对局:开局成功切面板;失败(题库越界/损坏)toast 并留在选关。</summary>
@@ -219,7 +340,15 @@ namespace Box.HotUpdate.WaterSort
 
         void OnBackToSelect()
         {
-            // 放弃本局进度回选关(模块仍 Active,与 LeaveToHub 退出模块是两条独立路径)
+            // 放弃本局进度回前层(模块仍 Active,与 LeaveToHub 退出模块是两条独立路径):
+            // 每日对局 → 每日主页(保留每日会话;ApplyDailyTexts 同步刚结算/放弃后的完成态与按钮文案);
+            // 常规对局 → 选关
+            if (_session != null && _session.IsDaily)
+            {
+                ShowPanel(Panel.Daily);
+                ApplyDailyTexts();
+                return;
+            }
             ShowPanel(Panel.Select);
         }
 
@@ -297,6 +426,20 @@ namespace Box.HotUpdate.WaterSort
         void OnLevelSolved()
         {
             if (_session == null) return;
+            if (_session.IsDaily)
+            {
+                // 每日挑战(WS-09):不发首通奖、不推进常规解锁,只落「今日完成」(Streak 由 WaterSortDailyStore
+                // 从 doneSeeds 推导)——归属按开局种子 _dailySeed(开局时取 UTC 日),跨零点对局不错记。
+                if (_dailySeed > 0) WaterSortDailyStore.MarkDone(_dailySeed);
+                ShowPanel(Panel.Settle);
+                if (_resultText != null)
+                    _resultText.text = L10n.Format("watersort.settle.result",
+                        _session.MoveCount, DifficultyText(_session.Difficulty));
+                if (_rewardText != null) _rewardText.gameObject.SetActive(false); // 每日挑战无首通奖励行
+                UpdateCoinLabel();
+                if (_nextButton != null) _nextButton.SetInteractable(false); // 每日仅一关:不提供「下一关」
+                return;
+            }
             // 首通推进(WS-04:解锁只认首通;重玩不推进)+ 首通发奖(WS-08:奖励曲线在 WaterSortConfig,
             // 仅首通入账 box.coins,重玩/已解锁关卡不发——解耦 RecordFirstWin 返回值复用为推进与发奖的共同信号)。
             bool firstWin = WaterSortProgressStore.RecordFirstWin(_session.LevelId);
@@ -374,10 +517,17 @@ namespace Box.HotUpdate.WaterSort
         void ApplyLanguage()
         {
             SetText("SelectPanel/Title", L10n.Get("watersort.select.title"));
-            // 对局标题「第 N 关 · 难度」:仅对局中显示,StartGame/换关均先经 ApplyLanguage 到位
+            SetLabel("SelectPanel/DailyButton", L10n.Get("watersort.daily.title")); // 每日入口按钮(常规选关页)
+            // 每日主页顶栏(进模块必经 ApplyLanguage;语种模块内不切换,一次到位)
+            SetText("DailyPanel/Title", L10n.Get("watersort.daily.title"));
+            SetLabel("DailyPanel/BackButton", L10n.Get("game.back"));
+            // 对局标题:仅对局中显示,StartGame/换关均先经 ApplyLanguage 到位;
+            // 每日挑战显示专名「每日挑战」(当日仅一关、无序号),常规显示「第 N 关 · 难度」
             if (_session != null && _session.IsInLevel)
-                SetText("GamePanel/TopBar/GameTitle", L10n.Format("watersort.level.title",
-                    _session.LevelId, DifficultyText(_session.Difficulty)));
+                SetText("GamePanel/TopBar/GameTitle", _session.IsDaily
+                    ? L10n.Get("watersort.daily.title")
+                    : L10n.Format("watersort.level.title",
+                        _session.LevelId, DifficultyText(_session.Difficulty)));
             UpdateCoinLabel(); // M1.4:入场/换语言先刷一次(消费点各自刷新,见 TrySpendCoins/GrantCoins)
             SetText("SettlePanel/Title", L10n.Get("watersort.settle.title"));
             SetLabel("SelectPanel/HubButton", L10n.Get("game.back")); // 复用既有键(返回)

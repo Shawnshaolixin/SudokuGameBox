@@ -143,6 +143,14 @@ namespace Box.Services
             { "watersort.toast.hintFail", "暂无可提示的走法,试试撤销" }, // 求解失败(死局/超时)不扣币
             { "watersort.toast.noLevels", "关卡包缺失,请稍后重进" }, // 题库加载失败(构建期错误兜底)
             { "watersort.toast.badLevel", "关卡数据异常" }, // 越界/损坏条目
+
+            // 水排序每日挑战(M2.3,WS-09)
+            { "watersort.daily.title", "每日挑战" }, // 对局标题 + 选关页入口按钮共用
+            { "watersort.daily.state.new", "今日尚未完成" }, // 每日主页状态行
+            { "watersort.daily.state.done", "今日已完成" },
+            { "watersort.daily.streak", "已连续 {0} 天" }, // 连续完成天数(Streak)
+            { "watersort.daily.play", "开始挑战" }, // 今日未完成时按钮
+            { "watersort.daily.replay", "再玩一次" }, // 今日已完成时按钮(重玩不重复落完成/不发奖)
         };
 
         static readonly Dictionary<string, string> _en = new Dictionary<string, string>
@@ -231,6 +239,14 @@ namespace Box.Services
             { "watersort.toast.hintFail", "No hint available. Try Undo." },
             { "watersort.toast.noLevels", "Level pack missing. Re-enter later." },
             { "watersort.toast.badLevel", "Level data error" },
+
+            // Water Sort Daily Challenge (M2.3, WS-09)
+            { "watersort.daily.title", "Daily Challenge" }, // Game title + select-page entry button share
+            { "watersort.daily.state.new", "Not cleared today" },
+            { "watersort.daily.state.done", "Cleared today" },
+            { "watersort.daily.streak", "{0}-day streak" },
+            { "watersort.daily.play", "Start" },
+            { "watersort.daily.replay", "Play again" },
         };
     }
 }

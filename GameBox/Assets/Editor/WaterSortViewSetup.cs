@@ -48,6 +48,11 @@ public static class WaterSortViewSetup
     const int FullLevelCount = 100;  // M1.5 首批正式题库(≥100 关,WS-03;数量即内容形态,切换即重写)
     const int SeedBase = 0x5757;     // 关号种子基(稳定复现;demo 包与最终题库同管线同种子域)
 
+    // 每日题库(M2.3,WS-09):生成工具 WaterSortDailyGenSetup 与运行时 WaterSortDailyLevelStore 共用落点;
+    // 地址须与 WaterSortDailyLevelStore.DailyLevelsAddress 保持一字不差(运行期加载常量,双处同步)
+    internal const string DailyLevelsPath = DataDir + "/daily_levels.json";
+    internal const string DailyLevelsAddress = "WaterSort/Levels/daily_levels.json";
+
     // 占位配色(与运行时 WaterSortTubeRack 色板无关;文本/背景用,表现后置 AIGC 替换)
     static readonly Color Backdrop = new Color(0.05f, 0.08f, 0.11f, 1f); // 全屏深蓝灰(玩法底色)
     static readonly Color Accent = new Color(0.20f, 0.55f, 0.90f);       // 主按钮蓝(同 MoreGames)
@@ -151,6 +156,7 @@ public static class WaterSortViewSetup
         }
         EnsureBinder(); // 新建后首次运行也会走自愈路径(此时必命中,保持行为单一路径)
         EnsureM14Nodes(); // M1.4:增量节点补建 + 几何校准(幂等,见下)
+        EnsureM23DailyNodes(); // M2.3:每日入口按钮 + 每日主页面板(幂等,见下)
     }
 
     /// <summary>根挂/校准 HotViewBinder(幂等):LoadPrefabContents 原地改,保 GUID。</summary>
@@ -301,6 +307,53 @@ public static class WaterSortViewSetup
             {
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
                 Debug.Log("[WaterSortSetup] M1.4 节点补建完成(底栏四钮 + 结算奖励行)");
+            }
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>
+    /// M2.3 幂等补建每日挑战节点(WS-09;契约见 WaterSortView 类头):
+    /// ① SelectPanel/DailyButton —— 选关页顶部入口钮(标题栏与选关网格之间的留白带);
+    /// ② DailyPanel 整棵子树 —— 标题/返回/今日状态/连续天数/开始钮(与 Select/Game/Settle 并列,
+    ///    ShowPanel 四面板互斥切换)。全部子节点为纯 AOT 容器,行为在 WaterSortView(Bind/FindInCard 路径);
+    /// 首次为 prefab 已有节点时的增量路径,新建路径由 EnsureM23DailyNodes 同一收敛(BuildRootTree 不建每日区)。
+    /// </summary>
+    static void EnsureM23DailyNodes()
+    {
+        var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        bool dirty = false;
+        try
+        {
+            var select = root.transform.Find("SelectPanel");
+            if (select != null && select.Find("DailyButton") == null)
+            {
+                // 入口钮放标题(830)与滚动区(顶 670)之间的留白带;Accent 主色钮(同 M1.4 底栏钮形态)
+                NewButton(select, "DailyButton", "", new Vector2(0, 730), new Vector2(440, 92), true);
+                dirty = true;
+            }
+            var daily = root.transform.Find("DailyPanel");
+            if (daily == null)
+            {
+                var panel = NewPanel(root.transform, "DailyPanel"); // 全屏节区(同 Select/Game/Settle)
+                daily = panel;
+                // 顶栏:返回(左,同 GamePanel/TopBar/BackButton 几何)+ 标题(中,运行期 ApplyLanguage 落文案)
+                NewButton(daily, "BackButton", "", new Vector2(-400, 830), new Vector2(220, 88), true);
+                NewText(daily, "Title", "", new Vector2(0, 830), new Vector2(640, 90), 48, true);
+                // 中部状态区:今日完成状态(大字)/ 连续天数(小字)/ 开始挑战钮(向下对齐)
+                NewText(daily, "StateText", "", new Vector2(0, 200), new Vector2(900, 110), 64, true);
+                NewText(daily, "StreakText", "", new Vector2(0, 20), new Vector2(700, 80), 44, false);
+                NewButton(daily, "PlayButton", "", new Vector2(0, -260), new Vector2(520, 128), true);
+                panel.gameObject.SetActive(false); // 初始隐藏(ShowPanel 由视图切换)
+                dirty = true;
+            }
+            if (dirty)
+            {
+                PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+                Debug.Log("[WaterSortSetup] M2.3 每日挑战节点补建完成(DailyButton + DailyPanel)");
             }
         }
         finally
@@ -544,7 +597,7 @@ public static class WaterSortViewSetup
     }
 
     /// <summary>条目入库自愈:缺则建,组错/地址错则改(幂等)。</summary>
-    static void EnsureEntry(string assetPath, string address)
+    internal static void EnsureEntry(string assetPath, string address)
     {
         var settings = AddressableAssetSettingsDefaultObject.Settings;
         var group = settings?.FindGroup(GroupGameWaterSort);
@@ -565,9 +618,13 @@ public static class WaterSortViewSetup
 
     static void RegisterLevelsEntry() => EnsureEntry(LevelsJsonPath, LevelsAddress);
 
+    /// <summary>每日题库条目入库(M2.3;由 WaterSortDailyGenSetup 生成后调用,幂等自愈)。</summary>
+    internal static void RegisterDailyLevelsEntry() => EnsureEntry(DailyLevelsPath, DailyLevelsAddress);
+
     // ---- 节点构建助手(与 Phase4/MoreGames 生成器同构) ----
 
-    static void EnsureFolders()
+    /// <summary>目录自愈(幂等;WaterSortDailyGenSetup 独立跑日题时同用,故 internal)。</summary>
+    internal static void EnsureFolders()
     {
         EnsureFolder("Assets/Modules");
         EnsureFolder("Assets/Modules/WaterSort");
