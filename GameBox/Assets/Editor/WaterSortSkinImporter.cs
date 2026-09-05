@@ -37,6 +37,13 @@ public static class WaterSortSkinImporter
         foreach (var file in Directory.GetFiles(UiDir, "*.png"))
         {
             var path = file.Replace('\\', '/');
+            var name = System.IO.Path.GetFileNameWithoutExtension(path);
+            if (!IsConformingName(name))
+            {
+                // 命名不合规(空格/大写等,21 文档 §6.6/18 文档 CI-2):跳过入组并提示,防脏地址进产物
+                Debug.LogWarning($"[WaterSortSkin] 跳过不合规文件名(请改名后重存): {name}");
+                continue;
+            }
             ApplyImportPreset(path);                  // 有导入变更 → SaveAndReimport(条目随后同轮补上)
             WaterSortViewSetup.EnsureEntry(path, AddressOf(path)); // 幂等:缺则建,组错/地址错则改
         }
@@ -59,11 +66,25 @@ public static class WaterSortSkinImporter
         return true;
     }
 
-    /// <summary>代码地址 = 去 Assets/ 前缀的相对路径去扩展名(如 WaterSort/UI/ws_tube),21 文档 §6.1。</summary>
+    /// <summary>代码地址 = 去掉 Assets/Modules/ 前缀的相对路径去扩展名(如 WaterSort/UI/ws_tube),
+    /// 21 文档 §6.1 —— 与题库 WaterSort/Levels/*.json、数独 Sudoku/Fx/* 同一约定;
+    /// 注册地址与加载 key 不一致(如误只去 Assets/)会致 PlayMode 各模式都报 No Location。</summary>
     static string AddressOf(string path)
     {
-        const string prefix = "Assets/";
+        const string prefix = "Assets/Modules/";
         return path.Substring(prefix.Length, path.Length - prefix.Length - ".png".Length);
+    }
+
+    /// <summary>文件名合规校验:小写下划线 + 数字(与 18 文档 CI-2 后缀约定配套,地址不得含空格)。</summary>
+    static bool IsConformingName(string name)
+    {
+        for (int i = 0; i < name.Length; i++)
+        {
+            char c = name[i];
+            bool ok = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+            if (!ok) return false;
+        }
+        return true;
     }
 
     /// <summary>组缺失时补建(照 WaterSortViewSetup.EnsureGroup 同构;DefaultGroup schemas 免手动配打包规则)。</summary>

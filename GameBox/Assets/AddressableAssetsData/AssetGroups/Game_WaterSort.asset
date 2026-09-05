@@ -16,17 +16,17 @@ MonoBehaviour:
   m_GUID: 4ec2cf2f88ff5144bbfd27372b7998ab
   m_SerializeEntries:
   - m_GUID: 33073d500e0ad734493f943096a40ebb
-    m_Address: Modules/WaterSort/UI/ws_tube
+    m_Address: WaterSort/UI/ws_tube
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4b35254ec6c0c0141beb06ac5cccd107
-    m_Address: Modules/WaterSort/UI/ws_btn_daily
+    m_Address: WaterSort/UI/ws_btn_daily
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4c8aec3c48bc35d45a1c066b0fbb1d21
-    m_Address: Modules/WaterSort/UI/ws_panel_card
+    m_Address: WaterSort/UI/ws_panel_card
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -36,7 +36,7 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4ffbe02fd31330942a368a3a93d934ad
-    m_Address: Modules/WaterSort/UI/ws_bg_ocean
+    m_Address: WaterSort/UI/ws_bg_ocean
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -51,12 +51,12 @@ MonoBehaviour:
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d67c07a2827a2a347a752b8ee15cb830
-    m_Address: Modules/WaterSort/UI/ws_btn_back
+    m_Address: WaterSort/UI/ws_btn_back
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: da9f2a4be97f9354ca502fc53bab72cd
-    m_Address: Modules/WaterSort/UI/ws_level_btn
+    m_Address: WaterSort/UI/ws_level_btn
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
