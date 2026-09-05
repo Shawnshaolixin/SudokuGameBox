@@ -29,9 +29,10 @@ public static class Phase9HybridCLRSetup
 {
     /// <summary>
     /// 热更程序集名单(无 .dll 后缀,与热更 asmdef 名字一一对应)。
-    /// 9-2 起含 Core 基座(内容最小化)+ Sudoku 玩法。
+    /// 9-2 起含 Core 基座(内容最小化)+ Sudoku 玩法;M3.4(19 文档 WS-20)加 WaterSort ——
+    /// 与 HotUpdateService.HotUpdateAssemblies、link.xml、GenerateContent 的 module_overrides 四方同步。
     /// </summary>
-    public static readonly string[] HotUpdateAssemblies = { "Box.HotUpdate.Core", "Box.HotUpdate.Sudoku" };
+    public static readonly string[] HotUpdateAssemblies = { "Box.HotUpdate.Core", "Box.HotUpdate.Sudoku", "Box.HotUpdate.WaterSort" };
 
     /// <summary>热更远程组(9-4:dll/metadata/overrides 组,Local + 可变更)。</summary>
     public const string GroupHotUpdateLocal = "HotUpdate_Local";

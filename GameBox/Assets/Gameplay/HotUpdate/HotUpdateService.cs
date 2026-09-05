@@ -15,11 +15,13 @@ namespace Box.Gameplay.HotUpdate
     /// </summary>
     public sealed class HotUpdateService
     {
-        /// <summary>热更程序集名单(与 Phase9HybridCLRSetup.HotUpdateAssemblies 保持一致;Box.Gameplay 不引用 Box.Editor,故本地维护)。</summary>
+        /// <summary>热更程序集名单(与 Phase9HybridCLRSetup.HotUpdateAssemblies 保持一致;Box.Gameplay 不引用 Box.Editor,故本地维护)。
+        /// M3.4 加 Box.HotUpdate.WaterSort —— 四方同步见 Phase9HybridCLRSetup 名单注释。</summary>
         public static readonly IReadOnlyList<string> HotUpdateAssemblies = new[]
         {
             "Box.HotUpdate.Core",
-            "Box.HotUpdate.Sudoku"
+            "Box.HotUpdate.Sudoku",
+            "Box.HotUpdate.WaterSort"
         };
 
         /// <summary>

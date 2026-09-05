@@ -167,6 +167,10 @@ GameBox/Assets/BuiltinHotUpdate.meta
 # 部署目录(deploy_remote.ps1 拷贝 ServerData 并起 http 服务)
 _deploy_remote/
 
+# Unity Test Framework 批处理启动时写入 Assets/Resources 的性能采样残留(每次 batch 会话生成,无保留价值)
+GameBox/Assets/Resources/PerformanceTestRunInfo.json*
+GameBox/Assets/Resources/PerformanceTestRunSettings.json*
+
 # Firebase 等 UPM 本地包 tgz(官方仅 tgz 分发,大体积不入库,clone 后需手动放置)
 GameBox/Packages/*.tgz
 

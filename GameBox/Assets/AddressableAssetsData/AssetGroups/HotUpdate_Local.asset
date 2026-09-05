@@ -18,29 +18,30 @@ MonoBehaviour:
   - m_GUID: 3d384dba4efe59b4f90a5453c9266efd
     m_Address: HotUpdate/Metadata/Box.UI
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 50c3df3a1d18b95408e10ab6a7384d39
     m_Address: HotUpdate/Metadata/UnityEngine.CoreModule
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 613ddb51118b2f94d8abb43498f8e047
     m_Address: HotUpdate/Metadata/System.Core
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6cb218a38737d014b86b1d07e699daf5
     m_Address: HotUpdate/Metadata/UniTask
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7f425f913e807214d93e1857ee239324
     m_Address: HotUpdate/Metadata/mscorlib
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a9ba38f09bb29b745a2993d73fcd026f
+    m_Address: HotUpdate/Dll/Box.HotUpdate.WaterSort
     m_ReadOnly: 0
     m_SerializedLabels:
     - HotUpdate
@@ -48,20 +49,17 @@ MonoBehaviour:
   - m_GUID: c282f6304d354f94ab71d9e148f47d95
     m_Address: HotUpdate/Dll/Box.HotUpdate.Core
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: e2d16fd05ca51a34b980660a5187b8a6
     m_Address: HotUpdate/module_overrides
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: f0fdadbef447bd9469b1f4bb001768f2
     m_Address: HotUpdate/Dll/Box.HotUpdate.Sudoku
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   m_ReadOnly: 0
   m_Settings: {fileID: 11400000, guid: 68b66f896e1f0094f97398d17cf2c77b, type: 2}

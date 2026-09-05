@@ -20,6 +20,7 @@ MonoBehaviour:
   hotUpdateAssemblies:
   - Box.HotUpdate.Core
   - Box.HotUpdate.Sudoku
+  - Box.HotUpdate.WaterSort
   preserveHotUpdateAssemblies: []
   hotUpdateDllCompileOutputRootDir: HybridCLRData/HotUpdateDlls
   externalHotUpdateAssembliyDirs: []

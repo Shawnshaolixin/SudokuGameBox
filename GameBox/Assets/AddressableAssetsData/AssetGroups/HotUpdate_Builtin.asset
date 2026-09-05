@@ -18,41 +18,40 @@ MonoBehaviour:
   - m_GUID: 11aee36e954d34d42914fab1e762ce36
     m_Address: BuiltinHotUpdate/Metadata/Box.UI
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 18843b230de46364fae254911762a338
     m_Address: BuiltinHotUpdate/Metadata/mscorlib
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 1db7ff6a1d8f10c489e3d5309bab4aec
     m_Address: BuiltinHotUpdate/Metadata/UniTask
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 31ce03b2982ed514b86b90a61140c70e
     m_Address: BuiltinHotUpdate/Dll/Box.HotUpdate.Core
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7eb70626eed157f41b343faf63d7c458
     m_Address: BuiltinHotUpdate/Metadata/System.Core
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 91495396c03864e498355128b2af71bc
     m_Address: BuiltinHotUpdate/Metadata/UnityEngine.CoreModule
     m_ReadOnly: 0
-    m_SerializedLabels:
-    - HotUpdate
+    m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a6dbb87cd21af424e975164afb9b3446
     m_Address: BuiltinHotUpdate/Dll/Box.HotUpdate.Sudoku
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b5be0f29b5e7c6442a6e5f4c746472ce
+    m_Address: BuiltinHotUpdate/Dll/Box.HotUpdate.WaterSort
     m_ReadOnly: 0
     m_SerializedLabels:
     - HotUpdate
