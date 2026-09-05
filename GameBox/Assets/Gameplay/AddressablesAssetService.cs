@@ -19,7 +19,20 @@ namespace Box.Gameplay
 
         public void LoadAsset<T>(string address, Action<T> onLoaded) where T : class
         {
-            var handle = Addressables.LoadAssetAsync<T>(address);
+            // 契约:失败/缺失必须回调 null,不抛到业务层(类头)。无效 key(未入组/产物目录缺失,
+            // 如 PlayMode=Use Existing Build 而条目是后注册的)会令 LoadAssetAsync 在返回前
+            // 同步抛 InvalidKeyException —— 必须在壳层边界兜住,否则会打断调用方流程(WaterSort 曾现)。
+            AsyncOperationHandle handle;
+            try
+            {
+                handle = Addressables.LoadAssetAsync<T>(address);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Assets] 加载失败(地址无效): {address} {e.Message}");
+                onLoaded?.Invoke(null);
+                return;
+            }
             handle.Completed += op =>
             {
                 if (op.Status != AsyncOperationStatus.Succeeded)
@@ -35,7 +48,18 @@ namespace Box.Gameplay
 
         public void Instantiate(string address, Action<object> onLoaded)
         {
-            var handle = Addressables.InstantiateAsync(address);
+            // 同 LoadAsset:无效 key 同步抛异常须兜住(InstantiateAsync 无 location 时同样抛)
+            AsyncOperationHandle handle;
+            try
+            {
+                handle = Addressables.InstantiateAsync(address);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Assets] 实例化失败(地址无效): {address} {e.Message}");
+                onLoaded?.Invoke(null);
+                return;
+            }
             handle.Completed += op =>
             {
                 if (op.Status != AsyncOperationStatus.Succeeded)
