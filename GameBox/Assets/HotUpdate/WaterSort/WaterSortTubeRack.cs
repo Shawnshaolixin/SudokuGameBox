@@ -6,12 +6,13 @@ using UnityEngine.UI;
 namespace Box.HotUpdate.WaterSort
 {
     /// <summary>
-    /// 试管架(运行时代码绘制):按会话盘面在 TubeArea 内重建试管列 —— 每支试管 = 容器节点 + 底部向上
-    /// 分层液块(先入子级,先画)+ Glass 顶层(最后子级 = 最晚绘制,杯身贴图叠在液块上方:管壁/杯弧/
-    /// 高光压住液体边缘,形成「水在管内」透视)。杯身贴图(21 文档 UI-04 ws_tube,Single 整图随管宽等比
-    /// 缩放,Simple 渲染无需九宫),液块 tint 12 色板。
-    /// 贴图经 IAssetService 异步按地址加载(地址约定 21 文档 §6.1);未就绪/未注册时回退旧占位
-    /// 半透明色,美术缺席玩法不受影响;加载完成自动补贴现存试管。
+    /// 试管架(运行时代码绘制):按会话盘面在 TubeArea 内重建试管列。每支试管 = 容器节点 + (可选)
+    /// 「Liquid 遮罩层 + 液块」+ Glass 顶层(最后子级 = 最晚绘制,杯身贴图叠在液体上方:管壁/杯弧/高光
+    /// 压住水缘,形成「水在管内」透视)。
+    /// 液体裁剪:ws_tube_mask(21 文档随图附,白芯内腔剪影 x11-84/rows20-395)经 UGUI Mask
+    /// (showMaskGraphic=false,只写模板不渲染本体)把液块裁成内腔形状 —— 底弧/侧壁天然贴合,无水块
+    /// 方形穿出;mask 未就绪时回退直角液块(新版封底玻璃 alpha 渐变仍可压住水底)。
+    /// 杯身/遮罩贴图经 IAssetService 异步加载(地址约定 21 文档 §6.1);就绪后自动重建补画。
     /// 交互:点击试管选中(高亮),再点另一支 = 请求倒水(由视图经会话判定合法性);
     /// 点自己取消选中。组件运行期 AddComponent 到 TubeArea(不走 prefab 序列化,20 文档 §4 纪律同源)。
     /// 重建即清空重画(盘面 ≤12 管 × ≤4 层,一次性 UI 对象开销可忽略)。
@@ -21,17 +22,20 @@ namespace Box.HotUpdate.WaterSort
         /// <summary>杯身贴图地址(21 文档 §6.1 映射;编辑器 WaterSortSkinImporter 自动注册进 Game_WaterSort 组)。</summary>
         public const string TubeSpriteAddress = "WaterSort/UI/ws_tube";
 
+        /// <summary>内腔剪影遮罩地址(液块裁剪用,须与 ws_tube 同画布同构)。</summary>
+        public const string MaskSpriteAddress = "WaterSort/UI/ws_tube_mask";
+
         // 贴图就位后的选中高亮:图自带玻璃透明度/高光,不再用占位期的透明度提亮,改轻微蓝染区分
         // (占位方案见 Refresh 兜底分支;P3 落地 ws_glow_ring 柔光环后替换本染色)
         static readonly Color SelectedTint = new Color(0.80f, 0.92f, 1f, 1f);
 
-        // 内腔几何常量 —— 实测 ws_tube 96×400(玻璃外缘 x15..80、透明内腔 x17..78;
-        // 杯口环 rows 40..49、底弧收口 rows ~373..376)。换贴图后按同法重测
-        // (像素探针:Build/Tools/probe_tube_alpha.ps1 / probe_tube_rows.ps1)再校准本组常量。
-        const float WaterWidthFrac = 0.67f;      // 水宽 = 0.67×管宽:水缘 x15.8..80.2 收到管壁描边(x15-16/79-80)底下,
-                                                 // 玻璃顶层后画压住水缘 → 侧壁零可见间隙;此前 0.60 留 ~3px 透明缝
-        const float WaterBottomPadFrac = 0.065f; // 液柱底边距图底(≈26px/400):落座在底弧收口处,水不溢出管外
-        const float WaterTopGapFrac = 0.15f;     // 液柱顶距图顶最小余量(≈60px/400):满管液面也不顶到杯口环
+        // 液柱几何常量 —— 实测 96×400 二图(试管软玻璃体 x6..89、强壁线 x8-11/84-87;
+        // 封底渐变 rows ~340..397;mask 内腔 x11..84、底部至 ~row392)。换贴图按同法重测
+        // (像素探针:Build/Tools/probe_tube_alpha|rows|v2|v3.ps1)再校准本组常量。
+        const float DropWidthFrac = 0.98f;       // 液块宽 = 0.98×管宽:略超内腔由剪影裁边,侧缘零方形可见
+        const float DropWidthFallbackFrac = 0.78f; // 直角兜底宽(mask 未就绪):x10.6..85.4 收在强壁线 x8-11/84-87 底下
+        const float WaterBottomPadFrac = 0.015f; // 液柱底边距图底(≈6px/400):底块压进封底渐变区,方形底缘被玻璃梯度盖住
+        const float WaterTopGapFrac = 0.15f;     // 液柱顶距图顶最小余量(≈60px/400):满管液面也不顶到杯口区
         const float DropOverlapPx = 1f;          // 相邻液块 1px 重叠:消除浮点取整发丝缝(层间无可见间隙)
 
         // 占位色板(1..12 对应液滴值;色相取自常见水排序配色,表现替换时仅改本表)
@@ -59,7 +63,10 @@ namespace Box.HotUpdate.WaterSort
         int _selected = -1; // 当前选中试管;点同支取消
         RectTransform _self;
         Sprite _tubeSprite;            // 已加载杯身贴图(懒加载一次,视图缓存期内常驻)
-        bool _tubeSpriteRequested;     // 加载请求已发出(失败不回退重试,保持占位色兜底)
+        bool _tubeSpriteRequested;     // 杯身贴图请求已发出(失败不回退重试,占位色兜底)
+        Sprite _tubeMaskSprite;        // 已加载内腔遮罩(液块裁剪;未就绪 = 直角液块兜底)
+        bool _tubeMaskRequested;       // 遮罩请求已发出(失败不回退,维持兜底路径)
+        bool _refreshScheduled;        // 合帧重建去重标记(见 ScheduleRefresh)
 
         /// <summary>绑定会话(视图在会话就绪后调用一次;盘面以 Refresh 为准,无需重复设置)。</summary>
         public void SetSession(WaterSortSession session) => _session = session;
@@ -77,7 +84,7 @@ namespace Box.HotUpdate.WaterSort
             if (_session == null || _session.Board == null) return;
             if (_self == null) _self = (RectTransform)transform;
             ClearChildren();
-            EnsureTubeSprite(); // 贴图懒加载(首帧可能未就绪,就绪后由回调补画现存试管)
+            EnsureSprites(); // 贴图/遮罩懒加载(首帧可能未就绪,就绪后合帧重建,见 ScheduleRefresh)
 
             var board = _session.Board;
             int n = board.TubeCount;
@@ -93,15 +100,32 @@ namespace Box.HotUpdate.WaterSort
                 var rt = (RectTransform)col.transform;
                 rt.anchoredPosition = new Vector2(startX + t * (w + 12f), 0);
 
+                // 液宿主:遮罩就绪 → 内腔剪影节点(Liquid,UGUI Mask 裁剪液块);否则直接挂容器(直角兜底)
+                RectTransform host = rt;
+                bool masked = drops > 0 && _tubeMaskSprite != null;
+                if (masked)
+                {
+                    var liq = NewChild(rt, "Liquid", w, h, Color.white, false);
+                    var maskImg = liq.GetComponent<Image>();
+                    maskImg.sprite = _tubeMaskSprite;
+                    maskImg.type = Image.Type.Simple;
+                    maskImg.useSpriteMesh = true; // 关键:模板形状 = sprite 网格(Tight 导入裁掉透明外部),而非整矩形
+                    maskImg.color = Color.white;
+                    var mask = liq.AddComponent<Mask>();
+                    mask.showMaskGraphic = false; // 只写模板裁剪子级,自身不渲染(否则白底会盖住画面)
+                    host = (RectTransform)liq.transform;
+                }
+
                 // 液块:底边落座在杯底收口(几何常量类头),自底向上排;相邻块 1px 重叠消取整缝
+                // (Mask 模式水宽略超内腔,两侧由剪影裁齐;兜底模式收在强壁线底下)
                 float bottomY = -h * (0.5f - WaterBottomPadFrac);
                 float usableH = h * (1f - WaterBottomPadFrac - WaterTopGapFrac);
                 float dropH = (usableH + (drops - 1) * DropOverlapPx) / Mathf.Max(4, drops);
-                float waterW = w * WaterWidthFrac;
+                float waterW = w * (masked ? DropWidthFrac : DropWidthFallbackFrac);
                 for (int i = 0; i < drops; i++)
                 {
                     int color = board.Get(t, i); // 0=底
-                    var drop = NewChild(rt, "Drop", waterW, dropH, Palette[color - 1], false);
+                    var drop = NewChild(host, "Drop", waterW, dropH, Palette[color - 1], false);
                     float yBottom = bottomY + i * (dropH - DropOverlapPx); // 本块底边(i=0 贴杯底)
                     ((RectTransform)drop.transform).anchoredPosition =
                         new Vector2(0, yBottom + dropH * 0.5f);
@@ -126,33 +150,45 @@ namespace Box.HotUpdate.WaterSort
             }
         }
 
-        /// <summary>懒加载杯身贴图(IAssetService 回调式;失败留空只试一次 → 占位色兜底,见类头)。</summary>
-        void EnsureTubeSprite()
+        /// <summary>懒加载杯身/遮罩贴图(IAssetService 回调式;失败留空只试一次 → 占位色/直角液块兜底,见类头)。
+        /// 任一就绪 → 合帧重建整架(新遮罩需要新增 Liquid 节点,补画已不够;重建 ≤12 管开销可忽略)。</summary>
+        void EnsureSprites()
         {
-            if (_tubeSprite != null || _tubeSpriteRequested) return;
-            _tubeSpriteRequested = true;
-            ServiceLocator.Assets?.LoadAsset<Sprite>(TubeSpriteAddress, sp =>
+            if (!_tubeSpriteRequested)
             {
-                if (sp == null) return; // 未注册/未构建:保持占位色,不刷警告不重试
-                _tubeSprite = sp;
-                ApplyTubeSpriteAll();   // 首帧后加载完成:补画现存试管;后续 Refresh 直接走贴图分支
-            });
+                _tubeSpriteRequested = true;
+                ServiceLocator.Assets?.LoadAsset<Sprite>(TubeSpriteAddress, sp =>
+                {
+                    if (sp == null) return; // 未注册/未构建:保持占位色,不刷警告不重试
+                    _tubeSprite = sp;
+                    ScheduleRefresh();
+                });
+            }
+            if (!_tubeMaskRequested)
+            {
+                _tubeMaskRequested = true;
+                ServiceLocator.Assets?.LoadAsset<Sprite>(MaskSpriteAddress, sp =>
+                {
+                    if (sp == null) return;
+                    _tubeMaskSprite = sp;
+                    ScheduleRefresh();
+                });
+            }
         }
 
-        /// <summary>给现存全部试管统一补贴图并重上色(异步加载晚于首帧时使用;子节点序 = 管序,选中态一并重算;
-        /// 每管 Glass 恒为最后子级 = 顶层)。</summary>
-        void ApplyTubeSpriteAll()
+        /// <summary>贴图/遮罩到货后的重建:合帧只跑一次(两资源同帧回调时防重复重建/清空竞态)。</summary>
+        void ScheduleRefresh()
         {
-            for (int i = 0; i < transform.childCount; i++)
-            {
-                var tube = transform.GetChild(i);
-                if (tube.childCount == 0) continue;
-                var img = tube.GetChild(tube.childCount - 1).GetComponent<Image>();
-                if (img == null) continue;
-                img.sprite = _tubeSprite;
-                img.type = Image.Type.Simple;
-                img.color = i == _selected ? SelectedTint : Color.white;
-            }
+            if (_refreshScheduled) return;
+            _refreshScheduled = true;
+            StartCoroutine(RefreshNextFrame());
+        }
+
+        System.Collections.IEnumerator RefreshNextFrame()
+        {
+            yield return null;
+            _refreshScheduled = false;
+            Refresh();
         }
 
         /// <summary>倒水被拒(非法):抖动源管给出反馈(占位无音效,动画见 D-15 BoxTween)。</summary>

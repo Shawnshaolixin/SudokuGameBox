@@ -5,9 +5,6 @@ TextureImporter:
   - first:
       213: 5241031530704974202
     second: ws_tube_0
-  - first:
-      213: 2580680104613454318
-    second: ws_tube_1
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -51,7 +48,7 @@ TextureImporter:
   compressionQuality: 50
   spriteMode: 1
   spriteExtrude: 1
-  spriteMeshType: 1
+  spriteMeshType: 0
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 100
@@ -119,10 +116,10 @@ TextureImporter:
       name: ws_tube_0
       rect:
         serializedVersion: 2
-        x: 14
-        y: 22
-        width: 68
-        height: 327
+        x: 0
+        y: 0
+        width: 96
+        height: 400
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -133,28 +130,6 @@ TextureImporter:
       bones: []
       spriteID: a71ba44b862ebb840800000000000000
       internalID: 5241031530704974202
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: ws_tube_1
-      rect:
-        serializedVersion: 2
-        x: 25
-        y: 349
-        width: 46
-        height: 12
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: ee12762d1ea60d320800000000000000
-      internalID: 2580680104613454318
       vertices: []
       indices: 
       edges: []
@@ -174,7 +149,6 @@ TextureImporter:
       entries: []
     nameFileIdTable:
       ws_tube_0: 5241031530704974202
-      ws_tube_1: 2580680104613454318
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

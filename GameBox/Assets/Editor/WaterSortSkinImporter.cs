@@ -55,12 +55,27 @@ public static class WaterSortSkinImporter
     {
         var imp = AssetImporter.GetAtPath(path) as TextureImporter;
         if (imp == null) return false;
+        var name = System.IO.Path.GetFileNameWithoutExtension(path); // 供 _mask 网格规则判定
         bool dirty = false;
         if (imp.textureType != TextureImporterType.Sprite) { imp.textureType = TextureImporterType.Sprite; dirty = true; }
         if (imp.spriteImportMode != SpriteImportMode.Single) { imp.spriteImportMode = SpriteImportMode.Single; dirty = true; }
         if (!imp.alphaIsTransparency) { imp.alphaIsTransparency = true; dirty = true; }
         if (imp.mipmapEnabled) { imp.mipmapEnabled = false; dirty = true; }
         if (imp.filterMode != FilterMode.Bilinear) { imp.filterMode = FilterMode.Bilinear; dirty = true; }
+        // 网格类型:ws_*_mask(内腔剪影)须 Tight —— 裁掉透明外部后网格即内腔形状,
+        // UGUI Mask 的模板形状 = 遮罩图形网格,配合 Image.useSpriteMesh 才能按内腔裁剪液块
+        // (FullRect 网格会退化成矩形裁剪)。其余 UI 图统一 FullRect 防误配。
+        // spriteMeshType 在 TextureImporterSettings 上(TextureImporter 无此属性),经 Read/Set 设置。
+        bool wantTight = name.EndsWith("_mask", System.StringComparison.Ordinal);
+        var wantMesh = wantTight ? SpriteMeshType.Tight : SpriteMeshType.FullRect;
+        var tis = new TextureImporterSettings();
+        imp.ReadTextureSettings(tis);
+        if (tis.spriteMeshType != wantMesh)
+        {
+            tis.spriteMeshType = wantMesh;
+            imp.SetTextureSettings(tis);
+            dirty = true;
+        }
         if (!dirty) return false;
         imp.SaveAndReimport();
         return true;

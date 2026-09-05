@@ -45,6 +45,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 902fa6fa22853c0429c052c736cdb19a
+    m_Address: WaterSort/UI/ws_tube_mask
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bdb1bbb9d319a994cb6b1887b7e0a06a
     m_Address: WaterSort/Levels/daily_levels.json
     m_ReadOnly: 0
