@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Box.Services;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,8 +17,10 @@ namespace Box.HotUpdate.WaterSort
     /// 且剪影底弧贴玻璃壁线内侧(液缘藏进半透明壁线之下,无管外露边)。
     /// 兜底:遮罩或 shader 未就绪 → 直角液块(宽收在强壁线 x8-11/84-87 底下),就绪后合帧重建补画。
     /// 杯身/遮罩/ shader 经 IAssetService 异步加载(地址约定 21 文档 §6.1);就绪后自动重建补画。
-    /// 交互:点击试管选中(高亮),再点另一支 = 请求倒水(由视图经会话判定合法性);
-    /// 点自己取消选中。组件运行期 AddComponent 到 TubeArea(不走 prefab 序列化,20 文档 §4 纪律同源)。
+    /// 交互:点谁谁选中(整管拎起 SelectedLiftPx 停留 + 杯身微染);再点另一支时按引擎同源规则
+    /// (LegalMoves 枚举,见 IsPourable)预判倒水合法性 —— 合法发 PourRequested 交视图倒水
+    /// (成功后视图刷新摘选中,管落回);非法直接把选中切换到新点的管(旧管落回、新管拎起),
+    /// 无需先点回旧管;点自己取消选中。组件运行期 AddComponent 到 TubeArea(不走 prefab 序列化,20 文档 §4 纪律同源)。
     /// 重建即清空重画(盘面 ≤12 管 × ≤4 层,一次性 UI 对象开销可忽略)。
     /// </summary>
     public sealed class WaterSortTubeRack : MonoBehaviour
@@ -43,6 +47,13 @@ namespace Box.HotUpdate.WaterSort
         const float WaterTopGapFrac = 0.15f;     // 液柱顶距图顶最小余量(≈60px/400):满管液面也不顶到杯口区
         const float DropOverlapPx = 1f;          // 相邻液块 1px 重叠:消除浮点取整发丝缝(层间无可见间隙)
 
+        // 选中表现:拎起 = 试管整体上移 SelectedLiftPx 并停留(比高亮染色更直观),取消/倒完水落回原位
+        const float SelectedLiftPx = 26f;        // 选中上抬高度(px)
+        const float LiftDuration = 0.16f;        // 拎起动画时长(落回用 DropBounce 稍长,见 AnimateLift)
+
+        // 布局:≤4 管单行、5~8 管两行、>8 管三行;每行水平居中、整块垂直居中,行间距 RowGap
+        const float RowGap = 34f;
+
         // 占位色板(1..12 对应液滴值;色相取自常见水排序配色,表现替换时仅改本表)
         static readonly Color[] Palette =
         {
@@ -60,8 +71,8 @@ namespace Box.HotUpdate.WaterSort
             new Color32(0xFF, 0xE0, 0x82, 0xFF), // 12 淡黄
         };
 
-        /// <summary>倒水请求(源, 目标):发起时保持源选中态不变,成功与否由视图裁定——
-        /// 合法倒水后视图走「清选中 + 重建」(RefreshTubeArea);非法则仅抖动,选中保留可再试其他目标管。</summary>
+        /// <summary>倒水请求(源, 目标):仅合法移动会发出(试管架已按 LegalMoves 预判);
+        /// 视图 TryPour 成功后经 BoardChanged 刷新整架并摘选中(选中管随重建落回原位)。</summary>
         public event Action<int, int> PourRequested;
 
         WaterSortSession _session;
@@ -75,6 +86,9 @@ namespace Box.HotUpdate.WaterSort
         bool _liquidShaderRequested;   // shader 请求已发出(失败不回退,维持兜底路径)
         Material _liquidMaterial;      // 基材质:持有 _MaskTex;液块按 (层数,层序) 派生实例写 _MaskST
         readonly Dictionary<int, Material> _dropMaterials = new Dictionary<int, Material>(); // 实例缓存(见 GetDropMaterial)
+        Vector2[] _basePositions;      // 各管基准锚点(分行布局计算结果;选中抬起 = 基准 + SelectedLiftPx)
+        readonly Dictionary<int, CancellationTokenSource> _liftAnim =
+            new Dictionary<int, CancellationTokenSource>(); // 各管抬/落动画取消源(快速连点防动画打架)
         bool _refreshScheduled;        // 合帧重建去重标记(见 ScheduleRefresh)
 
         // shader 属性 ID(缓存避免每次重建字符串查表)
@@ -101,54 +115,76 @@ namespace Box.HotUpdate.WaterSort
 
             var board = _session.Board;
             int n = board.TubeCount;
-            // 尺寸自适应:管宽随管数收窄,高度按宽高比 4.6(经典细长试管),整体在容器内居中
-            float w = Mathf.Min(110f, (_self.rect.width - 80f - (n - 1) * 12f) / n);
-            float h = Mathf.Min(w * 4.6f, _self.rect.height - 60f);
-            float startX = -((n - 1) * (w + 12f)) * 0.5f;
+            // 分行布局:≤4 管单行 / 5~8 管两行 / >8 管三行。余量给底行(下重上轻视觉更稳),
+            // 每行水平居中、整块在容器内垂直居中;管序 = 自上而下逐行从左到右(与 Board 索引一致)
+            int rows = n <= 4 ? 1 : (n <= 8 ? 2 : 3);
+            int perRow = n / rows, extra = n % rows;
+            var rowCounts = new int[rows];
+            for (int r = 0; r < rows; r++)
+                rowCounts[r] = perRow + (extra > 0 && r >= rows - extra ? 1 : 0);
+            int maxPerRow = rowCounts[rows - 1]; // 底行最宽 → 水平尺寸按它收
+            // 尺寸自适应:管宽按最宽行的管数收窄;高度按宽高比 4.6(经典细长试管)并受
+            // 「行数 × 管高 + 行距」总高约束;高度受限时按比例反收管宽,保持试管形状
+            float w = Mathf.Min(110f, (_self.rect.width - 80f - (maxPerRow - 1) * 12f) / maxPerRow);
+            float h = Mathf.Min(w * 4.6f, (_self.rect.height - 60f - (rows - 1) * RowGap) / rows);
+            w = Mathf.Min(w, h / 4.6f);
 
-            for (int t = 0; t < n; t++)
+            _basePositions = new Vector2[n];
+            CancelLiftAnims(); // 重建即全换新节点:挂着的抬/落动画全部作废
+            float blockH = rows * h + (rows - 1) * RowGap;
+            int t = 0;
+            for (int r = 0; r < rows; r++)
             {
-                int drops = board.TopCount(t);
-                var col = BuildTube(t, w, h); // 空容器(无 Image 不挡射线);液块先入子级、Glass 最后入
-                var rt = (RectTransform)col.transform;
-                rt.anchoredPosition = new Vector2(startX + t * (w + 12f), 0);
+                float rowY = blockH * 0.5f - h * 0.5f - r * (h + RowGap); // 本行中心 y(首行最上)
+                float startX = -((rowCounts[r] - 1) * (w + 12f)) * 0.5f;  // 本行水平居中
+                for (int c = 0; c < rowCounts[r]; c++, t++)
+                {
+                    int drops = board.TopCount(t);
+                    var col = BuildTube(t, w, h); // 空容器(无 Image 不挡射线);液块先入子级、Glass 最后入
+                    var rt = (RectTransform)col.transform;
+                    var basePos = new Vector2(startX + c * (w + 12f), rowY);
+                    rt.anchoredPosition = basePos;
+                    _basePositions[t] = basePos;
 
-                // 液块:底边落座在杯底收口(几何常量类头),自底向上排;相邻块 1px 重叠消取整缝。
-                // 软裁剪就绪时液块宽略超内腔,两侧/底弧由遮罩 alpha 软裁齐;兜底模式收在强壁线底下
-                bool softClipped = drops > 0 && _liquidMaterial != null;
-                float bottomY = -h * (0.5f - WaterBottomPadFrac);
-                float usableH = h * (1f - WaterBottomPadFrac - WaterTopGapFrac);
-                float dropH = (usableH + (drops - 1) * DropOverlapPx) / Mathf.Max(4, drops);
-                float waterW = w * (softClipped ? DropWidthFrac : DropWidthFallbackFrac);
-                for (int i = 0; i < drops; i++)
-                {
-                    int color = board.Get(t, i); // 0=底
-                    var drop = NewChild(rt, "Drop", waterW, dropH, Palette[color - 1], false);
-                    float yBottom = bottomY + i * (dropH - DropOverlapPx); // 本块底边(i=0 贴杯底)
-                    ((RectTransform)drop.transform).anchoredPosition =
-                        new Vector2(0, yBottom + dropH * 0.5f);
-                    if (softClipped)
-                        drop.GetComponent<Image>().material =
-                            GetDropMaterial(h, drops, i, dropH); // 逐块写遮罩 UV 映射
-                }
+                    // 液块:底边落座在杯底收口(几何常量类头),自底向上排;相邻块 1px 重叠消取整缝。
+                    // 软裁剪就绪时液块宽略超内腔,两侧/底弧由遮罩 alpha 软裁齐;兜底模式收在强壁线底下
+                    bool softClipped = drops > 0 && _liquidMaterial != null;
+                    float bottomY = -h * (0.5f - WaterBottomPadFrac);
+                    float usableH = h * (1f - WaterBottomPadFrac - WaterTopGapFrac);
+                    float dropH = (usableH + (drops - 1) * DropOverlapPx) / Mathf.Max(4, drops);
+                    float waterW = w * (softClipped ? DropWidthFrac : DropWidthFallbackFrac);
+                    for (int i = 0; i < drops; i++)
+                    {
+                        int color = board.Get(t, i); // 0=底
+                        var drop = NewChild(rt, "Drop", waterW, dropH, Palette[color - 1], false);
+                        float yBottom = bottomY + i * (dropH - DropOverlapPx); // 本块底边(i=0 贴杯底)
+                        ((RectTransform)drop.transform).anchoredPosition =
+                            new Vector2(0, yBottom + dropH * 0.5f);
+                        if (softClipped)
+                            drop.GetComponent<Image>().material =
+                                GetDropMaterial(h, drops, i, dropH); // 逐块写遮罩 UV 映射
+                    }
 
-                // Glass 顶层(最后子级 = 最晚绘制 → 玻璃压在液体上,管壁/杯口弧/高光叠在水层前方,呈现水在管内)
-                var glass = AppendGlass(rt, t, w, h);
-                if (_tubeSprite != null)
-                {
-                    // 贴图模式:Simple 整图等比缩放到 w×h;颜色仅做选中微染(玻璃透明度/高光由贴图自带)
-                    glass.sprite = _tubeSprite;
-                    glass.type = Image.Type.Simple;
-                    glass.color = t == _selected ? SelectedTint : Color.white;
-                }
-                else
-                {
-                    // 兜底占位(贴图未就绪/未注册):半透明杯体,选中提亮;贴图就绪后由回调补画
-                    glass.color = t == _selected
-                        ? new Color(0.45f, 0.55f, 0.70f, 0.9f)  // 选中高亮(占位:提亮杯体)
-                        : new Color(1f, 1f, 1f, 0.10f);
+                    // Glass 顶层(最后子级 = 最晚绘制 → 玻璃压在液体上,管壁/杯口弧/高光叠在水层前方,呈现水在管内)
+                    var glass = AppendGlass(rt, t, w, h);
+                    if (_tubeSprite != null)
+                    {
+                        // 贴图模式:Simple 整图等比缩放到 w×h;颜色仅做选中微染(玻璃透明度/高光由贴图自带)
+                        glass.sprite = _tubeSprite;
+                        glass.type = Image.Type.Simple;
+                        glass.color = t == _selected ? SelectedTint : Color.white;
+                    }
+                    else
+                    {
+                        // 兜底占位(贴图未就绪/未注册):半透明杯体,选中提亮;贴图就绪后由回调补画
+                        glass.color = t == _selected
+                            ? new Color(0.45f, 0.55f, 0.70f, 0.9f)  // 选中高亮(占位:提亮杯体)
+                            : new Color(1f, 1f, 1f, 0.10f);
+                    }
                 }
             }
+            // 跨重建保留的选中(正常提交型重建前视图已 ClearSelection;贴图回调重建等路径防御性复位抬起位)
+            if (_selected >= 0 && _selected < n) SnapSelected();
         }
 
         /// <summary>懒加载杯身/遮罩贴图与液体 shader(IAssetService 回调式;失败留空只试一次 → 占位色/直角
@@ -217,9 +253,10 @@ namespace Box.HotUpdate.WaterSort
             return mat;
         }
 
-        /// <summary>释放派生/基材质(重建复用缓存,仅销毁时清一次,防原生材质泄漏)。</summary>
+        /// <summary>释放派生/基材质与抬落动画取消源(重建复用缓存,仅销毁时清一次,防原生泄漏)。</summary>
         void OnDestroy()
         {
+            CancelLiftAnims();
             foreach (var kv in _dropMaterials) Destroy(kv.Value);
             _dropMaterials.Clear();
             if (_liquidMaterial != null) Destroy(_liquidMaterial);
@@ -248,20 +285,104 @@ namespace Box.HotUpdate.WaterSort
             await Box.UI.BoxTween.Shake(_self.GetChild(tubeIndex), 0.28f, 14f);
         }
 
-        /// <summary>清空选中标记(提交型重建前由视图调用;重建随之进行,无需本方法自行重绘)。</summary>
-        public void ClearSelection() => _selected = -1;
+        /// <summary>清空选中标记(提交型重建前由视图调用):取消挂着的抬/落动画,重建后各管归位基准点。</summary>
+        public void ClearSelection()
+        {
+            _selected = -1;
+            CancelLiftAnims();
+        }
 
         void OnTubeTap(int index)
         {
-            if (_selected < 0 || _selected == index)
+            if (_selected < 0)
             {
-                _selected = _selected == index ? -1 : index; // 首次=选中并重绘高亮;点同支=取消
-                Refresh();
+                SetSelected(index); // 无选中:点谁选中谁(拎起停留)
                 return;
             }
-            // 已选中源管后点另一支:交视图裁决。此处不清选中也不重绘——
-            // 合法倒水由视图刷新摘选中;非法倒水保留选中仅抖动,玩家可立刻再试目标。
-            PourRequested?.Invoke(_selected, index);
+            if (_selected == index)
+            {
+                SetSelected(-1); // 点自己:取消选中(落回原位)
+                return;
+            }
+            // 已有选中:先按引擎同源规则判倒水合法性 —— 合法才发请求(视图 TryPour 成功后经
+            // BoardChanged 刷新并摘选中,选中管落回);非法不再要求玩家先点回旧管,
+            // 直接把选中切换到新点的管(旧管落回、新管拎起)
+            if (IsPourable(_selected, index))
+            {
+                PourRequested?.Invoke(_selected, index);
+                return;
+            }
+            SetSelected(index);
+        }
+
+        /// <summary>倒水合法性预判(与会话 TryPour 同源:枚举引擎 LegalMoves 匹配 src→dst)。
+        /// 管数 ≤12+额外,枚举开销可忽略;会话/盘面缺失按不可倒处理(走选中切换)。</summary>
+        bool IsPourable(int src, int dst)
+        {
+            var b = _session?.Board;
+            if (b == null) return false;
+            foreach (var m in b.LegalMoves())
+                if (m.Src == src && m.Dst == dst) return true;
+            return false;
+        }
+
+        /// <summary>设置选中(index &lt; 0 = 取消):新选中管拎起停留、原选中管落回,同步杯身高亮。
+        /// 只动节点位移动画不整架重建(重建会打断动画且开销无谓);高亮同样就地去色。</summary>
+        void SetSelected(int index)
+        {
+            int prev = _selected;
+            _selected = index;
+            if (prev >= 0 && prev != index) AnimateLift(prev, false); // 旧选中落回
+            if (index >= 0) AnimateLift(index, true);                 // 新选中拎起
+            ApplyTint(prev);
+            ApplyTint(index);
+        }
+
+        /// <summary>拎起/落回动画:目标位 = 基准位 ± SelectedLiftPx。落回走 DropBounce(落地回弹,
+        /// 「放回去」的手感);同管旧动画先取消,防快速连点时位移动画叠加打架。</summary>
+        void AnimateLift(int tube, bool up)
+        {
+            if (tube < 0 || tube >= transform.childCount
+                || _basePositions == null || tube >= _basePositions.Length) return;
+            if (_liftAnim.TryGetValue(tube, out var old))
+            {
+                old.Cancel();
+                old.Dispose();
+            }
+            var cts = new CancellationTokenSource();
+            _liftAnim[tube] = cts;
+            var rt = (RectTransform)transform.GetChild(tube);
+            var from = rt.anchoredPosition;
+            var to = _basePositions[tube] + (up ? new Vector2(0, SelectedLiftPx) : Vector2.zero);
+            if (up) Box.UI.BoxTween.MoveTo(rt, from, to, LiftDuration, cts.Token).Forget();
+            else Box.UI.BoxTween.DropBounce(rt, from, to, LiftDuration + 0.12f, cts.Token).Forget();
+        }
+
+        /// <summary>选中管瞬移到抬起位(无动画):重建后恢复选中态用(防御路径,正常流程选中不跨重建)。</summary>
+        void SnapSelected()
+        {
+            if (_selected < 0 || _selected >= transform.childCount) return;
+            ((RectTransform)transform.GetChild(_selected)).anchoredPosition =
+                _basePositions[_selected] + new Vector2(0, SelectedLiftPx);
+        }
+
+        /// <summary>杯身高亮就地刷新(选中微蓝染/还原白色;占位期无贴图不动,抬起位移已足够区分)。</summary>
+        void ApplyTint(int tube)
+        {
+            if (_tubeSprite == null || tube < 0 || tube >= transform.childCount) return;
+            var glass = transform.GetChild(tube).Find("Glass")?.GetComponent<Image>();
+            if (glass != null) glass.color = tube == _selected ? SelectedTint : Color.white;
+        }
+
+        /// <summary>取消全部抬/落动画并释放取消源(重建清子级前/摘选中时调用,防动画写已销毁节点)。</summary>
+        void CancelLiftAnims()
+        {
+            foreach (var kv in _liftAnim)
+            {
+                kv.Value.Cancel();
+                kv.Value.Dispose();
+            }
+            _liftAnim.Clear();
         }
 
         GameObject BuildTube(int index, float w, float h)

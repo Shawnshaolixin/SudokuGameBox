@@ -415,7 +415,8 @@ namespace Box.HotUpdate.WaterSort
 
         /// <summary>
         /// 试管区刷新唯一接缝:倒水/撤销/重开/换关后调用——
-        /// 先摘选中再按盘面重建试管,同步步数文本(非法倒水抖动路径不经此方法,选中保留可再试)。
+        /// 先摘选中再按盘面重建试管,同步步数文本(非法倒水不会走到这:试管架已按 LegalMoves
+        /// 预判,非法点击在架内就地切换选中,不发请求)。
         /// </summary>
         void RefreshTubeArea()
         {
@@ -429,8 +430,9 @@ namespace Box.HotUpdate.WaterSort
             TutorialAfterBoardRefresh(); // 引导 S2 聚合演示对随盘面漂移:刷新后重扫重定位(M3.3)
         }
 
-        /// <summary>试管点击裁决:合法→会话推进(BoardChanged 驱动本区刷新);非法→源管抖动,选中保留可再试目标。
-        /// 引导局(M3.3)额外上报「是否同色聚合倒水」供第 2 步步进(判据与 Session 规则同源:非空 dst 顶层同色)。</summary>
+        /// <summary>试管点击执行:试管架已按 LegalMoves 预判,请求恒为合法移动 → TryPour 推进盘面
+        /// (BoardChanged 驱动本区刷新,选中管随重建落回)。防御分支(竞态下 TryPour 失败,理论不可达)
+        /// 抖动源管提示。引导局(M3.3)额外上报「是否同色聚合倒水」供第 2 步步进(判据与 Session 规则同源)。</summary>
         void OnPourRequested(int src, int dst)
         {
             if (_session == null || !_session.IsInLevel) return; // 面板切换竞态兜底
