@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Box.Services;
 using UnityEngine;
 using UnityEngine.UI;
@@ -6,13 +7,14 @@ using UnityEngine.UI;
 namespace Box.HotUpdate.WaterSort
 {
     /// <summary>
-    /// 试管架(运行时代码绘制):按会话盘面在 TubeArea 内重建试管列。每支试管 = 容器节点 + (可选)
-    /// 「Liquid 遮罩层 + 液块」+ Glass 顶层(最后子级 = 最晚绘制,杯身贴图叠在液体上方:管壁/杯弧/高光
-    /// 压住水缘,形成「水在管内」透视)。
-    /// 液体裁剪:ws_tube_mask(21 文档随图附,白芯内腔剪影 x11-84/rows20-395)经 UGUI Mask
-    /// (showMaskGraphic=false,只写模板不渲染本体)把液块裁成内腔形状 —— 底弧/侧壁天然贴合,无水块
-    /// 方形穿出;mask 未就绪时回退直角液块(新版封底玻璃 alpha 渐变仍可压住水底)。
-    /// 杯身/遮罩贴图经 IAssetService 异步加载(地址约定 21 文档 §6.1);就绪后自动重建补画。
+    /// 试管架(运行时代码绘制):按会话盘面在 TubeArea 内重建试管列。每支试管 = 容器节点 + 液块列 +
+    /// Glass 顶层(最后子级 = 最晚绘制,杯身贴图叠在液体上方:管壁/杯弧/高光压住水缘,形成「水在管内」透视)。
+    /// 液体裁剪(软裁剪):液块挂自定义材质(Box/UI/WaterSortLiquid = ws_liquid_soft),逐块写入 _MaskST
+    /// 把液块 quad 的 UV 映射到内腔剪影遮罩 ws_tube_mask(96×400 与杯身同画布),片元按遮罩 alpha
+    /// smoothstep 软过渡裁剪 —— 剪影边缘自带 1~2px 羽化,底弧等强曲线处无 stencil 硬裁的像素阶梯,
+    /// 且剪影底弧贴玻璃壁线内侧(液缘藏进半透明壁线之下,无管外露边)。
+    /// 兜底:遮罩或 shader 未就绪 → 直角液块(宽收在强壁线 x8-11/84-87 底下),就绪后合帧重建补画。
+    /// 杯身/遮罩/ shader 经 IAssetService 异步加载(地址约定 21 文档 §6.1);就绪后自动重建补画。
     /// 交互:点击试管选中(高亮),再点另一支 = 请求倒水(由视图经会话判定合法性);
     /// 点自己取消选中。组件运行期 AddComponent 到 TubeArea(不走 prefab 序列化,20 文档 §4 纪律同源)。
     /// 重建即清空重画(盘面 ≤12 管 × ≤4 层,一次性 UI 对象开销可忽略)。
@@ -22,19 +24,22 @@ namespace Box.HotUpdate.WaterSort
         /// <summary>杯身贴图地址(21 文档 §6.1 映射;编辑器 WaterSortSkinImporter 自动注册进 Game_WaterSort 组)。</summary>
         public const string TubeSpriteAddress = "WaterSort/UI/ws_tube";
 
-        /// <summary>内腔剪影遮罩地址(液块裁剪用,须与 ws_tube 同画布同构)。</summary>
+        /// <summary>内腔剪影遮罩地址(液块软裁剪用,须与 ws_tube 同画布同构)。</summary>
         public const string MaskSpriteAddress = "WaterSort/UI/ws_tube_mask";
+
+        /// <summary>液体软裁剪 shader 地址(Box/UI/WaterSortLiquid;采样遮罩 alpha 软过渡,替代 UGUI Mask 硬裁)。</summary>
+        public const string LiquidShaderAddress = "WaterSort/UI/ws_liquid_soft";
 
         // 贴图就位后的选中高亮:图自带玻璃透明度/高光,不再用占位期的透明度提亮,改轻微蓝染区分
         // (占位方案见 Refresh 兜底分支;P3 落地 ws_glow_ring 柔光环后替换本染色)
         static readonly Color SelectedTint = new Color(0.80f, 0.92f, 1f, 1f);
 
         // 液柱几何常量 —— 实测 96×400 二图(试管软玻璃体 x6..89、强壁线 x8-11/84-87;
-        // 封底渐变 rows ~340..397;mask 内腔 x11..84、底部至 ~row392)。换贴图按同法重测
-        // (像素探针:Build/Tools/probe_tube_alpha|rows|v2|v3.ps1)再校准本组常量。
-        const float DropWidthFrac = 0.98f;       // 液块宽 = 0.98×管宽:略超内腔由剪影裁边,侧缘零方形可见
-        const float DropWidthFallbackFrac = 0.78f; // 直角兜底宽(mask 未就绪):x10.6..85.4 收在强壁线 x8-11/84-87 底下
-        const float WaterBottomPadFrac = 0.015f; // 液柱底边距图底(≈6px/400):底块压进封底渐变区,方形底缘被玻璃梯度盖住
+        // 封底渐变 rows ~340..397;遮罩剪影贴壁线内侧 1px、底弧随壁线收口)。换贴图按同法重测
+        // (像素探针:Build/Tools/probe_tube_*.ps1、生成脚本 Build/Tools/gen_ws_tube_mask.py)再校准本组常量。
+        const float DropWidthFrac = 0.98f;       // 液块宽 = 0.98×管宽:略超内腔由遮罩 alpha 软裁齐,侧缘零方形可见
+        const float DropWidthFallbackFrac = 0.78f; // 直角兜底宽(软裁剪未就绪):x10.6..85.4 收在强壁线 x8-11/84-87 底下
+        const float WaterBottomPadFrac = 0.015f; // 液柱底边距图底(≈6px/400):与遮罩底弧收口行对齐,底缘藏进封底描边
         const float WaterTopGapFrac = 0.15f;     // 液柱顶距图顶最小余量(≈60px/400):满管液面也不顶到杯口区
         const float DropOverlapPx = 1f;          // 相邻液块 1px 重叠:消除浮点取整发丝缝(层间无可见间隙)
 
@@ -64,9 +69,17 @@ namespace Box.HotUpdate.WaterSort
         RectTransform _self;
         Sprite _tubeSprite;            // 已加载杯身贴图(懒加载一次,视图缓存期内常驻)
         bool _tubeSpriteRequested;     // 杯身贴图请求已发出(失败不回退重试,占位色兜底)
-        Sprite _tubeMaskSprite;        // 已加载内腔遮罩(液块裁剪;未就绪 = 直角液块兜底)
+        Sprite _tubeMaskSprite;        // 已加载内腔遮罩(液块软裁剪;与 shader 双就绪才启用裁剪)
         bool _tubeMaskRequested;       // 遮罩请求已发出(失败不回退,维持兜底路径)
+        Shader _liquidShader;          // 液体软裁剪 shader(与遮罩双就绪 → 构建基材质)
+        bool _liquidShaderRequested;   // shader 请求已发出(失败不回退,维持兜底路径)
+        Material _liquidMaterial;      // 基材质:持有 _MaskTex;液块按 (层数,层序) 派生实例写 _MaskST
+        readonly Dictionary<int, Material> _dropMaterials = new Dictionary<int, Material>(); // 实例缓存(见 GetDropMaterial)
         bool _refreshScheduled;        // 合帧重建去重标记(见 ScheduleRefresh)
+
+        // shader 属性 ID(缓存避免每次重建字符串查表)
+        static readonly int MaskTexId = Shader.PropertyToID("_MaskTex");
+        static readonly int MaskSTId = Shader.PropertyToID("_MaskST");
 
         /// <summary>绑定会话(视图在会话就绪后调用一次;盘面以 Refresh 为准,无需重复设置)。</summary>
         public void SetSession(WaterSortSession session) => _session = session;
@@ -100,35 +113,23 @@ namespace Box.HotUpdate.WaterSort
                 var rt = (RectTransform)col.transform;
                 rt.anchoredPosition = new Vector2(startX + t * (w + 12f), 0);
 
-                // 液宿主:遮罩就绪 → 内腔剪影节点(Liquid,UGUI Mask 裁剪液块);否则直接挂容器(直角兜底)
-                RectTransform host = rt;
-                bool masked = drops > 0 && _tubeMaskSprite != null;
-                if (masked)
-                {
-                    var liq = NewChild(rt, "Liquid", w, h, Color.white, false);
-                    var maskImg = liq.GetComponent<Image>();
-                    maskImg.sprite = _tubeMaskSprite;
-                    maskImg.type = Image.Type.Simple;
-                    maskImg.useSpriteMesh = true; // 关键:模板形状 = sprite 网格(Tight 导入裁掉透明外部),而非整矩形
-                    maskImg.color = Color.white;
-                    var mask = liq.AddComponent<Mask>();
-                    mask.showMaskGraphic = false; // 只写模板裁剪子级,自身不渲染(否则白底会盖住画面)
-                    host = (RectTransform)liq.transform;
-                }
-
-                // 液块:底边落座在杯底收口(几何常量类头),自底向上排;相邻块 1px 重叠消取整缝
-                // (Mask 模式水宽略超内腔,两侧由剪影裁齐;兜底模式收在强壁线底下)
+                // 液块:底边落座在杯底收口(几何常量类头),自底向上排;相邻块 1px 重叠消取整缝。
+                // 软裁剪就绪时液块宽略超内腔,两侧/底弧由遮罩 alpha 软裁齐;兜底模式收在强壁线底下
+                bool softClipped = drops > 0 && _liquidMaterial != null;
                 float bottomY = -h * (0.5f - WaterBottomPadFrac);
                 float usableH = h * (1f - WaterBottomPadFrac - WaterTopGapFrac);
                 float dropH = (usableH + (drops - 1) * DropOverlapPx) / Mathf.Max(4, drops);
-                float waterW = w * (masked ? DropWidthFrac : DropWidthFallbackFrac);
+                float waterW = w * (softClipped ? DropWidthFrac : DropWidthFallbackFrac);
                 for (int i = 0; i < drops; i++)
                 {
                     int color = board.Get(t, i); // 0=底
-                    var drop = NewChild(host, "Drop", waterW, dropH, Palette[color - 1], false);
+                    var drop = NewChild(rt, "Drop", waterW, dropH, Palette[color - 1], false);
                     float yBottom = bottomY + i * (dropH - DropOverlapPx); // 本块底边(i=0 贴杯底)
                     ((RectTransform)drop.transform).anchoredPosition =
                         new Vector2(0, yBottom + dropH * 0.5f);
+                    if (softClipped)
+                        drop.GetComponent<Image>().material =
+                            GetDropMaterial(h, drops, i, dropH); // 逐块写遮罩 UV 映射
                 }
 
                 // Glass 顶层(最后子级 = 最晚绘制 → 玻璃压在液体上,管壁/杯口弧/高光叠在水层前方,呈现水在管内)
@@ -150,8 +151,8 @@ namespace Box.HotUpdate.WaterSort
             }
         }
 
-        /// <summary>懒加载杯身/遮罩贴图(IAssetService 回调式;失败留空只试一次 → 占位色/直角液块兜底,见类头)。
-        /// 任一就绪 → 合帧重建整架(新遮罩需要新增 Liquid 节点,补画已不够;重建 ≤12 管开销可忽略)。</summary>
+        /// <summary>懒加载杯身/遮罩贴图与液体 shader(IAssetService 回调式;失败留空只试一次 → 占位色/直角
+        /// 液块兜底,见类头)。任一就绪 → 合帧重建整架;遮罩+shader 双就绪时先建基材质再重建。</summary>
         void EnsureSprites()
         {
             if (!_tubeSpriteRequested)
@@ -171,9 +172,58 @@ namespace Box.HotUpdate.WaterSort
                 {
                     if (sp == null) return;
                     _tubeMaskSprite = sp;
+                    TryBuildLiquidMaterial();
                     ScheduleRefresh();
                 });
             }
+            if (!_liquidShaderRequested)
+            {
+                _liquidShaderRequested = true;
+                ServiceLocator.Assets?.LoadAsset<Shader>(LiquidShaderAddress, sh =>
+                {
+                    if (sh == null) return;
+                    _liquidShader = sh;
+                    TryBuildLiquidMaterial();
+                    ScheduleRefresh();
+                });
+            }
+        }
+
+        /// <summary>遮罩 + shader 双就绪时构建液体基材质(挂 _MaskTex);液块实例按需从它派生。
+        /// 单独就绪其一不构建 —— 缺遮罩无裁剪形状、缺 shader 无软裁逻辑,均走直角兜底。</summary>
+        void TryBuildLiquidMaterial()
+        {
+            if (_liquidMaterial != null || _tubeMaskSprite == null || _liquidShader == null) return;
+            _liquidMaterial = new Material(_liquidShader);
+            _liquidMaterial.SetTexture(MaskTexId, _tubeMaskSprite.texture);
+        }
+
+        /// <summary>液块材质:按 (层数, 层序) 缓存派生实例(同构液块共用,合批友好),写入 _MaskST =
+        /// 液块 quad(texcoord 0..1 = 液块自身矩形)到遮罩 UV 空间的平移(xy)+缩放(zw)。管矩形归一化为
+        /// [0,1](左下原点)后:液块宽恒为 DropWidthFrac,底边 v = WaterBottomPadFrac + i×层高步进。
+        /// 几何式须与 Refresh 绘制循环保持一字不差,否则裁剪形状与液块错位。</summary>
+        Material GetDropMaterial(float h, int drops, int i, float dropH)
+        {
+            int key = drops * 8 + i; // 层数 ≤4、层序 <8,单字节键互斥
+            if (!_dropMaterials.TryGetValue(key, out var mat))
+            {
+                mat = new Material(_liquidMaterial);
+                float yBottom = -h * (0.5f - WaterBottomPadFrac) + i * (dropH - DropOverlapPx);
+                float u0 = 0.5f * (1f - DropWidthFrac);
+                float v0 = yBottom / h + 0.5f;
+                mat.SetVector(MaskSTId, new Vector4(u0, v0, DropWidthFrac, dropH / h));
+                _dropMaterials[key] = mat;
+            }
+            return mat;
+        }
+
+        /// <summary>释放派生/基材质(重建复用缓存,仅销毁时清一次,防原生材质泄漏)。</summary>
+        void OnDestroy()
+        {
+            foreach (var kv in _dropMaterials) Destroy(kv.Value);
+            _dropMaterials.Clear();
+            if (_liquidMaterial != null) Destroy(_liquidMaterial);
+            _liquidMaterial = null;
         }
 
         /// <summary>贴图/遮罩到货后的重建:合帧只跑一次(两资源同帧回调时防重复重建/清空竞态)。</summary>
