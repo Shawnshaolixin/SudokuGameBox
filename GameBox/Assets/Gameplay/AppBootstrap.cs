@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Box.Gameplay.HotUpdate;
 using Box.ModuleFramework;
 using Box.Services;
@@ -18,6 +20,19 @@ namespace Box.Gameplay
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Boot()
         {
+            // ===== 2026-09-05 真机"点 More Games 无反应"事故的运行侧根治(catalog 缓存劫持) =====
+            // Addressables 离线分支(ContentCatalogProvider.DetermineIdToLoad)在 persistentDataPath 缓存
+            // catalog 存在时无条件优先加载、不校验与包内一致性 —— 曾装过含远程组的旧包会在
+            // {persistentDataPath}/com.unity.addressables 留下 catalog_*.bin,其 bundle 名指向旧内容哈希
+            // (ui_local...c86…),与当前包内文件(…37152ac5)不符 → 全部资源加载失败、UI 静默无响应
+            // (force-stop/pm clear 均不清该目录,故每次启动复现;构建侧烧 True 只禁写不挡读)。
+            // v1.0 包无远程内容:该缓存对本包永远无效且可能劫持 → 每次冷启动删除,天然免疫历史残留;
+            // 删除后 Addressables 走内建自愈(缓存缺失 → 加载失败重试 → 读包内 catalog)。
+            // v1.1(HYBRIDCLR_UNITY)严禁删除 —— 热更离线语义(WS-18 已下载内容断网可玩)依赖该缓存。
+#if !HYBRIDCLR_UNITY
+            ClearAddressablesCatalogCache(); // 必须在任何 Addressables API 调用之前(本方法为全工程最先入口)
+#endif
+
             // ===== 分析服务(Phase 11 前置:Firebase 提前接入,2026-08 拍板) =====
             // 真实现需 SUDOKU_FIREBASE 符号(编辑器菜单「Box/商业化/应用 Firebase 编译符号」,
             // FirebaseSetup.cs)与 Assets/google-services.json;未定义符号时自动回退桩(事件打印 Console),
@@ -88,5 +103,30 @@ namespace Box.Gameplay
 
             Debug.Log($"[AppBootstrap] UIService + ModuleLoader + Services registered (存档:{save.Exists})");
         }
+
+#if !HYBRIDCLR_UNITY
+        /// <summary>
+        /// 删除 Addressables 的 catalog 缓存目录(仅 v1.0 语义编译,原因见 Boot 顶部事故注释)。
+        /// 目录 = {persistentDataPath}/com.unity.addressables(ContentCatalogProvider 的 localCachePath,
+        /// 真机实测仅含 catalog_*.bin/.hash;AssetBundle 走 UnityEngine.Caching 不在此目录)。
+        /// 失败静默降级(罕见场景下次冷启动再删),绝不阻塞启动。
+        /// </summary>
+        static void ClearAddressablesCatalogCache()
+        {
+            try
+            {
+                var cacheRoot = Path.Combine(Application.persistentDataPath, "com.unity.addressables");
+                if (Directory.Exists(cacheRoot))
+                {
+                    Directory.Delete(cacheRoot, true);
+                    Debug.Log("[AppBootstrap] 已清除 Addressables catalog 缓存残留: " + cacheRoot);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[AppBootstrap] 清除 Addressables catalog 缓存失败(下次启动重试): " + e.Message);
+            }
+        }
+#endif
     }
 }
