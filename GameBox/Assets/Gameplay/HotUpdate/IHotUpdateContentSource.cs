@@ -411,7 +411,8 @@ namespace Box.Gameplay.HotUpdate
 
     /// <summary>
     /// HybridCLR 运行时装载器(9-3 默认实现):全反射,禁止编译期引用 HybridCLR.Runtime
-    /// (v1.0 主包无该程序集,直接引用会被 IL2CPP 裁剪 → MissingMethod 崩溃)。
+    /// (v1.0 包虽带类型头,但运行时方法被 IL2CPP 裁剪,调用即 MissingMethod —— 见
+    /// IsRuntimeAvailable 的 #if 注释;直接编译期引用同样会裁剪崩溃)。
     /// 反射探测成功后才执行;HomologousImageMode 枚举经方法参数类型解析,不硬编码命名空间/数值。
     /// 9-4 起语义与真实 HybridCLR 对齐:LoadMetadata 按 AOT 程序集逐个装载(Consistent 模式),
     /// 全部元数据就绪后再 Assembly.Load 热更程序集。
@@ -420,7 +421,21 @@ namespace Box.Gameplay.HotUpdate
     {
         const string RuntimeApiTypeName = "HybridCLR.RuntimeApi, HybridCLR.Runtime";
 
+        // 2026-09-05 真机重启后 More Games 无反应(第二层根因,19 文档 §10 第 5 项):
+        // v1.0 包实际带 HybridCLR.Runtime **类型头**(HybridCLR 为 git Package v8.14.1,
+        // 其 Runtime asmdef 无条件编译进所有 Player),Type.GetType 恒非 null → 旧写法恒 true,
+        // 热更链每启执行 TryUpdateCatalogAsync → 下载服务器(staging)远程 catalog 写缓存
+        // (服务器内容 = 旧远程组部署产物,实测含 c86f31c3/7d8d5143 bundle 名)→ Addressables
+        // 初始化读该缓存 → 劫持包内内容(同一次启动内覆盖 AppBootstrap 的缓存清除)。
+        // 修复:v1.0(无宏)恒 false 整链跳过 —— v1.0 无远程内容语义,热更 dll 已 AOT 随包,
+        // 运行时方法还被 IL2CPP 裁剪(LoadMetadataForAOTAssembly MissingMethodException 实测),
+        // 热更链对本包既无用又有害(网络请求 + 缓存污染种子);
+        // v1.1(HYBRIDCLR_UNITY)保持反射真探测,宏语义即构建语义,两模式各自自洽。
+#if HYBRIDCLR_UNITY
         public bool IsRuntimeAvailable => Type.GetType(RuntimeApiTypeName) != null;
+#else
+        public bool IsRuntimeAvailable => false;
+#endif
 
         public bool LoadMetadata(string aotAssemblyName, byte[] metadataBytes)
         {
