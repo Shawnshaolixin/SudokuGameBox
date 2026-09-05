@@ -1,19 +1,28 @@
 using System;
+using Box.Services;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace Box.HotUpdate.WaterSort
 {
     /// <summary>
-    /// 试管架(运行时代码绘制,M1.3 占位美术):
-    /// 按会话盘面在 TubeArea 内重建试管列 —— 玻璃底色 Image + 底部向上分层液块 Image,
-    /// 占位阶段无贴图/无圆角,表现后置 M3 走 AIGC 管线替换(玩法逻辑不受影响)。
+    /// 试管架(运行时代码绘制):按会话盘面在 TubeArea 内重建试管列 —— 杯身贴图(21 文档 UI-04 ws_tube,
+    /// Single 整图随管宽/管数等比缩放,Simple 渲染无需九宫)+ 底部向上分层液块 Image(tint 12 色板)。
+    /// 贴图经 IAssetService 异步按地址加载(地址约定 21 文档 §6.1);未就绪/未注册时回退旧占位
+    /// 半透明色,美术缺席玩法不受影响;加载完成自动补贴现存试管。
     /// 交互:点击试管选中(高亮),再点另一支 = 请求倒水(由视图经会话判定合法性);
     /// 点自己取消选中。组件运行期 AddComponent 到 TubeArea(不走 prefab 序列化,20 文档 §4 纪律同源)。
     /// 重建即清空重画(盘面 ≤12 管 × ≤4 层,一次性 UI 对象开销可忽略)。
     /// </summary>
     public sealed class WaterSortTubeRack : MonoBehaviour
     {
+        /// <summary>杯身贴图地址(21 文档 §6.1 映射;编辑器 WaterSortSkinImporter 自动注册进 Game_WaterSort 组)。</summary>
+        public const string TubeSpriteAddress = "WaterSort/UI/ws_tube";
+
+        // 贴图就位后的选中高亮:图自带玻璃透明度/高光,不再用占位期的透明度提亮,改轻微蓝染区分
+        // (占位方案见 Refresh 兜底分支;P3 落地 ws_glow_ring 柔光环后替换本染色)
+        static readonly Color SelectedTint = new Color(0.80f, 0.92f, 1f, 1f);
+
         // 占位色板(1..12 对应液滴值;色相取自常见水排序配色,表现替换时仅改本表)
         static readonly Color[] Palette =
         {
@@ -38,6 +47,8 @@ namespace Box.HotUpdate.WaterSort
         WaterSortSession _session;
         int _selected = -1; // 当前选中试管;点同支取消
         RectTransform _self;
+        Sprite _tubeSprite;            // 已加载杯身贴图(懒加载一次,视图缓存期内常驻)
+        bool _tubeSpriteRequested;     // 加载请求已发出(失败不回退重试,保持占位色兜底)
 
         /// <summary>绑定会话(视图在会话就绪后调用一次;盘面以 Refresh 为准,无需重复设置)。</summary>
         public void SetSession(WaterSortSession session) => _session = session;
@@ -55,6 +66,7 @@ namespace Box.HotUpdate.WaterSort
             if (_session == null || _session.Board == null) return;
             if (_self == null) _self = (RectTransform)transform;
             ClearChildren();
+            EnsureTubeSprite(); // 贴图懒加载(首帧可能未就绪,就绪后由回调补画现存试管)
 
             var board = _session.Board;
             int n = board.TubeCount;
@@ -69,11 +81,21 @@ namespace Box.HotUpdate.WaterSort
                 var col = BuildTube(t, w, h);
                 var rt = (RectTransform)col.transform;
                 rt.anchoredPosition = new Vector2(startX + t * (w + 12f), 0);
-                // 玻璃底 + 液块(颜色按 1..drops 自底向上;空管无液块)
                 var glass = col.GetComponent<Image>();
-                glass.color = t == _selected
-                    ? new Color(0.45f, 0.55f, 0.70f, 0.9f)  // 选中高亮(占位:提亮杯体)
-                    : new Color(1f, 1f, 1f, 0.10f);
+                if (_tubeSprite != null)
+                {
+                    // 贴图模式:Simple 整图等比缩放到 w×h;颜色仅做选中微染(玻璃透明度/高光由贴图自带)
+                    glass.sprite = _tubeSprite;
+                    glass.type = Image.Type.Simple;
+                    glass.color = t == _selected ? SelectedTint : Color.white;
+                }
+                else
+                {
+                    // 兜底占位(贴图未就绪/未注册):半透明杯体,选中提亮;贴图就绪后由回调补画
+                    glass.color = t == _selected
+                        ? new Color(0.45f, 0.55f, 0.70f, 0.9f)  // 选中高亮(占位:提亮杯体)
+                        : new Color(1f, 1f, 1f, 0.10f);
+                }
                 float innerW = w * 0.68f, innerH = h * 0.86f;
                 const float dropGap = 3f;
                 float dh = (innerH - (drops - 1) * dropGap) / Mathf.Max(4, drops);
@@ -86,6 +108,32 @@ namespace Box.HotUpdate.WaterSort
                     ((RectTransform)drop.transform).anchoredPosition =
                         new Vector2(0, bottomY + dh * 0.5f + i * (dh + dropGap));
                 }
+            }
+        }
+
+        /// <summary>懒加载杯身贴图(IAssetService 回调式;失败留空只试一次 → 占位色兜底,见类头)。</summary>
+        void EnsureTubeSprite()
+        {
+            if (_tubeSprite != null || _tubeSpriteRequested) return;
+            _tubeSpriteRequested = true;
+            ServiceLocator.Assets?.LoadAsset<Sprite>(TubeSpriteAddress, sp =>
+            {
+                if (sp == null) return; // 未注册/未构建:保持占位色,不刷警告不重试
+                _tubeSprite = sp;
+                ApplyTubeSpriteAll();   // 首帧后加载完成:补画现存试管;后续 Refresh 直接走贴图分支
+            });
+        }
+
+        /// <summary>给现存全部试管统一补贴图并重上色(异步加载晚于首帧时使用;子节点序 = 管序,选中态一并重算)。</summary>
+        void ApplyTubeSpriteAll()
+        {
+            for (int i = 0; i < transform.childCount; i++)
+            {
+                var img = transform.GetChild(i).GetComponent<Image>();
+                if (img == null) continue;
+                img.sprite = _tubeSprite;
+                img.type = Image.Type.Simple;
+                img.color = i == _selected ? SelectedTint : Color.white;
             }
         }
 
