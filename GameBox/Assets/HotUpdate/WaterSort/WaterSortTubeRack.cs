@@ -28,7 +28,8 @@ namespace Box.HotUpdate.WaterSort
         // 内腔几何常量 —— 实测 ws_tube 96×400(玻璃外缘 x15..80、透明内腔 x17..78;
         // 杯口环 rows 40..49、底弧收口 rows ~373..376)。换贴图后按同法重测
         // (像素探针:Build/Tools/probe_tube_alpha.ps1 / probe_tube_rows.ps1)再校准本组常量。
-        const float WaterWidthFrac = 0.60f;      // 水宽 = 0.60×管宽:坐落在透明内腔 x17..78 内,两侧留 AA 安全边不压管壁
+        const float WaterWidthFrac = 0.67f;      // 水宽 = 0.67×管宽:水缘 x15.8..80.2 收到管壁描边(x15-16/79-80)底下,
+                                                 // 玻璃顶层后画压住水缘 → 侧壁零可见间隙;此前 0.60 留 ~3px 透明缝
         const float WaterBottomPadFrac = 0.065f; // 液柱底边距图底(≈26px/400):落座在底弧收口处,水不溢出管外
         const float WaterTopGapFrac = 0.15f;     // 液柱顶距图顶最小余量(≈60px/400):满管液面也不顶到杯口环
         const float DropOverlapPx = 1f;          // 相邻液块 1px 重叠:消除浮点取整发丝缝(层间无可见间隙)
