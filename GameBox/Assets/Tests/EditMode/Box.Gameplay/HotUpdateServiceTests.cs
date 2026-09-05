@@ -128,7 +128,7 @@ namespace Box.Gameplay.Tests
                 HotUpdateService.AotMetadataAssemblies, al.LoadedMetadatas,
                 "catalog 失败后 AOT 元数据仍逐个装载(内置兜底)");
             CollectionAssert.AreEqual(
-                new[] { "Box.HotUpdate.Core", "Box.HotUpdate.Sudoku" }, al.LoadedAssemblies,
+                HotUpdateService.HotUpdateAssemblies, al.LoadedAssemblies,
                 "catalog 失败后热更程序集仍装载(断网可玩的关键)");
             Assert.AreEqual(1, loader.Entries.Count, "无远程 overrides → 清单保持包内");
         }
@@ -146,10 +146,12 @@ namespace Box.Gameplay.Tests
             Assert.IsTrue(source.FallbackCalled, "总超时后编排层应显式调用 UseBuiltinFallback");
             Assert.AreEqual(HotUpdateService.AotMetadataAssemblies.Count, source.MetadataLoadCount,
                 "切内置后元数据装载继续");
-            Assert.AreEqual(2, source.DllLoadCount, "切内置后 dll 装载继续");
+            Assert.AreEqual(HotUpdateService.HotUpdateAssemblies.Count, source.DllLoadCount,
+                "切内置后 dll 装载继续");
         }
 
-        /// <summary>成功路径:两个热更程序集依次装载 → overrides 全量刷新清单。</summary>
+        /// <summary>成功路径:名单内热更程序集(现 3 个,M3.4 起含 WaterSort)依次装载 → overrides 全量刷新清单。
+        /// 断言引用 HotUpdateService.HotUpdateAssemblies 常量,名单变更不产生硬编码失步(2026-09-05 M3.4 欠账教训)。</summary>
         [Test]
         public async Task Success_LoadsBothAssembliesAndRefreshesCatalog()
         {
@@ -169,8 +171,8 @@ namespace Box.Gameplay.Tests
             await new HotUpdateService(source, al).RunAsync(loader);
 
             CollectionAssert.AreEqual(
-                new[] { "Box.HotUpdate.Core", "Box.HotUpdate.Sudoku" },
-                source.LoadedDlls, "按名单顺序装载两个热更程序集");
+                HotUpdateService.HotUpdateAssemblies,
+                source.LoadedDlls, "按名单顺序装载全部热更程序集");
             CollectionAssert.AreEqual(
                 HotUpdateService.AotMetadataAssemblies,
                 source.LoadedMetadatas, "按 AOT 元数据清单逐个加载");
@@ -178,7 +180,7 @@ namespace Box.Gameplay.Tests
                 HotUpdateService.AotMetadataAssemblies,
                 al.LoadedMetadatas, "装载器逐个收到 AOT 元数据");
             CollectionAssert.AreEqual(
-                new[] { "Box.HotUpdate.Core", "Box.HotUpdate.Sudoku" },
+                HotUpdateService.HotUpdateAssemblies,
                 al.LoadedAssemblies, "元数据就绪后装载热更程序集");
             Assert.AreEqual(2, loader.Entries.Count, "远程 overrides 全量替换包内清单");
             Assert.AreEqual("sudoku2", loader.Entries[1].id);
@@ -223,7 +225,8 @@ namespace Box.Gameplay.Tests
             await new HotUpdateService(source, new FakeLoader()).RunAsync(loader);
 
             Assert.AreEqual(5, source.MetadataLoadCount, "AOT 元数据仍正常加载");
-            Assert.AreEqual(2, source.DllLoadCount, "dll 仍正常装载");
+            Assert.AreEqual(HotUpdateService.HotUpdateAssemblies.Count, source.DllLoadCount,
+                "dll 仍正常装载");
             Assert.AreEqual(1, loader.Entries.Count, "远程清单无效时保持包内清单");
         }
     }

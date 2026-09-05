@@ -175,7 +175,7 @@ Gate1 空工程初始化（HybridCLR_Gate1）
 | 4.5-1 | ModuleFramework 薄骨架（IGameModule/IModuleLoader/ModuleContext/ModuleCatalog + ModuleLoader 静态注册，全 AOT；Resources 兜底清单 Assets/Resources/Config/ModuleCatalog.asset） |
 | 4.5-2 | 程序集拆分 HotUpdate.Sudoku（玩法迁入热更程序集，命名空间 Box.HotUpdate.Sudoku；大厅 Box.Gameplay 不再静态引用玩法类型，依赖方向 AOT → 玩法 单向） |
 | 4.5-3 | 数独迁入 IGameModule（SudokuModule 参数化入口：args="daily" 直开每日挑战，否则难度弹窗；GameContext 收敛，大厅不再持有玩法状态） |
-| 4.5-4 | 埋点契约对齐（§8.4 {module_id}.{action}：sudoku.level_start / sudoku.level_complete / sudoku.hint_used） |
+| 4.5-4 | 埋点契约对齐（§8.4 {module_id}_{action}：sudoku_level_start / sudoku_level_complete / sudoku_hint_used；旧命名带点号已被 FA 拒收,2026-09-05 全库清理为 snake_case,正典见 04 §6.1） |
 | 4.5-5 | link.xml 入口类型保留（Assembly 级 preserve，防 IL2CPP 裁剪导致 Type.GetType 返回 null） |
 
 **验收**：EditMode/PlayMode 全绿；纯 AOT AAB 构建通过；大厅进出数独无回归；v1.0 无热更依赖。
@@ -361,8 +361,8 @@ v1.0 主包无此类型 → null → 整链静默跳过；禁止直接引用（v
 - **验证②**：PlayMode **4/4 全绿**，新增 `Startup_Under_Timeout_With_HotUpdate_Degrade`（启动 ≤2.5s 断言通过）；
   覆盖降级路径：Editor 下 HybridCLR.Runtime 存在 → 热更链路走 Addressables 本地查找 → 无远程资源 → 静默降级包内版本，数独全链路可玩。
 - **验证③（真机闭环）**：待 9-4 远程资源就绪 + Android 设备执行（在线首启 / 断网冷启动 / 服务器停机三态）。
-- **已知问题**：Android 符号 `SENTIS_ANALYTICS_ENABLED` **三次**被 Unity 批处理进程保存漂移丢失（2026-08-31，已手工恢复）；
-  规律：均发生在 `-batchmode` 进程（2 次 `-runTests` PlayMode、1 次编译检查）后，Android defines 末项被截断、Standalone 完好；
+- **已知问题**：Android 符号 `SENTIS_ANALYTICS_ENABLED` **四次**被 Unity 批处理进程保存漂移丢失（2026-08-31 三次 + 2026-09-05 一次，均手工恢复）；
+  规律：均发生在 `-batchmode` 进程（2 次 `-runTests` PlayMode、1 次编译检查、1 次 EditMode 全量回归）后，Android defines 末项被截断、Standalone 完好；
   仓库内无 PlayMode 期写入方（仅 3 个 Editor 脚本 -executeMethod 才写）→ 疑为 Unity 6000 批处理符号序列化 bug；
   防御：**每次批处理进程后 `git diff` 复核该文件**，根因排查列为待办（不阻塞 Phase 9）。
 
@@ -456,7 +456,7 @@ Content Update 增量验证放后半（先全量验证同 key 覆盖）。真机
 | 9.5-3 | TutorialController 步骤编排(事件驱动状态机,挂 GameplayView,可选钩子零开销) |
 | 9.5-4 | OnboardingService 状态管理(box.onboarding 存档分区,已完/可跳过持久化) |
 | 9.5-5 | 引导局整合(固定种子 Beginner 谜题、屏蔽全部广告、可跳过;结算弹每日挑战入口) |
-| 9.5-6 | 埋点 tutorial_step(step_index, skipped)(04 文档 §埋点契约) + EditMode/PlayMode 测试 |
+| 9.5-6 | 埋点 sudoku_tutorial_step(step_index, skipped)(04 §6.1/6.2,落地前先补 04 §6.2 字典再写码) + EditMode/PlayMode 测试 |
 
 **验收**：新装用户首局 ≤6 步引导、≤90 秒,全程可跳过、零广告;引导完成状态断电重启不重复;埋点可见。
 

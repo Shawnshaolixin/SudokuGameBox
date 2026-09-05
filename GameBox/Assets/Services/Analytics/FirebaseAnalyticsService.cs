@@ -57,10 +57,17 @@ namespace Box.Services
         /// <summary>
         /// 统一事件上报：GA4 参数仅支持 string/long/double，bool 转 0/1，其余转字符串。
         /// 依赖未就绪时静默丢弃（与桩行为一致，不阻塞业务链路）。
+        /// 事件名先过一次契约校验(AnalyticsEvents,04 文档 §6.1)——非法名会被 FA SDK 静默
+        /// 拒收(2026-09-05 带点/斜杠命名全丢的教训),违规打 Warning 便于开发期发现。
         /// </summary>
         private void Log(string eventName, string parameterName, object parameterValue)
         {
             if (!_available) return;
+            if (!AnalyticsEvents.IsValidName(eventName))
+            {
+                Debug.LogWarning($"[Firebase] 埋点事件名非法被丢弃(仅 [a-z0-9_] 且字母开头 ≤40,04 文档 §6.1): {eventName}");
+                return;
+            }
             try
             {
                 if (parameterValue == null)

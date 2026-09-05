@@ -536,7 +536,7 @@ namespace Box.HotUpdate.WaterSort
         /// <summary>激励完成埋点(04 文档 §5 ad_reward 字典:placement 点位)。</summary>
         void LogAdReward(string placement)
         {
-            ServiceLocator.Analytics?.LogEvent("watersort.ad_reward", "placement", placement);
+            ServiceLocator.Analytics?.LogEvent("watersort_ad_reward", "placement", placement);
         }
 
         // ---- 结算面板 ---- //
@@ -742,7 +742,7 @@ namespace Box.HotUpdate.WaterSort
             if (save == null || save.Coins < price) return false;
             save.Coins -= price;
             save.Save(); // box.* 变更需显式落盘(接口契约:仅 SetModule 自动落盘)
-            ServiceLocator.Analytics?.LogEvent("watersort.coin_spend", reason, price); // 埋点 source=玩法+动作
+            ServiceLocator.Analytics?.LogEvent("watersort_coin_spend", reason, price); // 埋点 source=玩法+动作
             UpdateCoinLabel();
             SyncConsumeButtons();
             return true;
@@ -755,7 +755,7 @@ namespace Box.HotUpdate.WaterSort
             if (save == null || amount <= 0) return;
             save.Coins += amount;
             save.Save();
-            ServiceLocator.Analytics?.LogEvent("watersort.coin_reward", "amount", amount);
+            ServiceLocator.Analytics?.LogEvent("watersort_coin_reward", "amount", amount);
             UpdateCoinLabel();
         }
 
@@ -937,14 +937,14 @@ namespace Box.HotUpdate.WaterSort
         /// <summary>步骤展示埋点(04 文档 §5 tutorial_step;step_index 从 1 起,运营侧直读)。
         /// 跳过事件在 OnTutorialEnded 补发(接口仅单键值对,拆分上报)。</summary>
         void OnTutorialStepShown(int stepIndex)
-            => ServiceLocator.Analytics?.LogEvent("watersort.tutorial_step", "step_index", stepIndex + 1);
+            => ServiceLocator.Analytics?.LogEvent("watersort_tutorial_step", "step_index", stepIndex + 1);
 
         /// <summary>引导收尾回调(完成/跳过都经此):跳过补 skipped 埋点;统一置空引用
         /// (Done/Skipped 落盘由 TutorialFlow 内部完成,视图只管退出引导态)。</summary>
         void OnTutorialEnded(bool finished)
         {
             if (!finished)
-                ServiceLocator.Analytics?.LogEvent("watersort.tutorial_step", "skipped", 1);
+                ServiceLocator.Analytics?.LogEvent("watersort_tutorial_step", "skipped", 1);
             _tut = null;
         }
 

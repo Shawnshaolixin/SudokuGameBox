@@ -216,7 +216,7 @@ public sealed class ModuleLoader : IModuleLoader   // AOT 侧实现,由 VContain
 1. 独立 asmdef,**只引用 Shared Services 接口程序集 + `HotUpdate.Core`**,不引用其他玩法
 2. 入口是单个 prefab + 一个 `IGameModule` 实现;资源全部落在自己的 Addressables Group,**不得引用其他 Group 的资源**
 3. 玩法内部自带"回到大厅"入口,且退出路径唯一
-4. 埋点事件带模块前缀 `{module_id}.{action}`(§8.4)
+4. 埋点事件带模块前缀 `{module_id}_{action}`(§8.4)
 5. 存档只读写自己的分区,货币只走 `IEconomyService`(D-5)
 6. **不得直接读 Firebase / AdMob 等 SDK 类型**,只用服务接口(否则热更侧会踩 AOT 泛型缺失)
 
@@ -260,7 +260,7 @@ Editor 菜单 `Box/New Module...` 一键生成:
 4. **异步打开**:Addressables 加载 prefab + 加载中占位/超时兜底;失败返回 `false` 不抛到业务层
 5. **缓存与卸载**:界面按"常驻/缓存 N 个/立即销毁"三档策略;模块退出时强制清空该模块界面并释放句柄(与 §3.2 的内存回落断言对齐)
 6. **弹窗互斥与队列**:全局唯一"抢屏仲裁器" —— 插屏广告、签到弹窗、回归礼包、升级提示排队而非叠加。**盒子最常见的线上事故就是插屏与弹窗互相盖住导致卡死**,这条必须在 P0 就有
-7. **UI 埋点自动化**:界面 `OnShow` 自动上报 `{module_id}.ui_show`,带 `active_traits`(§8.4),不靠业务手写
+7. **UI 埋点自动化**:界面 `OnShow` 自动上报 `ui_show`(事件名固定;view.Id 是资源路径,含 `/` 与大小写不能拼事件名,作 `view` 参数上报,见 04 §6.1),带 `active_traits`(§8.4),不靠业务手写
 8. **适配**:CanvasScaler 策略 + 安全区(刘海/挖孔)+ 横竖屏约束统一在基类处理
 
 #### 边界纪律
@@ -648,9 +648,9 @@ public sealed class TraitProfile : ScriptableObject
 
 ### 8.4 埋点与配置命名契约(v2.0 新增)
 
-- 事件名:`{module_id}.{action}`,全小写下划线;模块前缀取自清单 `id`,不许手写字面量(用脚手架生成的常量)
+- 事件名:`{module_id}_{action}`(如 `sudoku_level_start`),全小写 snake_case——仅 `[a-z0-9_]` 且字母开头、≤40 是 Firebase 硬限制,带点/斜杠命名被 SDK 静默拒收(2026-09-05 全库清理教训,规则正典见 04 §6.1,事件字典 04 §6.2 为唯一权威);模块前缀取自清单 `id`,不许手写字面量(用脚手架生成的常量);违规由 `AnalyticsEvents.IsValidName` 在服务入口拦截(Warning + 丢弃)
 - 公共参数:`app_version`、`code_version`、`content_version`、`config_version`、`active_traits`(截断到 N 个)
-- Trait 参数命名:`{族}.{能力}.{参数}`(如 `ads.interstitial_protect.cooldownSec`),与 Trait id 严格同名前缀
+- Trait 参数命名:`{族}.{能力}.{参数}`(如 `ads.interstitial_protect.cooldownSec`),与 Trait id 严格同名前缀(注意:该写法是**配置键**,若日后要作埋点参数进 Firebase,须转无点 snake_case——FA 参数名与事件名同字符限制)
 - **事件表版本化**:`docs` 下维护事件表并带版本号;新增事件必须先进表再写代码(否则半年后无法做同比)
 
 ---

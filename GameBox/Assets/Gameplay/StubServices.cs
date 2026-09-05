@@ -105,6 +105,8 @@ namespace Box.Gameplay
 
     /// <summary>
     /// 分析桩实现:未接入 Firebase 时使用,把事件打印到 Console。
+    /// 事件名过契约校验(AnalyticsEvents,04 文档 §6.1)——桩是开发/CI 主力,违规在此暴露
+    /// 比真机 FA 静默拒收早一个环节(2026-09-05 带点/斜杠命名教训)。
     /// </summary>
     public sealed class AnalyticsServiceStub : IAnalyticsService
     {
@@ -115,11 +117,21 @@ namespace Box.Gameplay
 
         public void LogEvent(string eventName)
         {
+            if (!AnalyticsEvents.IsValidName(eventName))
+            {
+                Debug.LogWarning($"[AnalyticsStub] 埋点事件名非法(仅 [a-z0-9_] 且字母开头 ≤40,04 文档 §6.1): {eventName}");
+                return;
+            }
             Debug.Log($"[AnalyticsStub] 事件:{eventName}");
         }
 
         public void LogEvent(string eventName, string parameterName, object parameterValue)
         {
+            if (!AnalyticsEvents.IsValidName(eventName))
+            {
+                Debug.LogWarning($"[AnalyticsStub] 埋点事件名非法(仅 [a-z0-9_] 且字母开头 ≤40,04 文档 §6.1): {eventName}");
+                return;
+            }
             Debug.Log($"[AnalyticsStub] 事件:{eventName}  {parameterName}={parameterValue}");
         }
 

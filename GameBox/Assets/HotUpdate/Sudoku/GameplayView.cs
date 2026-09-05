@@ -154,7 +154,7 @@ namespace Box.HotUpdate.Sudoku
             RefreshTitle(); // 标题走 L10n(每日挑战/数独-难度)
             RefreshBoard();
             PlayBoardIntro(); // 给定数字逐个弹跳入场(波浪式)
-            _svc?.Router.Analytics?.LogEvent("sudoku.level_start"); // §8.4 {module_id}.{action}
+            _svc?.Router.Analytics?.LogEvent("sudoku_level_start"); // §8.4 事件名 snake_case(04 文档 §6.1)
 
             _timerCts?.Cancel();
             _timerCts = new CancellationTokenSource();
@@ -166,7 +166,7 @@ namespace Box.HotUpdate.Sudoku
             RefreshBoard();
             PlaySfx(AudioSfx.Win); // TODO(试听):胜利音临时占位(switch 系列尾部),待正式 fanfare 替换
             if (_board != null) FxPool.Celebrate(_board.transform.position); // 胜利庆祝:棋盘中心双爆发
-            _svc?.Router.Analytics?.LogEvent("sudoku.level_complete");
+            _svc?.Router.Analytics?.LogEvent("sudoku_level_complete");
 
             var result = new SettlementResult
             {
@@ -330,7 +330,7 @@ namespace Box.HotUpdate.Sudoku
                 PlaySfx(AudioSfx.Hint); // 提示落子轻音
                 FxPool.PlayBurst(FxPool.SparkTex, CellWorldPos(hintIdx), 16, 1f,
                     new Color(1f, 0.85f, 0.4f)); // 提示反馈:金色火花出现在被提示格
-                _svc?.Router.Analytics?.LogEvent("sudoku.hint_used");
+                _svc?.Router.Analytics?.LogEvent("sudoku_hint_used");
             }
             RefreshBoard(); // 回奖后同步按钮 interactable(HintExhausted 置灰 → 可点)
         }
