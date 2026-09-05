@@ -6,8 +6,10 @@ using UnityEngine.UI;
 namespace Box.HotUpdate.WaterSort
 {
     /// <summary>
-    /// 试管架(运行时代码绘制):按会话盘面在 TubeArea 内重建试管列 —— 杯身贴图(21 文档 UI-04 ws_tube,
-    /// Single 整图随管宽/管数等比缩放,Simple 渲染无需九宫)+ 底部向上分层液块 Image(tint 12 色板)。
+    /// 试管架(运行时代码绘制):按会话盘面在 TubeArea 内重建试管列 —— 每支试管 = 容器节点 + 底部向上
+    /// 分层液块(先入子级,先画)+ Glass 顶层(最后子级 = 最晚绘制,杯身贴图叠在液块上方:管壁/杯弧/
+    /// 高光压住液体边缘,形成「水在管内」透视)。杯身贴图(21 文档 UI-04 ws_tube,Single 整图随管宽等比
+    /// 缩放,Simple 渲染无需九宫),液块 tint 12 色板。
     /// 贴图经 IAssetService 异步按地址加载(地址约定 21 文档 §6.1);未就绪/未注册时回退旧占位
     /// 半透明色,美术缺席玩法不受影响;加载完成自动补贴现存试管。
     /// 交互:点击试管选中(高亮),再点另一支 = 请求倒水(由视图经会话判定合法性);
@@ -22,6 +24,14 @@ namespace Box.HotUpdate.WaterSort
         // 贴图就位后的选中高亮:图自带玻璃透明度/高光,不再用占位期的透明度提亮,改轻微蓝染区分
         // (占位方案见 Refresh 兜底分支;P3 落地 ws_glow_ring 柔光环后替换本染色)
         static readonly Color SelectedTint = new Color(0.80f, 0.92f, 1f, 1f);
+
+        // 内腔几何常量 —— 实测 ws_tube 96×400(玻璃外缘 x15..80、透明内腔 x17..78;
+        // 杯口环 rows 40..49、底弧收口 rows ~373..376)。换贴图后按同法重测
+        // (像素探针:Build/Tools/probe_tube_alpha.ps1 / probe_tube_rows.ps1)再校准本组常量。
+        const float WaterWidthFrac = 0.60f;      // 水宽 = 0.60×管宽:坐落在透明内腔 x17..78 内,两侧留 AA 安全边不压管壁
+        const float WaterBottomPadFrac = 0.065f; // 液柱底边距图底(≈26px/400):落座在底弧收口处,水不溢出管外
+        const float WaterTopGapFrac = 0.15f;     // 液柱顶距图顶最小余量(≈60px/400):满管液面也不顶到杯口环
+        const float DropOverlapPx = 1f;          // 相邻液块 1px 重叠:消除浮点取整发丝缝(层间无可见间隙)
 
         // 占位色板(1..12 对应液滴值;色相取自常见水排序配色,表现替换时仅改本表)
         static readonly Color[] Palette =
@@ -78,10 +88,26 @@ namespace Box.HotUpdate.WaterSort
             for (int t = 0; t < n; t++)
             {
                 int drops = board.TopCount(t);
-                var col = BuildTube(t, w, h);
+                var col = BuildTube(t, w, h); // 空容器(无 Image 不挡射线);液块先入子级、Glass 最后入
                 var rt = (RectTransform)col.transform;
                 rt.anchoredPosition = new Vector2(startX + t * (w + 12f), 0);
-                var glass = col.GetComponent<Image>();
+
+                // 液块:底边落座在杯底收口(几何常量类头),自底向上排;相邻块 1px 重叠消取整缝
+                float bottomY = -h * (0.5f - WaterBottomPadFrac);
+                float usableH = h * (1f - WaterBottomPadFrac - WaterTopGapFrac);
+                float dropH = (usableH + (drops - 1) * DropOverlapPx) / Mathf.Max(4, drops);
+                float waterW = w * WaterWidthFrac;
+                for (int i = 0; i < drops; i++)
+                {
+                    int color = board.Get(t, i); // 0=底
+                    var drop = NewChild(rt, "Drop", waterW, dropH, Palette[color - 1], false);
+                    float yBottom = bottomY + i * (dropH - DropOverlapPx); // 本块底边(i=0 贴杯底)
+                    ((RectTransform)drop.transform).anchoredPosition =
+                        new Vector2(0, yBottom + dropH * 0.5f);
+                }
+
+                // Glass 顶层(最后子级 = 最晚绘制 → 玻璃压在液体上,管壁/杯口弧/高光叠在水层前方,呈现水在管内)
+                var glass = AppendGlass(rt, t, w, h);
                 if (_tubeSprite != null)
                 {
                     // 贴图模式:Simple 整图等比缩放到 w×h;颜色仅做选中微染(玻璃透明度/高光由贴图自带)
@@ -95,18 +121,6 @@ namespace Box.HotUpdate.WaterSort
                     glass.color = t == _selected
                         ? new Color(0.45f, 0.55f, 0.70f, 0.9f)  // 选中高亮(占位:提亮杯体)
                         : new Color(1f, 1f, 1f, 0.10f);
-                }
-                float innerW = w * 0.68f, innerH = h * 0.86f;
-                const float dropGap = 3f;
-                float dh = (innerH - (drops - 1) * dropGap) / Mathf.Max(4, drops);
-                for (int i = 0; i < drops; i++)
-                {
-                    int color = board.Get(t, i); // 0=底
-                    var drop = NewChild(rt, "Drop", innerW, dh, Palette[color - 1]);
-                    // 液块中心:自容器底部向上排(容器高 h,液区底 = -(h/2 - (h-innerH)/2))
-                    float bottomY = -(h * 0.5f - (h - innerH) * 0.5f);
-                    ((RectTransform)drop.transform).anchoredPosition =
-                        new Vector2(0, bottomY + dh * 0.5f + i * (dh + dropGap));
                 }
             }
         }
@@ -124,12 +138,15 @@ namespace Box.HotUpdate.WaterSort
             });
         }
 
-        /// <summary>给现存全部试管统一补贴图并重上色(异步加载晚于首帧时使用;子节点序 = 管序,选中态一并重算)。</summary>
+        /// <summary>给现存全部试管统一补贴图并重上色(异步加载晚于首帧时使用;子节点序 = 管序,选中态一并重算;
+        /// 每管 Glass 恒为最后子级 = 顶层)。</summary>
         void ApplyTubeSpriteAll()
         {
             for (int i = 0; i < transform.childCount; i++)
             {
-                var img = transform.GetChild(i).GetComponent<Image>();
+                var tube = transform.GetChild(i);
+                if (tube.childCount == 0) continue;
+                var img = tube.GetChild(tube.childCount - 1).GetComponent<Image>();
                 if (img == null) continue;
                 img.sprite = _tubeSprite;
                 img.type = Image.Type.Simple;
@@ -162,27 +179,42 @@ namespace Box.HotUpdate.WaterSort
 
         GameObject BuildTube(int index, float w, float h)
         {
-            var go = NewChild(_self, "Tube" + index, w, h, Color.white); // 自带杯体 Image(底色由 Refresh 上色)
+            // 纯容器:自身无 Image(不挡射线也不产生图元);液块先入、Glass 后入,渲染序即先水后玻璃
+            return NewNode(_self, "Tube" + index, w, h);
+        }
+
+        /// <summary>玻璃顶层节点(追加为容器最后子级 = 最上层):承接点击,杯身贴图/占位色由调用方上色。</summary>
+        Image AppendGlass(RectTransform tube, int index, float w, float h)
+        {
+            var go = NewChild(tube, "Glass", w, h, Color.white, true);
             var img = go.GetComponent<Image>();
-            img.raycastTarget = true;
             var btn = go.AddComponent<Button>(); // 纯 Unity Button 承接点击;免过渡闪烁
             btn.targetGraphic = img;
             btn.transition = Selectable.Transition.None;
             var idx = index;
             btn.onClick.AddListener(() => OnTubeTap(idx));
-            return go;
+            return img;
         }
 
-        GameObject NewChild(RectTransform parent, string name, float w, float h, Color color)
+        /// <summary>纯容器节点(无 Image;供试管根/未来分组用,不参与渲染与射线)。</summary>
+        GameObject NewNode(RectTransform parent, string name, float w, float h)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             var rt = (RectTransform)go.transform;
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = new Vector2(w, h);
             rt.anchoredPosition = Vector2.zero;
-            go.GetComponent<Image>().color = color;
+            return go;
+        }
+
+        GameObject NewChild(RectTransform parent, string name, float w, float h, Color color, bool raycast = true)
+        {
+            var go = NewNode(parent, name, w, h);
+            var img = go.AddComponent<Image>();
+            img.color = color;
+            img.raycastTarget = raycast; // 液块关闭:点击穿透到 Glass 顶层;Glass 开(承接 Button)
             return go;
         }
 
