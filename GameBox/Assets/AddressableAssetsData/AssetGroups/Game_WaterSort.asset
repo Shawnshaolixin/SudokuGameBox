@@ -15,6 +15,11 @@ MonoBehaviour:
   m_GroupName: Game_WaterSort
   m_GUID: 4ec2cf2f88ff5144bbfd27372b7998ab
   m_SerializeEntries:
+  - m_GUID: 31bbd07b9cd43cf4e9ddf4622dacf2b5
+    m_Address: WaterSort/Audio/pour1
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 33073d500e0ad734493f943096a40ebb
     m_Address: WaterSort/UI/ws_tube
     m_ReadOnly: 0

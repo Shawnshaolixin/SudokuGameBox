@@ -84,10 +84,23 @@ namespace Box.Gameplay
                 return;
             }
 
-            // 地址路由:mod: 前缀 → 模块独有音效(模块目录),否则公共 SFX(见 AudioSfx 常量注释)
-            string address = name.StartsWith("mod:", System.StringComparison.Ordinal)
-                ? ModuleSfxAddressPrefix + name.Substring(4)
-                : SfxAddressPrefix + name;
+            // 地址路由(21 文档 §6.5 模块映射):
+            //   "mod:{module}/{name}" → {Module}/Audio/{name}(模块独有音效,随模块组热更);
+            //   "mod:{name}"          → Sudoku/Audio/{name}(旧约定,存量 Sudoku 音效保持兼容);
+            //   其余                   → 公共 SFX(见 AudioSfx 常量注释)。
+            string address;
+            if (name.StartsWith("mod:", System.StringComparison.Ordinal))
+            {
+                var shortName = name.Substring(4);
+                int slash = shortName.IndexOf('/');
+                address = slash > 0
+                    ? shortName.Substring(0, slash) + "/Audio/" + shortName.Substring(slash + 1)
+                    : ModuleSfxAddressPrefix + shortName;
+            }
+            else
+            {
+                address = SfxAddressPrefix + name;
+            }
 
             // 首次播放:异步加载,完成后直接播(此后缓存命中零延迟)
             _assets?.LoadAsset<AudioClip>(address, clip =>

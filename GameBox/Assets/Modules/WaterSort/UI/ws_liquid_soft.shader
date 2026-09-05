@@ -14,7 +14,8 @@ Shader "Box/UI/WaterSortLiquid"
     {
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _MaskTex ("内腔剪影遮罩(仅用 alpha)", 2D) = "white" {}
-        _MaskST ("遮罩UV平移(xy)缩放(zw)", Vector) = (0, 0, 1, 1)
+        _MaskST ("液块UV平移(xy)缩放(zw)", Vector) = (0, 0, 1, 1)
+        _MaskRot ("旋转补偿(xy=cos,sin;zw=液块中心UV)", Vector) = (1, 0, 0, 0)
         _EdgeLo ("软边下限(遮罩alpha)", Float) = 0.05
         _EdgeHi ("软边上限(遮罩alpha)", Float) = 0.5
         _Color ("Tint", Color) = (1, 1, 1, 1)
@@ -95,6 +96,11 @@ Shader "Box/UI/WaterSortLiquid"
 
             sampler2D _MaskTex;
             float4 _MaskST;
+            // 倒水倾斜的「水面水平」补偿:液块矩形在试管内反向旋转保持屏幕水平后,
+            // 其 UV 采样框相对试管转了 -θ;片元把 UV 绕液块中心反旋转回试管空间再采样,
+            // 裁剪边界即贴合倾斜后的内腔剪影(推导见 WaterSortTubeRack.AnimatePourRotate)。
+            // xy=(cosθ, sinθ)(θ=试管根节点旋转角),zw=液块中心(遮罩UV空间);默认恒等。
+            float4 _MaskRot;
             float _EdgeLo;
             float _EdgeHi;
 
@@ -116,7 +122,11 @@ Shader "Box/UI/WaterSortLiquid"
                 // 内腔软裁剪:遮罩 alpha 在 [EdgeLo, EdgeHi] 区间平滑重映射。
                 // 剪影贴图边缘有 1~2px 羽化,此处过渡带完全落在羽化内 → 抗锯齿;
                 // EdgeHi 以下全裁、以上全留,管内主体 alpha 不受影响。
-                half m = tex2D(_MaskTex, IN.maskUV).a;
+                // 先做旋转补偿(_MaskRot 恒等时零开销等价):UV 绕液块中心旋 -θ 回试管空间。
+                float2 o = IN.maskUV - _MaskRot.zw;
+                o = float2(o.x * _MaskRot.x + o.y * _MaskRot.y,
+                           o.y * _MaskRot.x - o.x * _MaskRot.y); // Rot(-θ)
+                half m = tex2D(_MaskTex, _MaskRot.zw + o).a;
                 color.a *= smoothstep(_EdgeLo, _EdgeHi, m);
 
                 #ifdef UNITY_UI_CLIP_RECT

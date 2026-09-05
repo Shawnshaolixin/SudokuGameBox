@@ -19,6 +19,9 @@ public static class WaterSortSkinImporter
     // 皮肤目录(21 文档 §6 落位:玩法专属 UI 图归模块目录,壳层共享仍走 Assets/Art/UI)
     const string UiDir = "Assets/Modules/WaterSort/UI";
 
+    // 模块音效目录(21 文档 §6.5:AudioManager 以 "mod:watersort/{名}" 路由到本目录)
+    const string AudioDir = "Assets/Modules/WaterSort/Audio";
+
     // 组名须与 WaterSortViewSetup(WS-20)一字不差;缺组时按 DefaultGroup 模式补建(逻辑同其 EnsureGroup)
     const string GroupGameWaterSort = "Game_WaterSort";
 
@@ -59,6 +62,23 @@ public static class WaterSortSkinImporter
                 continue;
             }
             WaterSortViewSetup.EnsureEntry(path, AddressOf(path));
+        }
+        // 模块音效(Audio/*.ogg,21 文档 §6.5):地址 WaterSort/Audio/{名},AudioManager 以
+        // "mod:watersort/{名}" 路由到本目录 —— 占位 pour1 与后续正式音效放对目录即自动入组
+        // (路径必须规范化,EnsureEntry 不认带 .. 的相对路径)
+        if (Directory.Exists(AudioDir))
+        {
+            foreach (var file in Directory.GetFiles(AudioDir, "*.ogg"))
+            {
+                var path = file.Replace('\\', '/');
+                var name = System.IO.Path.GetFileNameWithoutExtension(path);
+                if (!IsConformingName(name))
+                {
+                    Debug.LogWarning($"[WaterSortSkin] 跳过不合规文件名(请改名后重存): {name}");
+                    continue;
+                }
+                WaterSortViewSetup.EnsureEntry(path, AddressOf(path));
+            }
         }
         AssetDatabase.SaveAssets(); // 统一落盘(EnsureEntry 内部已 SetDirty;无变更时为空转 no-op)
     }

@@ -137,7 +137,11 @@ namespace Box.HotUpdate.WaterSort
             var tubeArea = FindInCard("GamePanel/TubeArea");
             if (tubeArea != null && tubeArea.GetComponent<WaterSortTubeRack>() == null)
                 _rack = tubeArea.gameObject.AddComponent<WaterSortTubeRack>();
-            if (_rack != null) _rack.PourRequested += OnPourRequested;
+            if (_rack != null)
+            {
+                _rack.PourRequested += OnPourRequested;
+                _rack.PourCompleted += OnPourCompleted; // 倒水动画收尾(重建后)的 HUD/引导同步
+            }
 
             Bind("SelectPanel/HubButton", LeaveToHub);
             Bind("SelectPanel/DailyButton", OnOpenDailyHome); // 每日入口(仅常规选关态可达)
@@ -403,26 +407,35 @@ namespace Box.HotUpdate.WaterSort
 
         void OnUndo()
         {
+            if (_rack != null && _rack.IsAnimating) return; // 倒水动画中锁操作(防动画中途盘面再变)
             if (_session != null && _session.Undo()) RefreshTubeArea();
         }
 
         void OnRestart()
         {
             if (_session == null || !_session.IsInLevel) return;
+            if (_rack != null && _rack.IsAnimating) return;
             _session.Restart();
             RefreshTubeArea();
         }
 
         /// <summary>
         /// 试管区刷新唯一接缝:倒水/撤销/重开/换关后调用——
-        /// 先摘选中再按盘面重建试管,同步步数文本(非法倒水不会走到这:试管架已按 LegalMoves
-        /// 预判,非法点击在架内就地切换选中,不发请求)。
+        /// 先摘选中再按盘面重建试管,同步步数文本。倒水走动画管道:动画期间本方法被
+        /// IsAnimating 挂起(盘面已落子,视觉由动画呈现),收尾经 PourCompleted 统一补同步。
         /// </summary>
         void RefreshTubeArea()
         {
             if (_rack == null) return; // 无试管架(prefab 缺 TubeArea)时静默跳过,行为不崩
+            if (_rack.IsAnimating) return; // 倒水动画中:挂起,动画收尾经 OnPourCompleted 补同步
             _rack.ClearSelection();    // 提交型重建统一摘选中(盘面已变,残留高亮无意义)
             _rack.Refresh();
+            SyncHudAfterBoardRefresh();
+        }
+
+        /// <summary>盘面变化后的 HUD/引导同步(试管区重建尾部与倒水动画收尾共用)。</summary>
+        void SyncHudAfterBoardRefresh()
+        {
             if (_stepText != null && _session != null)
                 _stepText.text = L10n.Format("watersort.step", _session.MoveCount);
             UpdateCoinLabel();       // 玩法内无全局金币事件(盒内暂无钱包组件),随每次盘面刷新就近同步
@@ -430,9 +443,12 @@ namespace Box.HotUpdate.WaterSort
             TutorialAfterBoardRefresh(); // 引导 S2 聚合演示对随盘面漂移:刷新后重扫重定位(M3.3)
         }
 
-        /// <summary>试管点击执行:试管架已按 LegalMoves 预判,请求恒为合法移动 → TryPour 推进盘面
-        /// (BoardChanged 驱动本区刷新,选中管随重建落回)。防御分支(竞态下 TryPour 失败,理论不可达)
-        /// 抖动源管提示。引导局(M3.3)额外上报「是否同色聚合倒水」供第 2 步步进(判据与 Session 规则同源)。</summary>
+        /// <summary>倒水动画收尾(试管架已重建到真实盘面):补做被动画挂起的 HUD/引导同步。</summary>
+        void OnPourCompleted() => SyncHudAfterBoardRefresh();
+
+        /// <summary>试管点击执行:试管架已按 LegalMoves 预判,请求恒为合法移动。流程 = 先上动画锁 →
+        /// TryPour 落子(BoardChanged 刷新被锁挂起)→ 播四段式倒水动画,收尾重建 + HUD 同步。
+        /// 引导局(M3.3)步进照旧即时上报。防御分支(TryPour 竞态失败,理论不可达):解锁并抖动源管。</summary>
         void OnPourRequested(int src, int dst)
         {
             if (_session == null || !_session.IsInLevel) return; // 面板切换竞态兜底
@@ -440,8 +456,28 @@ namespace Box.HotUpdate.WaterSort
             var b = _session.Board;
             if (b != null && b.TopCount(src) > 0 && b.TopCount(dst) > 0
                 && b.TopColor(src) == b.TopColor(dst)) merging = true;
-            if (_session.TryPour(src, dst)) TutorialOnPourSucceeded(merging);
-            else _rack?.ShakeTube(src);
+            // 动画量 = 本次实际转移格数(引擎 LegalMoves 给出,与 TryPour 落子同源)
+            int count = 0;
+            if (b != null)
+                foreach (var m in b.LegalMoves())
+                    if (m.Src == src && m.Dst == dst) { count = m.Count; break; }
+            if (count <= 0) return; // 理论不可达(试管架已预判合法)
+            if (_rack == null) // 无试管架(prefab 异常):退化为无动画直落
+            {
+                if (_session.TryPour(src, dst)) TutorialOnPourSucceeded(merging);
+                return;
+            }
+            _rack.BeginPour(); // 先锁:TryPour 的 BoardChanged 刷新被挂起到动画收尾
+            if (_session.TryPour(src, dst))
+            {
+                TutorialOnPourSucceeded(merging);
+                _rack.PlayPourAsync(src, dst, count).Forget();
+            }
+            else
+            {
+                _rack.CancelPour(); // 竞态兜底:解锁
+                _rack.ShakeTube(src);
+            }
         }
 
         /// <summary>
@@ -453,6 +489,7 @@ namespace Box.HotUpdate.WaterSort
         void OnHint()
         {
             if (_session == null || !_session.IsInLevel) return; // 结算/选关面板按钮不可达,双保险
+            if (_rack != null && _rack.IsAnimating) return;      // 倒水动画中锁道具
             if (TutorialHintActive) { DoTutorialHintDemo(); return; } // 引导第 3 步:走免费演示(不扣币/不弹广告)
             if (_session.HintsUsed >= WaterSortConfig.HintLimitPerLevel) return;
             var save = ServiceLocator.Save;
@@ -483,6 +520,7 @@ namespace Box.HotUpdate.WaterSort
         void OnAddExtraTube()
         {
             if (_session == null || !_session.IsInLevel) return;
+            if (_rack != null && _rack.IsAnimating) return; // 倒水动画中锁道具
             if (_session.ExtraTubesUsed >= WaterSortConfig.ExtraTubeLimitPerLevel) return;
             var save = ServiceLocator.Save;
             if (save != null && save.Coins >= WaterSortConfig.ExtraTubePriceCoins)

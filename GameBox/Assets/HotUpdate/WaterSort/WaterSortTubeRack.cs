@@ -54,6 +54,13 @@ namespace Box.HotUpdate.WaterSort
         // 布局:≤4 管单行、5~8 管两行、>8 管三行;每行水平居中、整块垂直居中,行间距 RowGap
         const float RowGap = 34f;
 
+        // 倒水动画节奏(四段式,总 ~0.72s;调快整体手感更「弹」,调慢更「重」)
+        const float PourLiftDuration = 0.16f;  // 滑移:源管悬停到目标管口上方
+        const float PourTiltDuration = 0.10f;  // 倾斜/转正(各一次)
+        const float PourFlowDuration = 0.30f;  // 倒水主段:液面同步升降 + 水流
+        const float PourBackDuration = 0.16f;  // 滑回原位(含落地回弹)
+        const float PourTiltDeg = 32f;         // 源管倾角(绕管中心,顺时针;液面保持水平见 PlayPourAsync)
+
         // 占位色板(1..12 对应液滴值;色相取自常见水排序配色,表现替换时仅改本表)
         static readonly Color[] Palette =
         {
@@ -89,11 +96,21 @@ namespace Box.HotUpdate.WaterSort
         Vector2[] _basePositions;      // 各管基准锚点(分行布局计算结果;选中抬起 = 基准 + SelectedLiftPx)
         readonly Dictionary<int, CancellationTokenSource> _liftAnim =
             new Dictionary<int, CancellationTokenSource>(); // 各管抬/落动画取消源(快速连点防动画打架)
+        float _layoutW = 80f;          // 最近一次布局的管宽(倒水动画几何计算用,初值防首帧未布局)
+        float _layoutH = 320f;         // 最近一次布局的管高(同上)
+        bool _animating;               // 倒水动画进行中:输入锁 + 盘面刷新挂起(收尾统一重建,见 PlayPourAsync)
         bool _refreshScheduled;        // 合帧重建去重标记(见 ScheduleRefresh)
+
+        /// <summary>倒水动画进行中(视图据此锁操作钮;RefreshTubeArea 亦据此挂起整架重建)。</summary>
+        public bool IsAnimating => _animating;
+
+        /// <summary>倒水动画收尾(整架已重建到真实盘面)后广播:视图做 HUD/引导同步。</summary>
+        public event Action PourCompleted;
 
         // shader 属性 ID(缓存避免每次重建字符串查表)
         static readonly int MaskTexId = Shader.PropertyToID("_MaskTex");
         static readonly int MaskSTId = Shader.PropertyToID("_MaskST");
+        static readonly int MaskRotId = Shader.PropertyToID("_MaskRot");
 
         /// <summary>绑定会话(视图在会话就绪后调用一次;盘面以 Refresh 为准,无需重复设置)。</summary>
         public void SetSession(WaterSortSession session) => _session = session;
@@ -109,6 +126,7 @@ namespace Box.HotUpdate.WaterSort
         public void Refresh()
         {
             if (_session == null || _session.Board == null) return;
+            if (_animating) return; // 倒水动画中盘面已落子:挂起重建,动画收尾统一刷(见 PlayPourAsync)
             if (_self == null) _self = (RectTransform)transform;
             ClearChildren();
             EnsureSprites(); // 贴图/遮罩懒加载(首帧可能未就绪,就绪后合帧重建,见 ScheduleRefresh)
@@ -128,6 +146,8 @@ namespace Box.HotUpdate.WaterSort
             float w = Mathf.Min(110f, (_self.rect.width - 80f - (maxPerRow - 1) * 12f) / maxPerRow);
             float h = Mathf.Min(w * 4.6f, (_self.rect.height - 60f - (rows - 1) * RowGap) / rows);
             w = Mathf.Min(w, h / 4.6f);
+            _layoutW = w; // 动画几何计算用(倒水悬停点/水流柱)
+            _layoutH = h;
 
             _basePositions = new Vector2[n];
             CancelLiftAnims(); // 重建即全换新节点:挂着的抬/落动画全部作废
@@ -383,6 +403,188 @@ namespace Box.HotUpdate.WaterSort
                 kv.Value.Dispose();
             }
             _liftAnim.Clear();
+        }
+
+        // ---- 倒水动画(四段式;仅合法移动会进入,视图已完成 TryPour 落子) ---- //
+
+        /// <summary>上动画锁(视图在 TryPour 前调用:BoardChanged 触发的整架刷新被 Refresh 挂起)。</summary>
+        public void BeginPour() => _animating = true;
+
+        /// <summary>解锁(竞态兜底:上锁后未能落子时复位,理论不可达)。</summary>
+        public void CancelPour() => _animating = false;
+
+        /// <summary>单格液面高度(与 Refresh 布局公式同源,勿改其一)。</summary>
+        float DropHeight(float h, int drops)
+            => (h * (1f - WaterBottomPadFrac - WaterTopGapFrac) + (drops - 1) * DropOverlapPx) / Mathf.Max(4, drops);
+
+        /// <summary>
+        /// 倒水动画(总 ~0.72s;盘面在进入前已落子,本动画只演「过程」,收尾重建到真实盘面):
+        /// 1) 源管提到最上层,滑移悬停到目标管口正上方(悬停点按倾角预偏,让管口对准目标口);
+        /// 2) 绕管中心倾斜 PourTiltDeg —— 液块子节点反向旋转保持屏幕水平(水面恒水平),
+        ///    材质 _MaskRot 同步反向补偿采样遮罩,裁剪边界贴合倾斜后的内腔剪影;
+        /// 3) 水流柱出现(占位音效),源管顶层 run 逐块平滑下降、目标管口新块同步长起
+        ///    (每帧更新矩形高度 + _MaskST;动画期用临时材质克隆,不污染共享缓存);
+        /// 4) 转正、滑回基准位(落地回弹),销毁临时节点,整架重建并广播 PourCompleted。
+        /// 途中视图销毁:destroyCancellationToken 令 UniTask.Yield 抛取消,临时节点随整架销毁。
+        /// </summary>
+        public async UniTaskVoid PlayPourAsync(int src, int dst, int count)
+        {
+            var ct = destroyCancellationToken;
+            try
+            {
+                // 兜底:软裁剪未就绪(无材质)/节点缺失(未布局)不演动画,直接重建交付结果
+                if (_liquidMaterial == null || src >= transform.childCount || dst >= transform.childCount)
+                {
+                    _animating = false;
+                    Refresh();
+                    PourCompleted?.Invoke();
+                    return;
+                }
+
+                var srcRt = (RectTransform)transform.GetChild(src);
+                var dstRt = (RectTransform)transform.GetChild(dst);
+                float h = _layoutH;
+                float w = _layoutW;
+                float bottomY = -h * (0.5f - WaterBottomPadFrac);
+                float u0 = 0.5f * (1f - DropWidthFrac);
+
+                // 源管液块(倒水前状态,自底向上):规范化 pivot 到底部 + 克隆临时材质供动画改写
+                var srcBlocks = new List<RectTransform>();
+                var srcMats = new List<Material>();
+                for (int i = 0; i < srcRt.childCount; i++)
+                {
+                    if (srcRt.GetChild(i).name != "Drop") continue;
+                    var block = (RectTransform)srcRt.GetChild(i);
+                    block.pivot = new Vector2(0.5f, 0f); // 底部锚定:收缩时底边不动
+                    srcBlocks.Add(block);
+                    var clone = new Material(block.GetComponent<Image>().material);
+                    block.GetComponent<Image>().material = clone;
+                    srcMats.Add(clone);
+                }
+                int srcDrops = srcBlocks.Count;
+                float dropH = DropHeight(h, srcDrops);
+                float unitSrc = dropH - DropOverlapPx;
+                for (int i = 0; i < srcDrops; i++)
+                    SetDropGeometry(srcBlocks[i], srcMats[i], w, bottomY + i * unitSrc, dropH, h);
+
+                // 目标管:生长块(插到 Glass 之下;颜色 = 倒入色 = 落子后目标顶层色)
+                int dstDrops = 0;
+                for (int i = 0; i < dstRt.childCount; i++)
+                    if (dstRt.GetChild(i).name == "Drop") dstDrops++;
+                float unitDst = DropHeight(h, dstDrops) - DropOverlapPx;
+                float growBottom = bottomY + dstDrops * unitDst; // 新块底 = 目标当前液面
+                float growFinalH = count * unitDst + DropOverlapPx;
+                int pourColor = _session.Board.TopColor(dst); // 落子后顶层即倒入色
+                var grow = NewChild(dstRt, "PourGrow", w * DropWidthFrac, 0.01f, Palette[pourColor - 1], false);
+                var growRt = (RectTransform)grow.transform;
+                growRt.pivot = new Vector2(0.5f, 0f);
+                grow.transform.SetSiblingIndex(dstRt.childCount - 2); // Glass(末子级)之前
+                var growMat = new Material(_liquidMaterial);
+                grow.GetComponent<Image>().material = growMat;
+
+                // 水流柱(挂架根 = 最上层绘制):细矩形,倒水段出现、首尾收细
+                float streamW = Mathf.Max(3f, w * 0.05f);
+                var stream = NewChild((RectTransform)transform, "PourStream", streamW, 1f, Palette[pourColor - 1], false);
+                var streamRt = (RectTransform)stream.transform;
+
+                // —— 1) 滑移悬停(源管提到最上层;悬停 x 按倾角预偏使管口对准目标口) ——
+                srcRt.SetAsLastSibling();
+                var glideFrom = srcRt.anchoredPosition; // 当前位(可能带选中抬起量),从原地起滑
+                var basePos = _basePositions[src];      // 动画结束落回的布局基准位
+                float tiltRad = -PourTiltDeg * Mathf.Deg2Rad; // 顺时针
+                var tiltQ = Quaternion.Euler(0f, 0f, -PourTiltDeg);
+                var mouthOffset = tiltQ * new Vector3(0f, h * 0.5f, 0f); // 倾斜后管口相对管心的偏移
+                var hoverPos = (Vector2)dstRt.anchoredPosition + new Vector2(-mouthOffset.x, h * 0.7f);
+                await Tween01(PourLiftDuration, ct, p =>
+                    srcRt.anchoredPosition = Vector2.LerpUnclamped(glideFrom, hoverPos, Box.UI.BoxTween.EaseInOutCubic(p)));
+
+                // —— 2) 倾斜(液块反向旋转 + 材质旋转补偿,水面保持水平) ——
+                await Tween01(PourTiltDuration, ct, p =>
+                    ApplySourceTilt(srcBlocks, srcMats, tiltRad * Box.UI.BoxTween.EaseInOutCubic(p)));
+
+                // —— 3) 倒水主段:水流 + 源液面下降 + 目标液面生长(同步) ——
+                ServiceLocator.Audio?.PlaySfx(AudioSfx.WaterPour);
+                await Tween01(PourFlowDuration, ct, p =>
+                {
+                    float grown = growFinalH * Box.UI.BoxTween.EaseInOutCubic(p); // 目标已涨高 = 源已降量(等量转移)
+                    // 源管顶层 run 自顶向下收缩(run = 顶层 count 块,同色)
+                    float remaining = count * unitSrc + DropOverlapPx - grown;
+                    for (int k = 0; k < count && srcDrops - count + k >= 0; k++)
+                    {
+                        int idx = srcDrops - count + k; // run 内第 k 块(自底数)
+                        float keepH = Mathf.Clamp(remaining - k * unitSrc, 0f, unitSrc);
+                        var block = srcBlocks[idx];
+                        block.gameObject.SetActive(keepH > 0.01f);
+                        SetDropGeometry(block, srcMats[idx], w, bottomY + idx * unitSrc, keepH, h);
+                    }
+                    // 目标生长块
+                    grow.gameObject.SetActive(grown > 0.01f);
+                    SetDropGeometry(growRt, growMat, w * DropWidthFrac, growBottom, grown, h);
+                    // 水流柱:顶 = 源管口,底 = 目标当前液面;宽度首尾收细
+                    var mouth = srcRt.anchoredPosition + (Vector2)(tiltQ * new Vector3(0f, h * 0.5f, 0f));
+                    var surface = (Vector2)dstRt.anchoredPosition + new Vector2(0f, -h * 0.5f + growBottom + grown);
+                    float widthFactor = p < 0.15f ? p / 0.15f : (p > 0.85f ? (1f - p) / 0.15f : 1f);
+                    streamRt.sizeDelta = new Vector2(streamW * Mathf.Clamp01(widthFactor), Mathf.Max(1f, mouth.y - surface.y));
+                    streamRt.anchoredPosition = new Vector2(dstRt.anchoredPosition.x, (mouth.y + surface.y) * 0.5f);
+                });
+
+                // —— 4) 转正 + 滑回基准位(落地回弹) ——
+                await Tween01(PourTiltDuration, ct, p =>
+                    ApplySourceTilt(srcBlocks, srcMats, tiltRad * (1f - Box.UI.BoxTween.EaseInOutCubic(p))));
+                srcRt.localRotation = Quaternion.identity;
+                await Box.UI.BoxTween.DropBounce(srcRt, hoverPos, basePos, PourBackDuration + 0.06f, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return; // 视图/架子销毁:临时节点随整架销毁,无需清理
+            }
+
+            // —— 收尾:解锁 + 重建到真实盘面(临时节点随之销毁)+ 广播 ——
+            _animating = false;
+            Refresh();
+            PourCompleted?.Invoke();
+        }
+
+        /// <summary>归一段时驱动:t 从 0 走到 1(按 Time.deltaTime),每帧回调 tick(t);ct 取消即抛出。</summary>
+        static async UniTask Tween01(float duration, CancellationToken ct, Action<float> tick)
+        {
+            float t = 0f;
+            while (t < 1f)
+            {
+                tick(t);
+                await UniTask.Yield(ct);
+                t = Mathf.Min(1f, t + Time.deltaTime / duration);
+            }
+            tick(1f);
+        }
+
+        /// <summary>液块几何统一写入口:矩形(底部锚定)+ 软裁剪材质 _MaskST 同步更新。
+        /// 几何式与 GetDropMaterial/Refresh 布局同源 —— 高度变化时矩形与遮罩采样框必须同步,
+        /// 否则剪影会随缩放变形(不可用 localScale 做液面动画的原因)。</summary>
+        static void SetDropGeometry(RectTransform rt, Material mat, float width, float bottomY, float height, float h)
+        {
+            rt.sizeDelta = new Vector2(width, Mathf.Max(0.01f, height));
+            rt.anchoredPosition = new Vector2(0f, bottomY);
+            if (mat != null)
+                mat.SetVector(MaskSTId, new Vector4(
+                    0.5f * (1f - DropWidthFrac), (bottomY + h * 0.5f) / h, DropWidthFrac, height / h));
+        }
+
+        /// <summary>源管倾斜姿态:液块子节点反向旋转 θ(屏幕上保持水平 → 水面恒水平),
+        /// 同时把各块临时材质的 _MaskRot 设为 (cosθ, sinθ, 块中心UV) —— 片元采样遮罩前
+        /// 把 UV 绕块中心旋回试管空间,裁剪边界贴合倾斜后的内腔剪影(推导见 shader 注释)。</summary>
+        static void ApplySourceTilt(List<RectTransform> blocks, List<Material> mats, float thetaRad)
+        {
+            var q = Quaternion.Euler(0f, 0f, -thetaRad * Mathf.Rad2Deg); // 反向旋转 → 水平
+            var rot = new Vector4(Mathf.Cos(thetaRad), Mathf.Sin(thetaRad), 0f, 0f);
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                blocks[i].localRotation = q;
+                var m = mats[i];
+                if (m == null) continue;
+                var st = m.GetVector(MaskSTId);
+                m.SetVector(MaskRotId, new Vector4(rot.x, rot.y, st.x + st.z * 0.5f, st.y + st.w * 0.5f));
+            }
         }
 
         GameObject BuildTube(int index, float w, float h)
