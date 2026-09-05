@@ -71,6 +71,10 @@ namespace Box.Services
             { "moreGames.close", "完成" },
             { "moreGames.comingSoon", "敬请期待" }, // 无更多游戏时按钮点击提示(2026-08-29 Bug 清单)
 
+            // 玩法模块名(ModuleCatalog.displayName 即本地化 key,More Games 列表按语言取文案;2026-09-05 Bug 清单 5)
+            { "module.sudoku", "数独" },
+            { "module.watersort", "水排序" },
+
             // 设置弹窗
             { "settings.title", "设置" },
             { "settings.soundOn", "音效:开" },
@@ -179,6 +183,10 @@ namespace Box.Services
             { "moreGames.title", "More Games" },
             { "moreGames.close", "Done" },
             { "moreGames.comingSoon", "Coming Soon" },
+
+            // 玩法模块名(ModuleCatalog.displayName 即本地化 key,More Games 列表按语言取文案;2026-09-05 Bug 清单 5)
+            { "module.sudoku", "Sudoku" },
+            { "module.watersort", "Water Sort" },
 
             // 设置弹窗
             { "settings.title", "Settings" },

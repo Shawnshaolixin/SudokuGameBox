@@ -80,7 +80,7 @@ namespace Box.HotUpdate.WaterSort
         WaterSortDailyPack _dailyPack;           // 本次会话每日题库缓存(主页/开局同源取关)
         int _dailySeed;                          // 本局每日挑战归属日期种子(开局取;结算按此落完成,防跨零点错记)
         WaterSortTubeRack _rack;     // 试管区渲染与点击(OnCreate 挂到 TubeArea;随视图销毁)
-        int _totalLevels;            // 题库总量(结算面板「下一关」放行判定:仅推进且有后关才可点)
+        int _totalLevels;            // 题库总量(选关渲染后赋值;结算 Next 放行判定见 NextLevelPlayable)
         TutorialFlow _tut;           // 新手引导流程(M3.3,WS-14;null=未开播/已收尾,见「新手引导」区)
         int _tutNonMergePours;       // S2 放行计数:无聚合演示对时连续普通倒水次数(见 TutorialS2GracePours)
         int _tutPairA = -1, _tutPairB = -1; // 当前盘「同色聚合」演示对(试管索引;-1=无,随盘面刷新重扫)
@@ -100,6 +100,23 @@ namespace Box.HotUpdate.WaterSort
             _settlePanel = FindInCard("SettlePanel");
             _content = FindInCard("SelectPanel/LevelScroll/Viewport/Content");
             _itemTemplate = FindInCard("SelectPanel/ItemTemplate");
+
+            // Bug 清单 6(2026-09-05,真机):选关内容不可见但盲点可触发。根因 = Viewport 挂经典 Mask,
+            // 遮罩图为全透明(Image a=0)+ CanvasRenderer CullTransparentMesh 在设备上剔除透明 mesh →
+            // stencil 空写 → 子级渲染裁剪全败;GraphicRaycaster 不受 stencil 限制 → 可点击(现象吻合)。
+            // 运行期换 RectMask2D(纯矩形几何裁剪,不依赖遮罩图/stencil);生成器 WaterSortViewSetup
+            // 已同步改型,此处兜底存量 bundle(免重打 prefab 资源即生效)。
+            var viewport = FindInCard("SelectPanel/LevelScroll/Viewport");
+            if (viewport != null)
+            {
+                var legacyMask = viewport.GetComponent<UnityEngine.UI.Mask>();
+                if (legacyMask != null)
+                {
+                    legacyMask.enabled = false; // 先摘出 stencil 裁剪链(帧内即生效)
+                    Destroy(legacyMask);        // 帧末移除组件(免残留状态)
+                    viewport.gameObject.AddComponent<UnityEngine.UI.RectMask2D>();
+                }
+            }
             _resultText = FindInCard("SettlePanel/ResultText")?.GetComponent<TextMeshProUGUI>();
             _stepText = FindInCard("GamePanel/StepText")?.GetComponent<TextMeshProUGUI>();
             _nextButton = FindInCard("SettlePanel/NextButton")?.GetComponent<BoxButton>();
@@ -143,6 +160,10 @@ namespace Box.HotUpdate.WaterSort
 
         protected override async UniTask OnShow(object args)
         {
+            // 缓存视图复推(UIRouter 命中缓存直接 OnShow,见 Router.PushAsync):复位退模块标记。
+            // 不复位则异步渲染续体(RenderLevelSelect/RenderDailyHomeAsync 的 _leaving 早退守卫)
+            // 误判"正在退出"而返回 → 二次进入选关空列表/按钮禁点(Bug 清单 7 伴随根因)。
+            _leaving = false;
             _session = WaterSortSession.Instance; // 模块 OnEnter 先建会话再推本视图,恒非空
             _pack = null;                          // 新会话旧题库失效(重新走缓存加载,代价近零)
             SubscribeSession();
@@ -563,8 +584,10 @@ namespace Box.HotUpdate.WaterSort
                 if (_nextButton != null) _nextButton.SetInteractable(false); // 每日仅一关:不提供「下一关」
                 return;
             }
-            // 首通推进(WS-04:解锁只认首通;重玩不推进)+ 首通发奖(WS-08:奖励曲线在 WaterSortConfig,
-            // 仅首通入账 box.coins,重玩/已解锁关卡不发——解耦 RecordFirstWin 返回值复用为推进与发奖的共同信号)。
+            // 首通发奖(WS-08:奖励曲线在 WaterSortConfig,仅首通入账 box.coins,重玩/已解锁关卡不发;
+            // RecordFirstWin 返回值 = 本次是否首通,复用作发奖/翻倍信号)。
+            // 解锁推进仍只认首通(WS-04,RecordFirstWin 落盘):Next 放行 = 下一关当前可达(首通/重玩一致,
+            // 见 NextLevelPlayable)——导航不推进解锁,不破坏解锁口径。
             bool firstWin = WaterSortProgressStore.RecordFirstWin(_session.LevelId);
             int reward = 0;
             if (firstWin)
@@ -586,8 +609,7 @@ namespace Box.HotUpdate.WaterSort
             if (_doubleButton != null) _doubleButton.gameObject.SetActive(reward > 0); // 翻倍钮与奖励行同显
             SetDoubleButtonState();
             UpdateCoinLabel(); // 发奖即刷新(顶栏在结算面板不可见,回对局时已是最新)
-            bool nextUnlocked = firstWin && _session.LevelId < _totalLevels; // 有后关且本次推进才可点
-            if (_nextButton != null) _nextButton.SetInteractable(nextUnlocked);
+            if (_nextButton != null) _nextButton.SetInteractable(NextLevelPlayable());
         }
 
         /// <summary>首通奖励行整行隐藏(每日结算/重玩结算;翻倍钮随行隐藏)。</summary>
@@ -627,19 +649,35 @@ namespace Box.HotUpdate.WaterSort
                 available ? L10n.Get("watersort.btn.double") : L10n.Get("watersort.btn.doubled"));
         }
 
+        /// <summary>
+        /// 结算 Next 放行判定(2026-09-05 Bug 清单 7):存在下一关且「下一关当前可玩」即放行。
+        /// 可玩 ⇔ 解锁数(自 1 起连续首通数)≥ 本关号 —— 选关页同样可达该关,Next 只是导航快捷,
+        /// 首通/重玩一致放行:重玩通关后 Next 灰掉属误伤(旧规则 firstWin && 有后关,
+        /// 重玩/重试通关必灰 = 真机"偶现不可点"的根因)。导航不推进解锁(推进仍只认 RecordFirstWin,
+        /// WS-04),每日结算恒禁、尾关无后关恒禁由调用分支保证。
+        /// </summary>
+        bool NextLevelPlayable()
+        {
+            if (_session == null || _session.IsDaily) return false;
+            if (_session.LevelId < 1 || _session.LevelId >= _totalLevels) return false;
+            return WaterSortProgressStore.UnlockedCount(WaterSortProgressStore.Load()) >= _session.LevelId;
+        }
+
         void OnNextLevel()
         {
+            // 防双击/连点:首击即锁钮(下次结算按 NextLevelPlayable 重放行;失败兜底分支恢复),
+            // 防第二击落到新对局试管上误倒水
+            if (_nextButton != null) _nextButton.SetInteractable(false);
             var level = _pack != null ? WaterSortLevelStore.FindById(_pack, _session.LevelId + 1) : null;
-            if (level != null)
+            if (level != null && _session.StartLevel(level)) // 换关:旧会话历史/过关标记随 StartLevel 复位
             {
-                if (_session.StartLevel(level)) // 换关:旧会话历史/过关标记随 StartLevel 复位
-                {
-                    ShowPanel(Panel.Game);
-                    ApplyLanguage();
-                    RefreshTubeArea();
-                }
+                ShowPanel(Panel.Game);
+                ApplyLanguage();
+                RefreshTubeArea();
+                return;
             }
-            if (level == null || !_session.IsInLevel) ShowToast("watersort.toast.noLevels"); // 题库尾部兜底
+            if (_nextButton != null) _nextButton.SetInteractable(NextLevelPlayable()); // 失败兜底恢复(理论不可达)
+            ShowToast("watersort.toast.noLevels"); // 题库尾部/加载缺失兜底
         }
 
         void OnRetry()

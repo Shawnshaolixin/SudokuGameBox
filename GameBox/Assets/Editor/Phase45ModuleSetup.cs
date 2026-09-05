@@ -24,7 +24,7 @@ public static class Phase45ModuleSetup
     /// <summary>内置玩法引导清单(首个玩法数独)。新增玩法不写这里,由玩法侧脚本调用 AddEntry。</summary>
     static void AddDefaultEntries(ModuleCatalog catalog)
     {
-        AddEntry(catalog, "sudoku", "Box.HotUpdate.Sudoku.SudokuModule", "Gameplay", "数独", 0);
+        AddEntry(catalog, "sudoku", "Box.HotUpdate.Sudoku.SudokuModule", "Gameplay", "module.sudoku", 0);
     }
 
     /// <summary>

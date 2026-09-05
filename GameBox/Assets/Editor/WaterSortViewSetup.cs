@@ -196,13 +196,15 @@ public static class WaterSortViewSetup
 
         var scroll = NewNode(select, "LevelScroll", new Vector2(0, -60), new Vector2(1000, 1460), PanelTint);
         scroll.gameObject.AddComponent<ScrollRect>().vertical = true; // 滚动体:见下字段接线
-        // Viewport 拉伸填满滚动区;Mask 裁剪列表越界。需显式 Image(Mask 依赖 Graphic)——
+        // Viewport 拉伸填满滚动区;RectMask2D 纯几何裁剪列表越界(经典 Mask + 全透明遮罩图在真机
+        // 被 CullTransparentMesh 剔除 → stencil 空写 → 内容不可见但可盲点,2026-09-05 Bug 清单 6 换型;
+        // WaterSortView.OnCreate 对存量 bundle 有同款运行期兜底,两处收敛到 RectMask2D)。
         // 透明底 + raycastTarget=true:空白区拖拽也命中(事件沿层级冒泡到 ScrollRect)
         var viewport = NewNode(scroll, "Viewport", Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0));
         Stretch(viewport);
         var vImg = viewport.gameObject.AddComponent<Image>();
         vImg.color = Color.clear;
-        viewport.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+        viewport.gameObject.AddComponent<RectMask2D>();
         var content = NewNode(viewport, "Content", Vector2.zero, new Vector2(0, 0), new Color(0, 0, 0, 0));
         content.anchorMin = new Vector2(0, 1);  // 顶锚:运行时按行撑高,ScrollRect 纵滚
         content.anchorMax = new Vector2(1, 1);
@@ -443,9 +445,10 @@ public static class WaterSortViewSetup
             Debug.LogWarning("[WaterSortSetup] ModuleCatalog.asset 缺失:请先执行 Phase45ModuleSetup.Build");
             return;
         }
-        // entryScene 为 v1.1 单场景化后废弃字段,传空串;大厅排序在数独(0)之后
+        // entryScene 为 v1.1 单场景化后废弃字段,传空串;大厅排序在数独(0)之后;
+        // displayName = 本地化 key(module.watersort,2026-09-05 Bug 清单 5:游戏名默认英文)
         Phase45ModuleSetup.AddEntry(catalog, "watersort",
-            "Box.HotUpdate.WaterSort.WaterSortModule", "", "水排序", 1);
+            "Box.HotUpdate.WaterSort.WaterSortModule", "", "module.watersort", 1);
     }
 
     // ---- ② 关卡 JSON(数量变化才重写;同种子确定性,重复执行内容一致) ----

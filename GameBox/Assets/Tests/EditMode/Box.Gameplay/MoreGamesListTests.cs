@@ -105,12 +105,17 @@ namespace Box.Gameplay.Tests
             Assert.AreEqual("更多游戏", L10n.Get("moreGames.title"));
             Assert.AreEqual("完成", L10n.Get("moreGames.close"));
             Assert.AreEqual("敬请期待", L10n.Get("moreGames.comingSoon"));
+            Assert.AreEqual("数独", L10n.Get("module.sudoku"));
+            Assert.AreEqual("水排序", L10n.Get("module.watersort"));
 
             L10n.Init("en");
             Assert.AreEqual("More Games", L10n.Get("menu.moreGames"));
             Assert.AreEqual("More Games", L10n.Get("moreGames.title"));
             Assert.AreEqual("Done", L10n.Get("moreGames.close"));
             Assert.AreEqual("Coming Soon", L10n.Get("moreGames.comingSoon"));
+            // 模块清单 displayName 即本地化 key(Bug 清单 5:More Games 游戏名默认英文)
+            Assert.AreEqual("Sudoku", L10n.Get("module.sudoku"));
+            Assert.AreEqual("Water Sort", L10n.Get("module.watersort"));
         }
     }
 }
