@@ -15,7 +15,8 @@ namespace Box.UI
     {
         public event Action<UIView> ViewPopped;
 
-        /// <summary>UI 埋点(§3.5 第 7 条):OnShow 自动上报 {id}.ui_show;null 则跳过。</summary>
+        /// <summary>UI 埋点(§3.5 第 7 条,04 文档 §6.1):OnShow 自动上报 ui_show + view 参数;null 则跳过。
+        /// 事件名固定合规(view.Id 是资源路径,含 / 与大小写,不能拼事件名 —— 2026-09-05 埋点清理立规)。</summary>
         public IAnalyticsService Analytics { get; set; }
 
         /// <summary>当前栈内(Window/Popup)视图数,仅供测试与调试。</summary>
@@ -65,7 +66,7 @@ namespace Box.UI
                     _stack.Push(view);
                 }
                 await view.ShowAsync(args); // 非栈层(HUD/Toast)只显示不入栈
-                Analytics?.LogEvent($"{view.Id}.ui_show"); // UI 埋点自动化(§3.5 第 7 条)
+                Analytics?.LogEvent("ui_show", "view", view.Id); // UI 埋点自动化:固定事件名 + view 路径参数(04 §6.1)
                 return (TView)view;
             }
             finally
