@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.AddressableAssets; // AddressableAssetSettingsDefaultObject(语义化内容构建取值)
 using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.Build;          // NamedBuildTarget(v1.1 符号操作)
 using UnityEditor.Build.Reporting;
@@ -54,8 +55,10 @@ public static class BuildScript
     [MenuItem("Box/Build/Android APK + AAB (test + release)")]
     public static void BuildAndroidApkAndAab()
     {
-        // Phase 6:Addressables 资源先构建(分组 Core/UI_Local/Art_Audio;UI 经 Addressables 加载)
-        // m_BuildAddressablesWithPlayerBuild=0 → 需显式构建,否则产物内缺 bundle 运行时加载失败
+        // Phase 6:Addressables 资源先构建(分组 Core/UI_Local/Art_Audio;UI 经 Addressables 加载)。
+        // 注:BuildAddressablesWithPlayerBuild=PreferencesValue(0) 时 EditorPrefs 默认 true,
+        // BuildPlayer 阶段 AddressablesPlayerBuildProcessor 会再自动跑一次内容构建(最终进包的
+        // 那份),此显式构建是双保险 —— 真正的烧录语义见 BuildAndroidInternal 的贯穿注释。
         try
         {
             AddressableAssetSettings.BuildPlayerContent();
@@ -85,8 +88,10 @@ public static class BuildScript
 
     static void BuildAndroid(bool aab)
     {
-        // Phase 6:Addressables 资源先构建(分组 Core/UI_Local/Art_Audio;UI 经 Addressables 加载)
-        // m_BuildAddressablesWithPlayerBuild=0 → 需显式构建,否则 AAB 内缺 bundle 运行时加载失败
+        // Phase 6:Addressables 资源先构建(分组 Core/UI_Local/Art_Audio;UI 经 Addressables 加载)。
+        // 注:BuildAddressablesWithPlayerBuild=PreferencesValue(0) 时 EditorPrefs 默认 true,
+        // BuildPlayer 阶段 AddressablesPlayerBuildProcessor 会再自动跑一次内容构建(最终进包的
+        // 那份),此显式构建是双保险 —— 真正的烧录语义见 BuildAndroidInternal 的贯穿注释。
         try
         {
             AddressableAssetSettings.BuildPlayerContent();
@@ -126,7 +131,29 @@ public static class BuildScript
             EditorApplication.Exit(1);
             return;
         }
-        BuildAndroidInternalCore(scenes, aab);
+
+        // 2026-09-05 真机"点 More Games 无反应"事故的构建侧根治(烧录语义必须贯穿 BuildPlayer):
+        // 包内 assets/aa/settings.json 的 DisableCatalogUpdateOnStartup 由 BuildPlayer 阶段的自动
+        // 内容构建写入 —— Addressables 的 BuildAddressablesWithPlayerBuild=PreferencesValue(0) 时
+        // EditorPrefs 默认 true,AddressablesPlayerBuildProcessor.PrepareForBuild 会在 BuildPlayer
+        // 内再跑一次 BuildPlayerContent,那次构建烧的值才是真正进包的(本次会话实测确认)。
+        // v1.0 随包无远程内容:必须烧 true(启动禁 catalog 更新,永远读包内自洽内容;否则离线时
+        // 加载 persistentDataPath 残留的旧远程 catalog → 全部 bundle 打不开、UI 静默无响应,
+        // 机制详见 Phase9Publish.BuildAll 注释)。故此处在整个 BuildPlayer 生命周期保持内存值
+        // true(覆盖自动构建),finally 恢复资产原值不留脏;v1.1 走 BuildV11 直调 Core,不经此函数。
+        var settings = AddressableAssetSettingsDefaultObject.Settings;
+        bool prevCatalogUpdate = settings.DisableCatalogUpdateOnStartup;
+        settings.DisableCatalogUpdateOnStartup = true;
+        try
+        {
+            BuildAndroidInternalCore(scenes, aab);
+        }
+        finally
+        {
+            settings.DisableCatalogUpdateOnStartup = prevCatalogUpdate;
+            Debug.Log("[BuildScript] v1.0 构建收尾:DisableCatalogUpdateOnStartup 已恢复资产原值("
+                      + prevCatalogUpdate + ")");
+        }
     }
 
     /// <summary>构建核心(签名纪律 + BuildPlayer + 产物命名);v1.0 与 v1.1(BuildV11)共用。</summary>
@@ -390,7 +417,9 @@ public static class BuildScript
                 return;
             }
 
-            // 2) Addressables 资源(先代码后资源,代码失败早暴露)
+            // 2) Addressables 资源(先代码后资源,代码失败早暴露);
+            // v1.1 语义:DisableCatalogUpdateOnStartup 保持资产默认 false(热更依赖启动拉远程
+            // catalog),自动内容构建(v1.0 侧注释的 PlayerBuildProcessor)烧的即 false,正确无需覆盖
             try
             {
                 AddressableAssetSettings.BuildPlayerContent();

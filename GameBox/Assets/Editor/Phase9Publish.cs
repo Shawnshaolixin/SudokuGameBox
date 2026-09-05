@@ -1,4 +1,5 @@
 using System.IO;
+using HybridCLR.Editor; // SettingsUtil.Enable:v1.0/v1.1 语义判定(缓存目录劫持根治,见 BuildAll 注释)
 using UnityEditor;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Build;
@@ -30,17 +31,37 @@ public static class Phase9Publish
             Debug.LogError("[Phase9Publish] Addressables 未初始化,请先执行 Phase9HybridCLRSetup.EnsureRemoteSetup");
             return;
         }
-        Debug.Log($"[Phase9Publish] 全量远程构建开始(BuildTarget={EditorUserBuildSettings.activeBuildTarget})...");
-        AddressableAssetSettings.CleanPlayerContent(settings.ActivePlayerDataBuilder);
-        AddressableAssetSettings.BuildPlayerContent(out var result);
-        if (result.Error == null || result.Error.Length == 0)
+        // 2026-09-05 真机"点 More Games 无反应"事故根治(缓存 catalog 目录劫持):
+        // Addressables 离线分支优先加载 persistentDataPath 缓存 catalog(源码 ContentCatalogProvider.
+        // DetermineIdToLoad:remote hash 不可达且缓存存在 → 用缓存,不用包内)——旧安装残留的
+        // 远程 catalog 会把本地 bundle 名指向旧内容哈希(ui_local...c86…),新包内文件是另一哈希
+        // (…37152ac5) → 全部资源加载失败、UI 静默无响应(force-stop 不清 persistentDataPath 故复现)。
+        // v1.0 包无远程内容:启动禁用 catalog 更新 → 缓存永不生效,永远读包内 catalog(自洽);
+        // v1.1(enable=true)必须保持 false —— 热更内容更新依赖启动拉取远程 catalog。
+        // 构建期按语义写入 settings.json 后恢复资产原值(入库默认 false,不留脏)。
+        bool prevCatalogUpdate = settings.DisableCatalogUpdateOnStartup;
+        settings.DisableCatalogUpdateOnStartup = !SettingsUtil.Enable;
+        try
         {
-            Debug.Log("[Phase9Publish] 全量构建成功:ServerData/" + EditorUserBuildSettings.activeBuildTarget
-                      + "(catalog + bundles + content_state.bin)");
+            Debug.Log($"[Phase9Publish] 全量远程构建开始(BuildTarget={EditorUserBuildSettings.activeBuildTarget}," +
+                      $"DisableCatalogUpdateOnStartup={settings.DisableCatalogUpdateOnStartup}," +
+                      $"HybridCLR enable={SettingsUtil.Enable})...");
+            AddressableAssetSettings.CleanPlayerContent(settings.ActivePlayerDataBuilder);
+            AddressableAssetSettings.BuildPlayerContent(out var result);
+            if (result.Error == null || result.Error.Length == 0)
+            {
+                Debug.Log("[Phase9Publish] 全量构建成功:ServerData/" + EditorUserBuildSettings.activeBuildTarget
+                          + "(catalog + bundles + content_state.bin)");
+            }
+            else
+            {
+                Debug.LogError("[Phase9Publish] 全量构建失败: " + result.Error);
+            }
         }
-        else
+        finally
         {
-            Debug.LogError("[Phase9Publish] 全量构建失败: " + result.Error);
+            settings.DisableCatalogUpdateOnStartup = prevCatalogUpdate;
+            UnityEditor.EditorUtility.SetDirty(settings); // 资产恢复入库原值(构建产物已固化,不受影响)
         }
     }
 
