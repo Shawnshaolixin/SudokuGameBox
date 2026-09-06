@@ -79,6 +79,7 @@ namespace Box.HotUpdate.WaterSort
         BoxButton _dailyPlayButton;              // 每日主页:开始/再玩今日挑战(题库就绪才可点)
         WaterSortDailyPack _dailyPack;           // 本次会话每日题库缓存(主页/开局同源取关)
         int _dailySeed;                          // 本局每日挑战归属日期种子(开局取;结算按此落完成,防跨零点错记)
+        bool _solvedPending;                     // 通关被倒水动画压住:PourCompleted 收尾时再弹结算(见 OnLevelSolved)
         WaterSortTubeRack _rack;     // 试管区渲染与点击(OnCreate 挂到 TubeArea;随视图销毁)
         int _totalLevels;            // 题库总量(选关渲染后赋值;结算 Next 放行判定见 NextLevelPlayable)
         TutorialFlow _tut;           // 新手引导流程(M3.3,WS-14;null=未开播/已收尾,见「新手引导」区)
@@ -387,6 +388,7 @@ namespace Box.HotUpdate.WaterSort
             }
             ShowPanel(Panel.Game);
             ApplyLanguage(); // 标题切「第 N 关」文案
+            _solvedPending = false; // 防残挂:上一局若有未消费的压住标记,开局即清(正常不可达,防御路径)
             RefreshTubeArea();
             MaybeStartTutorial(); // 常规第 1 关首次/中断重进:开播新手引导(WS-14)
         }
@@ -443,8 +445,17 @@ namespace Box.HotUpdate.WaterSort
             TutorialAfterBoardRefresh(); // 引导 S2 聚合演示对随盘面漂移:刷新后重扫重定位(M3.3)
         }
 
-        /// <summary>倒水动画收尾(试管架已重建到真实盘面):补做被动画挂起的 HUD/引导同步。</summary>
-        void OnPourCompleted() => SyncHudAfterBoardRefresh();
+        /// <summary>倒水动画收尾(试管架已重建到真实盘面):补做被动画挂起的 HUD/引导同步;
+        /// 若动画期间盘面已解(通关),此刻才弹结算 —— 结算必须等最后一个动作演完。</summary>
+        void OnPourCompleted()
+        {
+            SyncHudAfterBoardRefresh();
+            if (_solvedPending)
+            {
+                _solvedPending = false;
+                OnLevelSolved();
+            }
+        }
 
         /// <summary>试管点击执行:试管架已按 LegalMoves 预判,请求恒为合法移动。流程 = 先上动画锁 →
         /// TryPour 落子(BoardChanged 刷新被锁挂起)→ 播四段式倒水动画,收尾重建 + HUD 同步。
@@ -452,6 +463,7 @@ namespace Box.HotUpdate.WaterSort
         void OnPourRequested(int src, int dst)
         {
             if (_session == null || !_session.IsInLevel) return; // 面板切换竞态兜底
+            if (_rack != null && _rack.IsAnimating) return;      // 倒水动画中不接受新倒水(架子点击已锁,双保险)
             bool merging = false;
             var b = _session.Board;
             if (b != null && b.TopCount(src) > 0 && b.TopCount(dst) > 0
@@ -468,6 +480,7 @@ namespace Box.HotUpdate.WaterSort
                 return;
             }
             _rack.BeginPour(); // 先锁:TryPour 的 BoardChanged 刷新被挂起到动画收尾
+            _rack.ClearSelection(); // 倒水即摘选中:防收尾重建后源管残留拎起/蓝染(动画期 RefreshTubeArea 挂起)
             if (_session.TryPour(src, dst))
             {
                 TutorialOnPourSucceeded(merging);
@@ -605,6 +618,13 @@ namespace Box.HotUpdate.WaterSort
         void OnLevelSolved()
         {
             if (_session == null) return;
+            // 通关由最后一手倒水触发时(LevelSolved 在 TryPour 落子瞬间同步发出),若动画仍在播,
+            // 压住结算面板等 PourCompleted 收尾再弹 —— 否则「最后一个动作刚做就游戏结束」穿帮
+            if (_rack != null && _rack.IsAnimating)
+            {
+                _solvedPending = true;
+                return;
+            }
             // 过关计数(M3.2 全局频控,WS-12):常规/每日首解瞬间统一上报;展示只发生在结算 Hub 出口
             // (LeaveToHubAfterSettle)——连关/重开只计数不插屏,计数与展示解耦(数独侧同构)。
             // 引导期解关 = 已会玩:整段引导提前收尾(Done),本局不上报过关计数(WS-14 引导期间零广告)。

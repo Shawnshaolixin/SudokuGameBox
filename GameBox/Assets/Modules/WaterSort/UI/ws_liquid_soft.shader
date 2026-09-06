@@ -99,7 +99,7 @@ Shader "Box/UI/WaterSortLiquid"
             float4 _MaskST;
             // 倒水倾斜的「水面水平」补偿:液块矩形在试管内反向旋转保持屏幕水平后,
             // 其 UV 采样框相对试管转了 -θ;片元把 UV 绕液块中心反旋转回试管空间再采样,
-            // 裁剪边界即贴合倾斜后的内腔剪影(推导见 WaterSortTubeRack.AnimatePourRotate)。
+            // 裁剪边界即贴合倾斜后的内腔剪影(推导与调用见 WaterSortTubeRack.PlayPourAsync / ApplySourceTilt)。
             // xy=(cosθ, sinθ)(θ=试管根节点旋转角),zw=液块中心(遮罩UV空间);默认恒等。
             float4 _MaskRot;
             float _MaskAspect;

@@ -53,14 +53,21 @@ namespace Box.HotUpdate.WaterSort
 
         // 布局:≤4 管单行、5~8 管两行、>8 管三行;每行水平居中、整块垂直居中,行间距 RowGap
         const float RowGap = 34f;
+        const float RowGapMaxFrac = 0.6f; // 行内管间距上限(×管宽):管少的行居中、适度拉开不贴边;
+                                          // 管多(最宽行)时均分余量 ≤ 上限,自然间距直接生效、自动铺满
 
         // 倒水动画节奏(总 ~0.9s;调快整体手感更「弹」,调慢更「重」)
         const float PourLiftDuration = 0.14f;  // 滑移:源管前沿角送到锚点(目标口上方)
         const float PourTipPerUnitDuration = 0.30f; // 绕锚点倾倒:每份水的时长(份数线性放大 →
                                                // 旋转角速度随之放慢,流速恒定;回弧段固定不随份数)
-        const float PourBackDuration = 0.18f;  // 滑回基准位(含落地回弹)
-        const float PourMaxTiltDeg = 78f;      // 倾倒终角(接近水平,真实倒水姿态)
-        const float PourFlowStartFrac = 0.30f; // 倾倒进度超过此比例才开始出水(先抬起后出水)
+        const float PourBackDuration = 0.18f;  // 收管:从倾倒终态直线插值回基准位(不沿原弧)
+        // 整体节奏倍率:当前 2.5f(时长 2.5 倍 = 40% 速度,介于原速 1 与观察速 5 之间的手感值);
+        // 验收定稿后如回归原速改回 1f(总时长随倍率线性膨胀,忘改交付 = 倒水偏慢)
+        const float PourTimeScale = 2.5f;
+        const float PourMaxTiltDeg = 87f;      // 倾角绝对上限:常规水量下倾角由「液面贴唇口」条件自动
+                                               // 决定(LipTheta),本上限仅近乎倒空时才接近
+        const float PourTipPhaseFrac = 0.35f;  // 倾倒段内「快速倾到出水角」所占进度,余下边续转边倒
+        const float PourGlideTiltDeg = 30f;    // 滑移段预倾角上限:边移边旋到位;≤出水角途中不漏,少水管不一路转平
         const float PourAnchorAboveFrac = 0.10f; // 旋转锚点在目标「口顶端」上方的高度(×管高)
         // 倾斜期液块加宽系数:管体倾斜 θ 后内腔水平宽度 = 管宽/cosθ,水平液块须
         // 覆盖到两侧壁,否则露出液块自身直边(几何硬边锯齿,「台阶感」的成因);超宽部分由遮罩
@@ -98,6 +105,9 @@ namespace Box.HotUpdate.WaterSort
         bool _liquidShaderRequested;   // shader 请求已发出(失败不回退,维持兜底路径)
         Material _liquidMaterial;      // 基材质:持有 _MaskTex;液块按 (层数,层序) 派生实例写 _MaskST
         readonly Dictionary<int, Material> _dropMaterials = new Dictionary<int, Material>(); // 实例缓存(见 GetDropMaterial)
+        float _dropMatCacheH;          // 液块材质缓存构建时的管高(布局几何变化即整体失效,见 Refresh)
+        readonly List<Material> _pourTempMats = new List<Material>(); // 倒水期临时材质(液带克隆/生长块):
+                                                                      // Destroy 节点不回收材质,须显式销毁防原生泄漏
         Vector2[] _basePositions;      // 各管基准锚点(分行布局计算结果;选中抬起 = 基准 + SelectedLiftPx)
         readonly Dictionary<int, CancellationTokenSource> _liftAnim =
             new Dictionary<int, CancellationTokenSource>(); // 各管抬/落动画取消源(快速连点防动画打架)
@@ -157,7 +167,17 @@ namespace Box.HotUpdate.WaterSort
             _layoutW = w; // 动画几何计算用(倒水悬停点/水流柱)
             _layoutH = h;
             if (_liquidMaterial != null)
+            {
                 _liquidMaterial.SetFloat(MaskAspectId, w / h); // 旋转补偿的等比空间换算比(shader 注释)
+                if (!Mathf.Approximately(_dropMatCacheH, h))
+                {
+                    // 布局几何变化(分辨率/窗口尺寸/分行):缓存实例的 _MaskST/_MaskAspect 均为旧几何,
+                    // 复用会整体错位,废弃重建(派生实例创建时快照基材质,基材质改比例不会回传)
+                    foreach (var kv in _dropMaterials) Destroy(kv.Value);
+                    _dropMaterials.Clear();
+                    _dropMatCacheH = h;
+                }
+            }
 
             _basePositions = new Vector2[n];
             CancelLiftAnims(); // 重建即全换新节点:挂着的抬/落动画全部作废
@@ -166,13 +186,29 @@ namespace Box.HotUpdate.WaterSort
             for (int r = 0; r < rows; r++)
             {
                 float rowY = blockH * 0.5f - h * 0.5f - r * (h + RowGap); // 本行中心 y(首行最上)
-                float startX = -((rowCounts[r] - 1) * (w + 12f)) * 0.5f;  // 本行水平居中
+                // 本行水平分布:行内边缘间距 = clamp(均分余量, 12, RowGapMaxFrac·管宽),整行居中 ——
+                // 管少的行适度拉开、不贴边;管多(最宽行)时余量小、自然间距 ≤ 上限,自动协调铺满
+                float rowAvailW = _self.rect.width - 80f;
+                int rowCount = rowCounts[r];
+                float step, startX;
+                if (rowCount > 1)
+                {
+                    float gap = Mathf.Clamp((rowAvailW - rowCount * w) / (rowCount - 1),
+                        12f, w * RowGapMaxFrac);
+                    step = w + gap;
+                    startX = -(rowCount * w + (rowCount - 1) * gap) * 0.5f + w * 0.5f;
+                }
+                else
+                {
+                    step = 0f;
+                    startX = 0f; // 单管居中(当前行分布不会出现,防御路径)
+                }
                 for (int c = 0; c < rowCounts[r]; c++, t++)
                 {
                     int drops = board.TopCount(t);
                     var col = BuildTube(t, w, h); // 空容器(无 Image 不挡射线);液块先入子级、Glass 最后入
                     var rt = (RectTransform)col.transform;
-                    var basePos = new Vector2(startX + c * (w + 12f), rowY);
+                    var basePos = new Vector2(startX + c * step, rowY);
                     rt.anchoredPosition = basePos;
                     _basePositions[t] = basePos;
 
@@ -289,6 +325,8 @@ namespace Box.HotUpdate.WaterSort
             CancelLiftAnims();
             foreach (var kv in _dropMaterials) Destroy(kv.Value);
             _dropMaterials.Clear();
+            foreach (var m in _pourTempMats) Destroy(m); // 动画中途销毁的兜底:临时材质一并回收
+            _pourTempMats.Clear();
             if (_liquidMaterial != null) Destroy(_liquidMaterial);
             _liquidMaterial = null;
         }
@@ -315,15 +353,22 @@ namespace Box.HotUpdate.WaterSort
             await Box.UI.BoxTween.Shake(_self.GetChild(tubeIndex), 0.28f, 14f);
         }
 
-        /// <summary>清空选中标记(提交型重建前由视图调用):取消挂着的抬/落动画,重建后各管归位基准点。</summary>
+        /// <summary>清空选中标记(提交型重建前由视图调用):取消挂着的抬/落动画,就地还原杯身染色;
+        /// 重建后各管归位基准点。倒水前调用可防收尾重建后源管残留「拎起 + 蓝染」
+        /// (动画期 RefreshTubeArea 被挂起,选中只能在这里摘)。</summary>
         public void ClearSelection()
         {
+            int prev = _selected;
             _selected = -1;
             CancelLiftAnims();
+            if (prev >= 0) ApplyTint(prev); // 就地还原染色(贴图模式;收尾整架重建本身也会重上色)
         }
 
         void OnTubeTap(int index)
         {
+            // 倒水动画中锁点击:动画期再落子会并发第二个倒水任务,收尾重建会销毁对方动画握持的
+            // 节点 → 异常且 _animating 永久为 true(输入锁/盘面刷新全挂死)
+            if (_animating) return;
             if (_selected < 0)
             {
                 SetSelected(index); // 无选中:点谁选中谁(拎起停留)
@@ -429,12 +474,14 @@ namespace Box.HotUpdate.WaterSort
 
         /// <summary>
         /// 倒水动画(总 ~0.9s;盘面在进入前已落子,本动画只演「过程」,收尾重建到真实盘面):
-        /// 1) 源管提到最上层,滑移把管口「前沿角」(旋转朝向一侧的嘴角)送到锚点(目标口上方);
-        /// 2) 绕锚点倾倒近 90°:前沿角钉在锚点(管心位 = 锚点 - R(θ)·前沿角,真实倾倒姿态),
+        /// 1) 源管提到最上层,边移动边旋转到预倾角(≤出水角,封顶 PourGlideTiltDeg,途中不漏),
+        ///    把管口「前沿角」(旋转朝向一侧的嘴角)送到锚点(目标口上方);
+        /// 2) 绕锚点倾倒:前沿角钉在锚点(管心位 = 锚点 - R(θ)·前沿角,真实倾倒姿态),倾角按
+        ///    「液面贴唇口」条件随水量自动加大(LipTheta),
         ///    液块子节点反向旋转保持屏幕水平(水面恒水平),材质 _MaskRot 反向补偿采样遮罩,
-        ///    裁剪边界贴合倾斜后的内腔剪影;转过 PourFlowStartFrac 后开始出水 —— 水流柱 +
+        ///    裁剪边界贴合倾斜后的内腔剪影;液面触及前沿角(几何推导)后开始出水 —— 水流柱 +
         ///    源管顶层 run 逐块平滑下降 + 目标管口新块同步长起(等量转移;临时材质克隆);
-        /// 3) 沿原弧转回、滑回基准位(落地回弹),销毁临时节点,整架重建并广播 PourCompleted。
+        /// 3) 不沿原弧,直接插值回基准位,销毁临时节点,整架重建并广播 PourCompleted。
         /// 途中视图销毁:destroyCancellationToken 令 UniTask.Yield 抛取消,临时节点随整架销毁。
         /// </summary>
         public async UniTaskVoid PlayPourAsync(int src, int dst, int count)
@@ -474,7 +521,6 @@ namespace Box.HotUpdate.WaterSort
                 {
                     if (srcRt.GetChild(i).name != "Drop") continue;
                     var block = (RectTransform)srcRt.GetChild(i);
-                    block.pivot = new Vector2(0.5f, 0f); // 底部锚定:液带以底边定位、向上投影
                     var img = block.GetComponent<Image>();
                     float a = bottomY + i * unitSrc;
                     // 与上一带同色 → 并入(顶边抬高,自身隐藏);异色 → 新带
@@ -489,22 +535,37 @@ namespace Box.HotUpdate.WaterSort
                     var clone = new Material(img.material); // 临时克隆,共享缓存不可动画改写
                     img.material = clone;
                     bandMats.Add(clone);
+                    _pourTempMats.Add(clone);
                     bandA.Add(a);
                     bandB.Add(a + dropH);
                 }
+                // 液带保持原始中心锚点与几何(θ=0 时带 = 原块,起手零跳变);倾倒中由
+                // UpdateBands 以「屏幕水平带」语义重定位(中心锚点,见 SetBandGeometry)
                 // 动画期放宽软边过渡带(占满羽化全程):旋转采样下窄过渡带显锯齿(楼梯感),
-                // 全带宽 ≈2~3px 柔边,观感即「液体贴玻璃」的自然过渡;动画结束随克隆材质丢弃
+                // 全带宽 ≈2~3px 柔边,观感即「液体贴玻璃」的自然过渡;动画结束经 _pourTempMats 统一销毁
                 foreach (var m in bandMats)
                 {
                     m.SetFloat(EdgeLoId, 0f);
                     m.SetFloat(EdgeHiId, 1f);
+                }
+                // 合带后立即按各带完整轴向区间重建几何(θ=0):带矩形取的是 run 最底块(仅单格高),
+                // 不在滑移前撑满的话,多格同色 run 会在整个滑移段显示成 1 格(3 蓝 → 1 蓝穿帮)。
+                // 同色合并本身视觉无损(同色块间界面不可见),撑满后 θ=0 与原块逐像素一致;
+                // yLow 的 1px 下延与 UpdateBands 在 θ=0 的取值一致,倾倒段起手零跳变
+                for (int r = 0; r < bandRects.Count; r++)
+                {
+                    float yLow0 = bandA[r] - (r == 0 ? 0f : DropOverlapPx);
+                    SetBandGeometry(bandRects[r], bandMats[r], TiltQuadWidth(0f, w, h), w, 0f,
+                        (bandB[r] + yLow0) * 0.5f, bandB[r] - yLow0, h);
                 }
 
                 // 目标管:生长块(插到 Glass 之下;颜色 = 倒入色 = 落子后目标顶层色)
                 int dstDrops = 0;
                 for (int i = 0; i < dstRt.childCount; i++)
                     if (dstRt.GetChild(i).name == "Drop") dstDrops++;
-                float unitDst = DropHeight(h, dstDrops) - DropOverlapPx;
+                // 生长块按「倒水后层数」的单格高建模:终态几何与收尾重建一致,削弱收尾整列重排的
+                // snap(新旧单格高差亚像素级,与既有液块的接缝偏差可忽略)
+                float unitDst = DropHeight(h, dstDrops + count) - DropOverlapPx;
                 float growBottom = bottomY + dstDrops * unitDst; // 新块底 = 目标当前液面
                 float growFinalH = count * unitDst + DropOverlapPx;
                 int pourColor = _session.Board.TopColor(dst); // 落子后顶层即倒入色
@@ -514,13 +575,15 @@ namespace Box.HotUpdate.WaterSort
                 grow.transform.SetSiblingIndex(dstRt.childCount - 2); // Glass(末子级)之前
                 var growMat = new Material(_liquidMaterial);
                 grow.GetComponent<Image>().material = growMat;
+                _pourTempMats.Add(growMat);
 
                 // 水流柱(挂在目标管内、Glass 之下 → 玻璃叠在水流上方,有「没入管内」的层次;
-                // 顶可伸出管外到源管口 —— 子矩形不受父矩形裁剪):粗细 ~0.11 管宽,首尾收细
+                // 顶可伸出管外到源管口 —— 子矩形不受父矩形裁剪):粗细 ~0.11 管宽,出水首尾宽度淡入淡出
                 float streamW = Mathf.Max(5f, w * 0.11f);
                 var stream = NewChild(dstRt, "PourStream", streamW, 1f, Palette[pourColor - 1], false);
                 var streamRt = (RectTransform)stream.transform;
                 stream.transform.SetSiblingIndex(dstRt.childCount - 2); // 与生长块同层(Glass 之前)
+                stream.gameObject.SetActive(false); // 滑移段隐藏:初始 1px 高色线会在目标管内穿帮,出水建立再显示
 
                 // —— 1) 滑移:把管口「前沿角」送到锚点(目标口上方)。前沿角 = 旋转朝向一侧的嘴角
                 //    (往右倒 = 顺时针 = 右嘴角是前;往左倒同理) —— 倒水时它钉在锚点上不动 ——
@@ -529,78 +592,153 @@ namespace Box.HotUpdate.WaterSort
                 var basePos = _basePositions[src];      // 动画结束落回的布局基准位
                 float dir = Mathf.Sign(dstRt.anchoredPosition.x - glideFrom.x);
                 if (dir == 0f) dir = 1f;                          // 同列:默认顺时针(往右倒)
-                float tiltRad = -dir * PourMaxTiltDeg * Mathf.Deg2Rad; // 终角(带方向)
-                var tiltQ = Quaternion.Euler(0f, 0f, tiltRad * Mathf.Rad2Deg);
                 var anchor = (Vector2)dstRt.anchoredPosition + new Vector2(0f, h * 0.5f + h * PourAnchorAboveFrac); // 锚点 = 目标「口顶端」上方,非管中心
                 var frontLocal = new Vector2(dir * w * 0.5f, h * 0.5f);   // 前沿角(管局部)
-                var pivotPos = anchor - frontLocal;                // θ=0 时前沿角恰落在锚点上的管心位
-                await Tween01(PourLiftDuration, ct, p =>
-                    srcRt.anchoredPosition = Vector2.LerpUnclamped(glideFrom, pivotPos, Box.UI.BoxTween.EaseInOutCubic(p)));
+                // 倾角全程由「液面钉在唇口」条件驱动:液面是屏幕水平线(带模型),屏幕高 = 管心高
+                // + surface·cosθ,令其恰等于唇口(= 锚点)解得 |θ| = atan(2(h/2 − surface)/w)。
+                // 倒水时液面随消减量下降、倾角自动跟大 —— 上层水正好从管口流出、下一层刚好挨着
+                // 瓶口;固定终角方案必然顾此失彼(过大把液带全挤向管口,过小则水未到口就"提前减少")
+                // 初液面(轴向)= 顶带真实顶。不可按「带底 + count」反推:部分转移(count < 顶层
+                // run 长度,如目标只剩 2 格空间)时会低估液面 → 起手液面跳变一格,且顶带被整条
+                // 倒空、收尾重建把未倒的余量「凭空弹回」(水不守恒穿帮)
+                float surface0 = bandB[bandB.Count - 1];
+                float LipTheta(float surfaceAxial) // 液面贴唇口的倾角(带方向;PourMaxTiltDeg 仅近乎倒空时触顶)
+                    => -dir * Mathf.Clamp(
+                           Mathf.Atan(2f * (h * 0.5f - surfaceAxial) / w) * Mathf.Rad2Deg, 0f, PourMaxTiltDeg)
+                       * Mathf.Deg2Rad;
+                float thStart = LipTheta(surface0); // 出水角:初液面恰触唇口
+                // 滑移段预倾角:边移动边旋转,到位时已带 θ_pre = clamp(出水角, ±30°) ——
+                // ≤出水角保证滑移途中水不涌到管口漏出;封顶防少水管一路转到近水平
+                float preTilt = Mathf.Clamp(thStart,
+                    -PourGlideTiltDeg * Mathf.Deg2Rad, PourGlideTiltDeg * Mathf.Deg2Rad);
+                var glideTo = anchor - (Vector2)(Quaternion.Euler(0f, 0f, preTilt * Mathf.Rad2Deg) * frontLocal); // 到位管心位(前沿角钉锚点 @θ_pre)
+                // θ(p) 两段式:先从预倾角倾到出水角(占 PourTipPhaseFrac,不出水);出水后按
+                // 「液面钉唇口」随消减量自动加大倾角(与 tick 内 drainAxial 同式,严格同步)
+                float TipTheta(float p)
+                {
+                    if (p <= PourTipPhaseFrac)
+                        return preTilt + (thStart - preTilt) * Box.UI.BoxTween.EaseInOutCubic(p / PourTipPhaseFrac);
+                    float fp = (p - PourTipPhaseFrac) / (1f - PourTipPhaseFrac);
+                    float drain = growFinalH * Box.UI.BoxTween.EaseInOutCubic(fp) * unitSrc / unitDst;
+                    return LipTheta(surface0 - drain);
+                }
+                // 滑移:位置滑向锚点,同步旋转到 θ_pre,液带按当前倾角重排(UpdateBands 为 local
+                // function,前向调用合法;θ=0 首帧与合带撑满几何一致,零跳变)—— 边移边转
+                await Tween01(PourLiftDuration * PourTimeScale, ct, p =>
+                {
+                    float e = Box.UI.BoxTween.EaseInOutCubic(p);
+                    float theta = preTilt * e;
+                    UpdateBands(theta, 0f, false);
+                    ApplySourceTilt(srcRt, bandRects, bandMats, theta);
+                    srcRt.anchoredPosition = Vector2.LerpUnclamped(glideFrom, glideTo, e);
+                });
 
-                // —— 2) 绕锚点倾倒:前沿角钉在锚点(管心位 = 锚点 - R(θ)·前沿角),管身扫近 90°;
-                //    液带反向旋转 + 材质补偿保水面水平;转过 PourFlowStartFrac 后开始出水,
-                //    水流 + 顶带(液面)收缩 + 目标生长块同步(等量转移)。
-                //    时长与份数成比例(PourTipPerUnitDuration × count):倒 N 份慢 N 倍,
-                //    旋转角速度随份数放慢、单份流速恒定 ——
-                // 各液带按当前倾角重建几何:轴向区间 → 屏幕水平带(高度 = 轴向跨度 × cosθ,
-                // 底边锚定在带轴向底);顶带轴向顶随已倒量下降,其余带恒定 → 层间界面静止水平
-                void UpdateBands(float theta, float topBandAxialTop)
+                // —— 2) 绕锚点倾倒:前沿角钉在锚点(管心位 = 锚点 - R(θ)·前沿角),倾角随液面下降按
+                //    「液面贴唇口」自动加大(LipTheta)—— 上层正好流出、下层刚好挨着瓶口;
+                //    液带反向旋转 + 材质补偿保水面水平。θ 两段式:先快速倾到出水角,随后边续转
+                //    边倒。液体运动 = 「管口侧消减」:顶带(被倒色)的管口侧随水量退向闭端,
+                //    下层带相对管身完全固定(游戏惯例:分层贴管,不随倒水漂移,
+                //    底层永不脱离弧底)。时长与份数成比例(PourTipPerUnitDuration × count):
+                //    倒 N 份慢 N 倍,旋转角速度随份数放慢、单份流速恒定 ——
+                // 各液带按当前倾角重建几何(屏幕水平带语义):轴向区间 [a,b] 投影到屏幕高度
+                // [a·cosθ, b·cosθ](相对管心),最底带底边下探 w·|sinθ| 贴弧 —— 高倾角下沿管轴
+                // 延伸无效(轴向位移的竖直分量 ×cosθ≈0),必须直接以屏幕高度定位。
+                // 带矩形用「中心锚点」:中心屏幕位 (0, yCenter) 反解管局部坐标
+                // (x_c = y_c·tanθ, y_c = yCenter·cosθ),带横跨管包围盒且以管为中心 ——
+                // 旧方案沿轴向反算锚点会把锚点推到管外十余倍管宽,整条带渲染在管外(水跑管外)。
+                // 顶带轴向顶随已倒量下降(管口侧消减),其余带恒定 → 层间界面稳定
+                void UpdateBands(float theta, float drainAxial, bool topEmptied)
                 {
                     float quadW = TiltQuadWidth(theta, w, h);
-                    float cosT = Mathf.Cos(theta); // |θ| < 90° 恒正
+                    float cosT = Mathf.Cos(theta);   // |θ| < 90° 恒正
+                    float tanT = Mathf.Tan(theta);
+                    float sink = w * Mathf.Abs(Mathf.Sin(theta)); // 底带屏幕下探量(贴弧补偿)
                     for (int r = 0; r < bandRects.Count; r++)
                     {
-                        float b = r == bandRects.Count - 1 ? topBandAxialTop : bandB[r];
-                        float span = Mathf.Max(0.01f, b - bandA[r]);
-                        bandRects[r].gameObject.SetActive(span * cosT > 0.02f);
-                        SetDropGeometry(bandRects[r], bandMats[r], quadW, w, bandA[r], span * cosT, h);
+                        bool isTop = r == bandRects.Count - 1;
+                        if (isTop && topEmptied)
+                        {
+                            bandRects[r].gameObject.SetActive(false); // 已倒空:回程不复现
+                            continue;
+                        }
+                        // 层带轴向区间固定(贴管);只有顶带(被倒色)的管口侧随水量消减退向闭端
+                        float a = bandA[r];
+                        float b = isTop ? Mathf.Max(a + 0.01f, surface0 - drainAxial) : bandB[r];
+                        float yB = a * cosT, yT = b * cosT;           // 底/顶边的屏幕高度(相对管心)
+                        float yLow = yB - (r == 0 ? sink : DropOverlapPx); // 最底带下探贴弧;其余带下延 1px
+                                                                           // 压住下层带顶缘(防取整发丝缝,同静置布局)
+                        float drawH = Mathf.Max(0.01f, yT - yLow);
+                        float yCenter = (yT + yLow) * 0.5f;
+                        float yC = yCenter * cosT;
+                        // 屏幕中心 x 归零的反解:x_c = y_c·tanθ(= yCenter·sinθ)。⚠ 不可写成
+                        // yCenter·tanθ:屏幕位 R(θ)·c 的 y 分量含 sin²θ/cosθ 项,倾角越大放大越狠
+                        // (60° ≈1.75 倍、87° ≈19 倍),各带会被按轴向中点原样摆回(等效管未旋转),
+                        // 层间距拉开 + 底层带整条沉到管外被裁没 —— 分层/底层体积变小/漂移出管外
+                        float xC = yC * tanT;
+                        bandRects[r].gameObject.SetActive(drawH > 0.02f);
+                        SetBandGeometry(bandRects[r], bandMats[r], quadW, w, xC, yC, drawH, h);
                     }
                 }
 
                 ServiceLocator.Audio?.PlaySfx(AudioSfx.WaterPour);
-                float tipDuration = PourTipPerUnitDuration * count;
+                float tipDuration = PourTipPerUnitDuration * count * PourTimeScale;
+                bool topEmptied = false; // 顶带(被倒的 run)已倒空:回程不复现
                 await Tween01(tipDuration, ct, p =>
                 {
-                    float theta = tiltRad * Box.UI.BoxTween.EaseInOutCubic(p);
-                    float fp = Mathf.Clamp01((p - PourFlowStartFrac) / (1f - PourFlowStartFrac)); // 出水进度
+                    float theta = TipTheta(p);
+                    float fp = Mathf.Clamp01((p - PourTipPhaseFrac) / (1f - PourTipPhaseFrac)); // 出水进度
                     float grown = growFinalH * Box.UI.BoxTween.EaseInOutCubic(fp); // 目标已涨高 = 源已降量
-                    float remaining = Mathf.Max(0.01f, count * unitSrc + DropOverlapPx - grown);
-                    UpdateBands(theta, bandA[bandA.Count - 1] + remaining); // 顶带收缩,下层带不动
+                    float drainAxial = grown * unitSrc / unitDst;     // 顶带管口侧的消减量(轴向)
+                    if (surface0 - drainAxial <= bandA[bandA.Count - 1] + 0.02f) topEmptied = true;
+                    UpdateBands(theta, drainAxial, topEmptied);
                     ApplySourceTilt(srcRt, bandRects, bandMats, theta);
                     srcRt.anchoredPosition = anchor - (Vector2)(Quaternion.Euler(0f, 0f, theta * Mathf.Rad2Deg) * frontLocal);
 
                     grow.gameObject.SetActive(grown > 0.01f);
                     SetDropGeometry(growRt, growMat, w * DropWidthFrac, w, growBottom, grown, h);
-                    // 水流柱(目标管 Glass 之下):顶 = 源管口,底 = 目标管内液面 —— 没入感
-                    var mouth = (Vector2)(srcRt.anchoredPosition - dstRt.anchoredPosition)
-                                + (Vector2)(tiltQ * new Vector3(0f, h * 0.5f, 0f));
-                    float topY = mouth.y, botY = growBottom + grown;
-                    float widthFactor = fp <= 0f ? 0f : (fp > 0.85f ? (1f - fp) / 0.15f : 1f);
+                    // 水流柱(目标管 Glass 之下):顶 = 前沿唇口(钉在锚点,目标局部系高度恒定),
+                    // 底 = 目标管内液面 —— 没入感。不可用管口中心:高倾角时它高出唇口 ~w/2,
+                    // 水流顶端会悬空飘在管外
+                    float topY = h * (0.5f + PourAnchorAboveFrac), botY = growBottom + grown;
+                    // 首尾宽度淡入/淡出:出水建立 ~8% 进度渐入,收尾 15% 渐出(瞬现/瞬断生硬)
+                    float widthFactor = fp <= 0f ? 0f
+                        : Mathf.Min(1f, fp / 0.08f) * (fp > 0.85f ? (1f - fp) / 0.15f : 1f);
+                    stream.gameObject.SetActive(widthFactor > 0.01f); // 出水建立才显示(滑移段隐藏)
                     streamRt.sizeDelta = new Vector2(streamW * Mathf.Clamp01(widthFactor), Mathf.Max(1f, topY - botY));
                     streamRt.anchoredPosition = new Vector2(0f, (topY + botY) * 0.5f);
                 });
 
-                // —— 3) 沿原弧转回(前沿角仍钉锚点)+ 滑回基准位(落地回弹) ——
-                // 回弧固定时长(不随份数放大):倒完收管干脆;要随份数可改 tipDuration * 0.55f
-                float endRemaining = Mathf.Max(0.01f, count * unitSrc + DropOverlapPx - growFinalH);
-                await Tween01(PourTipPerUnitDuration * 0.55f, ct, p =>
+                // —— 3) 收管:不沿原弧返回 —— 直接从倾倒终态(位置/终角/液带)单段插值回
+                // 基准位,位置 + 旋转 + 液带同步,干净利落(原「沿弧转回 + 落地回弹」两段太拖沓)
+                float endDrain = growFinalH * unitSrc / unitDst; // 已完成的消减量冻结(水量已转移)
+                var tiltEndPos = srcRt.anchoredPosition;         // 倾倒段终点的管心位
+                float thetaEnd = TipTheta(1f);                   // 倾倒段终角(液面贴唇口的终态角)
+                float backDur = PourBackDuration * PourTimeScale;
+                await Tween01(backDur, ct, p =>
                 {
-                    float theta = tiltRad * (1f - Box.UI.BoxTween.EaseInOutCubic(p));
-                    UpdateBands(theta, bandA[bandA.Count - 1] + endRemaining);
+                    float e = Box.UI.BoxTween.EaseInOutCubic(p);
+                    float theta = thetaEnd * (1f - e);
+                    UpdateBands(theta, endDrain, topEmptied);
                     ApplySourceTilt(srcRt, bandRects, bandMats, theta);
-                    srcRt.anchoredPosition = anchor - (Vector2)(Quaternion.Euler(0f, 0f, theta * Mathf.Rad2Deg) * frontLocal);
+                    srcRt.anchoredPosition = Vector2.LerpUnclamped(tiltEndPos, basePos, e);
                 });
-                srcRt.localRotation = Quaternion.identity;
-                await Box.UI.BoxTween.DropBounce(srcRt, pivotPos, basePos, PourBackDuration + 0.06f, ct);
+                srcRt.localRotation = Quaternion.identity; // 兜底清残角(Tween01 终值已为 0)
             }
             catch (OperationCanceledException)
             {
-                return; // 视图/架子销毁:临时节点随整架销毁,无需清理
+                return; // 视图/架子销毁:临时节点随整架销毁,临时材质由 OnDestroy 回收,无需清理
+            }
+            catch (Exception e)
+            {
+                // 意外异常兜底:记日志后照常走收尾,防 _animating 永久为 true(输入锁/盘面刷新全挂死)
+                Debug.LogException(e);
             }
 
             // —— 收尾:解锁 + 重建到真实盘面(临时节点随之销毁)+ 广播 ——
             _animating = false;
             Refresh();
+            foreach (var m in _pourTempMats) Destroy(m); // 临时材质已无引用:显式销毁(节点 Destroy 不回收材质)
+            _pourTempMats.Clear();
             PourCompleted?.Invoke();
         }
 
@@ -620,7 +758,7 @@ namespace Box.HotUpdate.WaterSort
         /// <summary>液块几何统一写入口:矩形(底部锚定)+ 软裁剪材质 _MaskST 同步更新。
         /// quadW = 矩形实际宽(可为管宽的加宽倍数,倾斜期用),遮罩 UV 按实际几何推导 ——
         /// 高度/宽度变化时矩形与遮罩采样框必须同步,否则剪影会随缩放变形
-        /// (不可用 localScale 做液面动画的原因)。</summary>
+        /// (不可用 localScale 做液面动画的原因)。目标管生长块用(竖直管,底部锚定)。</summary>
         static void SetDropGeometry(RectTransform rt, Material mat, float quadW, float tubeW, float bottomY, float height, float h)
         {
             rt.sizeDelta = new Vector2(quadW, Mathf.Max(0.01f, height));
@@ -633,8 +771,27 @@ namespace Box.HotUpdate.WaterSort
             }
         }
 
+        /// <summary>液带几何写入口(中心锚定):带矩形是屏幕水平带,中心屏幕位 (xC, yC)(相对管心,
+        /// h 单位)反解出的管局部坐标,尺寸 (quadW, drawH)。_MaskST 按中心/尺寸推导 ——
+        /// 软裁剪补偿(_MaskRot 枢轴 = 带中心 UV,见 ApplySourceTilt)对此精确,与锚点位置无关。
+        /// 中心锚定的意义:带永远以管为中心横跨包围盒,不会因锚点远偏把整条带甩到管外。</summary>
+        static void SetBandGeometry(RectTransform rt, Material mat, float quadW, float tubeW,
+            float xC, float yC, float drawH, float tubeH)
+        {
+            rt.anchoredPosition = new Vector2(xC, yC);
+            rt.sizeDelta = new Vector2(quadW, Mathf.Max(0.01f, drawH));
+            if (mat != null)
+            {
+                float wFrac = quadW / tubeW, hFrac = drawH / tubeH;
+                mat.SetVector(MaskSTId, new Vector4(
+                    0.5f + xC / tubeW - wFrac * 0.5f,
+                    0.5f + yC / tubeH - hFrac * 0.5f,
+                    wFrac, hFrac));
+            }
+        }
+
         /// <summary>倾角 θ 下液块所需的屏幕宽 = 旋转后管矩形的包围盒宽(w·|cosθ| + h·|sinθ|)
-        /// + 羽化余量 —— 内腔水平跨度随倾角增大(78° 时 ≈3.9 倍管宽),水平液块必须盖满两壁,
+        /// + 羽化余量 —— 内腔水平跨度随倾角增大(最大倾角下 ≈4 倍管宽),水平液块必须盖满两壁,
         /// 否则露出液块自身直边(几何硬边,「楼梯/错位」的成因);超宽部分由遮罩裁掉 + UV 夹紧,
         /// θ=0 时自然回归常态宽。</summary>
         static float TiltQuadWidth(float thetaRad, float w, float h)
@@ -642,9 +799,9 @@ namespace Box.HotUpdate.WaterSort
 
         /// <summary>源管倾斜姿态(三件套配对,缺一即穿帮):① 管体根节点旋转 θ(瓶身/玻璃随动);
         /// ② 液带子节点反向旋转 θ 保持屏幕水平(水面恒水平);③ 各带临时材质 _MaskRot =
-        /// (cosθ, sinθ, 液带底部中心UV) —— 片元采样遮罩前把 UV 绕该枢轴(经 _MaskAspect 等比
+        /// (cosθ, sinθ, 液带中心UV) —— 片元采样遮罩前把 UV 绕该枢轴(经 _MaskAspect 等比
         /// 空间)旋回试管空间,裁剪边界贴合倾斜后的内腔。补偿枢轴必须与液带反向旋转的枢轴
-        /// (底部中心,pivot 已归一为 (0.5,0))同点;带几何由调用方先经 UpdateBands 刷新。</summary>
+        /// (带中心,pivot 为 (0.5,0.5))同点;带几何由调用方先经 UpdateBands 刷新。</summary>
         static void ApplySourceTilt(RectTransform root, List<RectTransform> rects, List<Material> mats, float thetaRad)
         {
             root.localRotation = Quaternion.Euler(0f, 0f, thetaRad * Mathf.Rad2Deg); // 管体倾斜
@@ -656,7 +813,8 @@ namespace Box.HotUpdate.WaterSort
                 var m = mats[i];
                 if (m == null) continue;
                 var st = m.GetVector(MaskSTId);
-                m.SetVector(MaskRotId, new Vector4(rot.x, rot.y, st.x + st.z * 0.5f, st.y)); // 枢轴 = 带底中心
+                m.SetVector(MaskRotId, new Vector4(rot.x, rot.y,
+                    st.x + st.z * 0.5f, st.y + st.w * 0.5f)); // 枢轴 = 带中心
             }
         }
 
