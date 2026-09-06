@@ -49,7 +49,7 @@ for c in range(W):
     mask[b + 1:, c] = 0
 
 # 0.8px 高斯羽化 → alpha 渐变边(软裁剪 shader 的抗锯齿来源)
-alpha = Image.fromarray(mask, 'L').filter(ImageFilter.GaussianBlur(0.8))
+alpha = Image.fromarray(mask, 'L').filter(ImageFilter.GaussianBlur(1.1))
 a = np.array(alpha)
 
 # 羽化尾迹约束:二值剪影之外、玻璃壁线带之外(alpha<0.4,即外壁柔光/背景)的

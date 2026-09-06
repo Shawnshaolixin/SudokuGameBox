@@ -116,8 +116,9 @@ namespace Box.Services
         /// <summary>胜利(临时占位,待正式 fanfare 替换,见 TODO;模块独有)。</summary>
         public const string Win = "mod:switch38";
 
-        /// <summary>水排序倒水(临时占位,复用 switch 系;待正式 liquid 音效替换;模块独有)。</summary>
-        public const string WaterPour = "mod:watersort/pour1";
+        /// <summary>水排序倒水(临时占位,复用 switch 系;待正式 liquid 音效替换;模块独有)。
+        /// 注意 Addressables key 区分大小写,模块段须与注册地址 WaterSort/Audio/... 同大小写。</summary>
+        public const string WaterPour = "mod:WaterSort/pour1";
     }
 
     /// <summary>

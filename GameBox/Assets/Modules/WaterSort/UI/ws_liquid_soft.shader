@@ -15,7 +15,8 @@ Shader "Box/UI/WaterSortLiquid"
         [PerRendererData] _MainTex ("Sprite Texture", 2D) = "white" {}
         _MaskTex ("内腔剪影遮罩(仅用 alpha)", 2D) = "white" {}
         _MaskST ("液块UV平移(xy)缩放(zw)", Vector) = (0, 0, 1, 1)
-        _MaskRot ("旋转补偿(xy=cos,sin;zw=液块中心UV)", Vector) = (1, 0, 0, 0)
+        _MaskRot ("旋转补偿(xy=cos,sin;zw=液块底部中心UV)", Vector) = (1, 0, 0, 0)
+        _MaskAspect ("管屏幕宽高比(w/h,旋转换算到等比空间)", Float) = 4.6
         _EdgeLo ("软边下限(遮罩alpha)", Float) = 0.05
         _EdgeHi ("软边上限(遮罩alpha)", Float) = 0.5
         _Color ("Tint", Color) = (1, 1, 1, 1)
@@ -101,6 +102,7 @@ Shader "Box/UI/WaterSortLiquid"
             // 裁剪边界即贴合倾斜后的内腔剪影(推导见 WaterSortTubeRack.AnimatePourRotate)。
             // xy=(cosθ, sinθ)(θ=试管根节点旋转角),zw=液块中心(遮罩UV空间);默认恒等。
             float4 _MaskRot;
+            float _MaskAspect;
             float _EdgeLo;
             float _EdgeHi;
 
@@ -122,11 +124,18 @@ Shader "Box/UI/WaterSortLiquid"
                 // 内腔软裁剪:遮罩 alpha 在 [EdgeLo, EdgeHi] 区间平滑重映射。
                 // 剪影贴图边缘有 1~2px 羽化,此处过渡带完全落在羽化内 → 抗锯齿;
                 // EdgeHi 以下全裁、以上全留,管内主体 alpha 不受影响。
-                // 先做旋转补偿(_MaskRot 恒等时零开销等价):UV 绕液块中心旋 -θ 回试管空间。
+                // 旋转补偿(_MaskRot 恒等时零开销等价):把片元 UV 偏移绕液块底部中心旋 -θ
+                // 回试管空间。⚠ 旋转必须在等比空间做 —— 试管 96×400(1:4.2),归一化 UV 空间里
+                // 的 32° 不是屏幕上的 32°,直接转会把采样区域扭得完全错位(液体露成方块/全消失)。
+                // 故 x 先乘管屏幕宽高比换算到「管高为单位」的等比空间,旋转后再换算回来。
+                // 采样 UV 夹回贴图范围:倾斜动画期液块加宽越出 [0,1],遮罩贴图是 Repeat 包装,
+                // 越界会回卷出错误 alpha;遮罩四边空白(alpha=0),夹回即等效全裁。
                 float2 o = IN.maskUV - _MaskRot.zw;
+                o = float2(o.x * _MaskAspect, o.y);                   // → 等比空间(管高单位)
                 o = float2(o.x * _MaskRot.x + o.y * _MaskRot.y,
-                           o.y * _MaskRot.x - o.x * _MaskRot.y); // Rot(-θ)
-                half m = tex2D(_MaskTex, _MaskRot.zw + o).a;
+                           o.y * _MaskRot.x - o.x * _MaskRot.y);      // Rot(-θ)
+                o = float2(o.x / _MaskAspect, o.y);                   // → UV 空间
+                half m = tex2D(_MaskTex, clamp(_MaskRot.zw + o, 0.002, 0.998)).a;
                 color.a *= smoothstep(_EdgeLo, _EdgeHi, m);
 
                 #ifdef UNITY_UI_CLIP_RECT
