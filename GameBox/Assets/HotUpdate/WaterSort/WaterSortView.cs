@@ -32,6 +32,8 @@ namespace Box.HotUpdate.WaterSort
     ///   DailyPanel/Title | StateText | StreakText | PlayButton | BackButton  每日主页(M2.3;完成态/Streak/重玩)
     ///   AdPanel/Card/MessageText | ConfirmButton | CancelButton  激励确认面板(M3.1 内嵌,见退出纪律)
     ///   WinOverlay                           运行期生成胜利弹层(遮罩 + ws_win_title 图;见 BuildWinOverlay)
+    ///   [运行期画布级]Backdrop               海洋背景全屏节点(不落 prefab,见 EnsureBackdropAsync ——
+    ///                                        SafeAreaFitter 只内缩视图根,画布级兄弟不受限,真机不露错边)
     ///
     /// 选关页/结算页已删(2026-09-06 改造):每日挑战入口隐藏,仅模块 args="daily" 可达
     /// (WaterSortModule.OnEnter);过关不再出结算面板 —— 弹胜利图 3 秒后自动进下一关
@@ -71,6 +73,7 @@ namespace Box.HotUpdate.WaterSort
         TextMeshProUGUI _coinLabel;              // 对局顶栏金币余额(随消费/发奖就近刷新)
         GameObject _winOverlay;                  // 过关胜利弹层(运行期代码生成:遮罩 + ws_win_title;见 BuildWinOverlay)
         Transform _winTitle;                     // 胜利标题节点(弹出动画对象)
+        GameObject _backdrop;                    // 画布级全屏背景(海洋图;随视图显隐/销毁,见 EnsureBackdropAsync)
         bool _winShowing;                        // 胜利弹层播放中(防重入;3 秒自动跳关)
         readonly Dictionary<string, Sprite> _skinSprites = new Dictionary<string, Sprite>(); // 皮肤图缓存(见 LoadSkin)
         Transform _adPanel;                      // 内嵌激励确认面板(WS-12;不进 Router,见类头退出纪律)
@@ -94,6 +97,7 @@ namespace Box.HotUpdate.WaterSort
         const string SkinRestart = "WaterSort/UI/ws_btn_restart_flat";
         const string SkinExtra = "WaterSort/UI/ws_btn_extra_flat";
         const string SkinWinTitle = "WaterSort/UI/ws_win_title";
+        const string SkinBg = "WaterSort/UI/ws_bg_ocean"; // 对局背景(运行时迁画布级全屏,见 EnsureBackdropAsync)
 
         const float WinPopSeconds = 0.35f; // 胜利标题弹入动画时长(EaseOutBack 回弹)
         const float WinHoldSeconds = 3f;   // 胜利弹层停留时长(需求:过 3 秒自动进下一关)
@@ -141,6 +145,7 @@ namespace Box.HotUpdate.WaterSort
             Bind("AdPanel/Card/ConfirmButton", OnAdConfirm); // 激励确认:关闭面板 → 伪视频直发/真激励
             Bind("AdPanel/Card/CancelButton", OnAdCancel);   // 取消:只关面板(不发放)
             BuildGameSkinAsync().Forget(); // 皮肤接入:按钮换图 + 胜利标题预热(异步,图缺失保持文字兜底)
+            EnsureBackdropAsync().Forget(); // 背景迁画布级全屏:图到即铺(缺失保缩进旧观感,不阻塞玩法)
             return UniTask.CompletedTask;
         }
 
@@ -150,6 +155,7 @@ namespace Box.HotUpdate.WaterSort
             // 不复位则异步渲染续体(RenderLevelSelect/RenderDailyHomeAsync 的 _leaving 早退守卫)
             // 误判"正在退出"而返回 → 二次进入选关空列表/按钮禁点(Bug 清单 7 伴随根因)。
             _leaving = false;
+            if (_backdrop != null) _backdrop.SetActive(true); // 背景随视图显隐(画布级兄弟不随视图根自动隐藏)
             _solvedPending = false; // 新入口新会话:上一局压住标记不可能再有,防御性复位
             // 胜利弹层复位:视图缓存复用(退模块时弹层可能停在中途,见 PlayWinThenAdvanceAsync 早退守卫),
             // 重进必须清 _winShowing 与弹层显隐,否则输入锁/遮罩残留卡死新会话
@@ -177,6 +183,8 @@ namespace Box.HotUpdate.WaterSort
 
         protected override UniTask OnHide()
         {
+            // 背景跟随显隐:视图被覆盖/退模块即收起(画布级兄弟不会随视图根自动隐藏)
+            if (_backdrop != null) _backdrop.SetActive(false);
             if (!_leaving)
             {
                 // OnHide 仅由「本视图被 Pop」触发(见类头退出纪律):关闭即离开模块 → 复位模块状态,
@@ -192,6 +200,7 @@ namespace Box.HotUpdate.WaterSort
         private new void OnDestroy()
         {
             UnsubscribeSession(); // 先退订会话事件,防旧会话实例残留引用(模块每次进入新建会话)
+            if (_backdrop != null) Destroy(_backdrop); // 画布级背景随视图销毁(防层残留盖住下层视图)
         }
 
         // ---- 面板切换 ---- //
@@ -620,6 +629,49 @@ namespace Box.HotUpdate.WaterSort
                 tcs.TrySetResult(sp);
             });
             return await tcs.Task;
+        }
+
+        // ---- 背景穿透安全区(2026-09-07 真机验收反馈:背景被安全区框住露错边) ----
+
+        /// <summary>
+        /// 把对局背景铺满含刘海/底条的全屏。根因:UIView.Awake 统一给视图根挂 SafeAreaFitter,运行帧把根锚点
+        /// 改写为安全区内缩矩形 → 画在根内(如 GamePanel 上的背景图)跟着缩,真机刘海/挖孔区露错边。
+        /// 解法与 2026-08-29 场景根 FullscreenBackgroundSetup 同思路:背景独立成视图所在画布层的直接子节点,
+        /// 全屏 stretch、不挂 SafeAreaFitter —— 永远铺满;视图根保持内缩(内容继续避让刘海)。
+        /// 编辑器里挂在 GamePanel 的原背景运行时清空(双叠同屏会因尺寸差显错边;节点保留,编辑器回看仍是图)。
+        /// 图缺失(未入组/构建漏检)→ 保持缩进旧观感,不阻塞玩法。同视图仅建一次(缓存复用路径已建即早退)。
+        /// </summary>
+        async UniTask EnsureBackdropAsync()
+        {
+            if (_backdrop != null || transform.parent == null) return; // 已建 / 尚未入画布层(理论不发生)
+            var sprite = await LoadSkinAsync(SkinBg);
+            if (sprite == null || this == null) return; // 加载失败或视图已销毁:维持原样
+            // 编辑器调好的底色/类型抄一份(可能带暗调/透度),先取再清原图
+            var src = _gamePanel != null ? _gamePanel.GetComponent<Image>() : null;
+
+            var bg = new GameObject("Backdrop", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            bg.transform.SetParent(transform.parent, false); // 画布级兄弟:视图根的 SafeAreaFitter 管不到它
+            bg.transform.SetSiblingIndex(transform.GetSiblingIndex()); // 插在视图身后(盖住层内旧物,被后续弹层自然盖过)
+            var rt = (RectTransform)bg.transform;
+            rt.anchorMin = Vector2.zero; // 全屏 stretch(画布即全屏,含刘海/挖孔/底条)
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = rt.offsetMax = Vector2.zero;
+            var img = bg.GetComponent<Image>();
+            img.sprite = sprite;
+            img.type = src != null ? src.type : Image.Type.Simple;
+            img.preserveAspect = src != null && src.preserveAspect;
+            img.color = src != null ? src.color : Color.white;
+            img.raycastTarget = false; // 纯背景不拦点击(事件派发自上层图像,天然不受影响,双保险)
+
+            if (src != null)
+            {
+                src.sprite = null; // 原缩进背景清空:海洋由画布级节点全屏呈现
+                var c = src.color;
+                c.a = 0f;
+                src.color = c;
+                src.raycastTarget = false;
+            }
+            _backdrop = bg;
         }
 
         // ---- 胜利弹层与自动跳关(2026-09-06 改造:结算面板删除后唯一过关呈现) ----
