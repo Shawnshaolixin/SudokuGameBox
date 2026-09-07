@@ -21,12 +21,6 @@ MonoBehaviour:
     m_SerializedLabels:
     - Art
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 095b9a0cd37ef2947a2fcd21547d39b5
-    m_Address: Art/Audio/SFX/switch34
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Art
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0a0e09d3c1c046540a366ff93276a0ae
     m_Address: Art/UI/Buttons/DailyChallenge_2_btn
     m_ReadOnly: 0
@@ -473,12 +467,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: cf1050503d8ab8f41a43245a703959c4
     m_Address: Art/Audio/SFX/switch6
-    m_ReadOnly: 0
-    m_SerializedLabels:
-    - Art
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: d06503ccbb413134abed6f2718780a97
-    m_Address: Art/Audio/SFX/rollover6
     m_ReadOnly: 0
     m_SerializedLabels:
     - Art

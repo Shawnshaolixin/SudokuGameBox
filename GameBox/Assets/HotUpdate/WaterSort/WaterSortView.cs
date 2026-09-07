@@ -151,6 +151,9 @@ namespace Box.HotUpdate.WaterSort
 
         protected override async UniTask OnShow(object args)
         {
+            // 水排序场景静默:大厅 BGM 不搭对局,暂停保进度(视图退出 OnHide 恢复续播)。
+            // 视图缓存复推会再次 OnShow,PauseBgm 幂等(未播时无操作)。
+            ServiceLocator.Audio?.PauseBgm();
             // 缓存视图复推(UIRouter 命中缓存直接 OnShow,见 Router.PushAsync):复位退模块标记。
             // 不复位则异步渲染续体(RenderLevelSelect/RenderDailyHomeAsync 的 _leaving 早退守卫)
             // 误判"正在退出"而返回 → 二次进入选关空列表/按钮禁点(Bug 清单 7 伴随根因)。
@@ -183,6 +186,8 @@ namespace Box.HotUpdate.WaterSort
 
         protected override UniTask OnHide()
         {
+            // 离开水排序场景(Pop 回大厅/主页):恢复大厅 BGM —— 与 OnShow 的 PauseBgm 配对,原位续播
+            ServiceLocator.Audio?.ResumeBgm();
             // 背景跟随显隐:视图被覆盖/退模块即收起(画布级兄弟不会随视图根自动隐藏)
             if (_backdrop != null) _backdrop.SetActive(false);
             if (!_leaving)
@@ -740,6 +745,9 @@ namespace Box.HotUpdate.WaterSort
             // 胜利彩带与弹层同刻播放(需求:过关加特效):爆点取画面中心偏下(y=-330 ≈ 下 1/3 处),
             // 花束由下而上贯穿标题漫全屏 —— 玩家视野重心在下半屏,爆点随之下移(2026-09-07 验收反馈)
             // (渲染在标题之上 —— Play 内部自建 WinConfetti 子节点,是遮罩/标题后的末位兄弟)
+            // 结算胜利乐(win.wav,2026-09-07):与彩带撒花同刻起播 —— 乐段 ~1s(44.1k/16bit/立体声)
+            // 远小于弹层停留 3s,自然收尾不越界进下一关,无需掐断(若换长乐段须配 StopSfx)
+            ServiceLocator.Audio?.PlaySfx(AudioSfx.WaterWin);
             WaterSortWinConfetti.Play(overlay.transform, new Vector2(0f, -330f));
             // 弹入:遮罩淡入与标题回弹并行(EaseOutBack 中段过冲 = 「弹」感)
             BoxTween.FadeTo(overlay, 0f, 1f, 0.25f).Forget();

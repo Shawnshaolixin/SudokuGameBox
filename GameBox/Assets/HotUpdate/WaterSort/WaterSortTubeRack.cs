@@ -5,6 +5,7 @@ using Box.Services;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
+using WaterSort.Core; // WaterSortBoard(容量/取层)与盘面规则同源
 
 namespace Box.HotUpdate.WaterSort
 {
@@ -384,6 +385,7 @@ namespace Box.HotUpdate.WaterSort
             // 直接把选中切换到新点的管(旧管落回、新管拎起)
             if (IsPourable(_selected, index))
             {
+                ServiceLocator.Audio?.PlaySfx(AudioSfx.WaterDrop); // 点目标管"放下"(倒水 pour 音在动画期接续)
                 PourRequested?.Invoke(_selected, index);
                 return;
             }
@@ -409,6 +411,10 @@ namespace Box.HotUpdate.WaterSort
             _selected = index;
             if (prev >= 0 && prev != index) AnimateLift(prev, false); // 旧选中落回
             if (index >= 0) AnimateLift(index, true);                 // 新选中拎起
+            // 拾/放音效(2026-09-07):拎起选中 = pick;取消落回 = drop。换选(旧落新起)只响 pick
+            // 不多音;合法倒水的"放下"点击音另在 OnTubeTap 发请求处(drop 与动画期 pour 错峰)
+            if (index >= 0) ServiceLocator.Audio?.PlaySfx(AudioSfx.WaterPick);
+            else ServiceLocator.Audio?.PlaySfx(AudioSfx.WaterDrop);
             ApplyTint(prev);
             ApplyTint(index);
         }
@@ -708,6 +714,28 @@ namespace Box.HotUpdate.WaterSort
                     streamRt.anchoredPosition = new Vector2(0f, (topY + botY) * 0.5f);
                 });
 
+                // 倒完水即停音(2026-09-07):pour.wav 长于动画,任其播完会把拖尾带进「收管+结算」,
+                // 听感像动作已停声还在响 —— 「一响一动作」纪律:动作终点主动掐断(未播完才停,无操作无害)
+                ServiceLocator.Audio?.StopSfx(AudioSfx.WaterPour);
+
+                // 某管被倒满凑齐一管的提示音(tube_full,2026-09-07):与「液面到顶」同帧响。
+                // 满管同色只可能由本手新成(TryPour 落子后满管即无空间再收水;满块禁倒空管的剪枝
+                // 也排除"倒满空管"歧义),故只查目标管终态 4 层同色即可 —— 盘面在动画期已是
+                // 落子后终态(架子刷新挂起,见 RefreshTubeArea),不必回推倒前状态
+                var bFull = _session?.Board;
+                if (bFull != null && !bFull.IsSolved()) // 终局那手抑制:1s 提示与 ~0.4s 后起的胜利乐叠音
+                {
+                    bool completed = false;
+                    if (bFull.TopCount(dst) == WaterSortBoard.Capacity)
+                    {
+                        completed = true; // 满且 4 层同色 = 凑齐一管(容量 4 恒成立,见 WaterSortBoard)
+                        byte c = bFull.Get(dst, 0);
+                        for (int i = 1; i < WaterSortBoard.Capacity; i++)
+                            if (bFull.Get(dst, i) != c) { completed = false; break; }
+                    }
+                    if (completed) ServiceLocator.Audio?.PlaySfx(AudioSfx.WaterTubeFull);
+                }
+
                 // —— 3) 收管:不沿原弧返回 —— 直接从倾倒终态(位置/终角/液带)单段插值回
                 // 基准位,位置 + 旋转 + 液带同步,干净利落(原「沿弧转回 + 落地回弹」两段太拖沓)
                 float endDrain = growFinalH * unitSrc / unitDst; // 已完成的消减量冻结(水量已转移)
@@ -726,6 +754,7 @@ namespace Box.HotUpdate.WaterSort
             }
             catch (OperationCanceledException)
             {
+                ServiceLocator.Audio?.StopSfx(AudioSfx.WaterPour); // 半途销毁同掐断:不留倒水拖尾
                 return; // 视图/架子销毁:临时节点随整架销毁,临时材质由 OnDestroy 回收,无需清理
             }
             catch (Exception e)

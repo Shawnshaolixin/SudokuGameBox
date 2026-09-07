@@ -82,6 +82,18 @@ namespace Box.Services
         /// <summary>播放短音效(首次异步加载并缓存,此后零延迟;音效开关关闭时静默跳过)。</summary>
         void PlaySfx(string name);
 
+        /// <summary>停止指定音效(池中正在播该音效的源才停;若异步加载尚未完成,加载完成后放弃本次播放)。
+        /// 用途:「一响一动作」纪律 —— 音效时长不得超过所配音的动作,动作/动画结束时主动掐断,
+        /// 防"动作已停、声音还在响"的拖尾(如倒水音须在倒完水那帧结束)。</summary>
+        void StopSfx(string name);
+
+        /// <summary>暂停 BGM(保留播放进度;音效不受影响)。玩法需要静默的场景
+        /// (如对局内不放大厅音乐的水排序)进入时调用,退出后 ResumeBgm 原位续播。</summary>
+        void PauseBgm();
+
+        /// <summary>恢复被 PauseBgm 暂停的 BGM(与 PauseBgm 配对;音乐开关关闭时不强播,尊重偏好)。</summary>
+        void ResumeBgm();
+
         /// <summary>切换 BGM 并循环播放(音乐开关关闭时只缓存不播,开启后续播)。</summary>
         void PlayBgm(string name);
 
@@ -116,9 +128,23 @@ namespace Box.Services
         /// <summary>胜利(临时占位,待正式 fanfare 替换,见 TODO;模块独有)。</summary>
         public const string Win = "mod:switch38";
 
-        /// <summary>水排序倒水(临时占位,复用 switch 系;待正式 liquid 音效替换;模块独有)。
+        /// <summary>水排序:点试管抬起(选中;pick.ogg,2026-09-07 正式音效替换 switch34 系)。
         /// 注意 Addressables key 区分大小写,模块段须与注册地址 WaterSort/Audio/... 同大小写。</summary>
-        public const string WaterPour = "mod:WaterSort/pour1";
+        public const string WaterPick = "mod:WaterSort/pick";
+
+        /// <summary>水排序:点自己取消选中 / 点目标管放下(drop.ogg;替换 rollover6 系)。</summary>
+        public const string WaterDrop = "mod:WaterSort/drop";
+
+        /// <summary>水排序:倒水动画音(pour.wav;替换临时占位 pour1)。</summary>
+        public const string WaterPour = "mod:WaterSort/pour";
+
+        /// <summary>水排序:某管被倒满凑齐一管(tube_full.wav,原 finish.wav 语义化改名 2026-09-07;
+        /// 与倒水动画「液面到顶」同帧响,见 WaterSortTubeRack.PlayPourAsync)。</summary>
+        public const string WaterTubeFull = "mod:WaterSort/tube_full";
+
+        /// <summary>水排序:过关结算胜利乐(win.wav,原「结算页面.wav」改名 2026-09-07;
+        /// 与胜利弹层撒花彩带同刻起播,见 PlayWinThenAdvanceAsync)。</summary>
+        public const string WaterWin = "mod:WaterSort/win";
     }
 
     /// <summary>

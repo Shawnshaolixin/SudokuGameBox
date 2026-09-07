@@ -6,7 +6,8 @@ namespace Box.Gameplay
 {
     /// <summary>
     /// 音频服务实现(Phase 8 体验打磨:音频系统)。
-    /// 职责:BGM 循环(全局常驻,主菜单/对局不断音)+ SFX 播放(SFX 源池轮转,连点不丢音)+ 偏好联动(开关即时生效)。
+    /// 职责:BGM 循环(全局常驻,玩法层可暂停/续播 —— 如对局静默的水排序,PauseBgm/ResumeBgm)
+    /// + SFX 播放(SFX 源池轮转,连点不丢音;StopSfx 掐断拖尾)+ 偏好联动(开关即时生效)。
     /// 架构:经 IAssetService(Addressables)异步加载 AudioClip 并缓存——首次播放有异步延迟,此后零延迟;
     /// 热更侧只调 IAudioService 接口(11 文档:Addressables/SDK 只在壳层)。
     /// 设计取舍:v1.0 仅 1 首 BGM + 短 SFX,用 AudioSource 分层音量(常量)即可,不引入 AudioMixer 资产;
@@ -29,6 +30,7 @@ namespace Box.Gameplay
         readonly ISettingsService _settings;
         readonly Dictionary<string, AudioClip> _sfxCache = new(); // 已加载 SFX 缓存(命中即播,免重复异步加载)
         readonly Dictionary<string, AudioClip> _bgmCache = new();
+        readonly HashSet<string> _stopPending = new(); // StopSfx 点名时尚未加载完成的名字:加载到达后放弃播放并清除
         readonly AudioSource[] _sfxPool;
         int _sfxCursor;
 
@@ -105,8 +107,10 @@ namespace Box.Gameplay
             // 首次播放:异步加载,完成后直接播(此后缓存命中零延迟)
             _assets?.LoadAsset<AudioClip>(address, clip =>
             {
+                bool stopRequested = _stopPending.Remove(name); // 点名记录无论成败都先清(防失败加载悬挂)
                 if (clip == null) return;
                 _sfxCache[name] = clip;
+                if (stopRequested) return; // 动作先于声音就绪(已掐断):放弃本次播放
                 if (_settings != null && !_settings.SoundEnabled) return; // 加载期间用户关了音效:放弃本次
                 PlayClip(clip);
             });
@@ -165,6 +169,37 @@ namespace Box.Gameplay
             {
                 _bgmSource.Stop();
             }
+        }
+
+        /// <summary>掐断指定音效的当前播放(池内正播该音效的源 Stop;同 clip 只可能来自同一动作重入,全停无害)。
+        /// PlayOneShot 播完不自动清 clip 引用,须以 isPlaying 判定"是否正在播";缓存未命中(加载途中)
+        /// 记入 _stopPending,加载完成回调放弃本次 —— 保证「动作先结束、声音后到位」时不响这一枪
+        /// (点名单在回调内无论成败都清除,防悬挂)。</summary>
+        public void StopSfx(string name)
+        {
+            if (string.IsNullOrEmpty(name) || _sfxPool.Length == 0) return;
+            if (!_sfxCache.TryGetValue(name, out var clip))
+            {
+                _stopPending.Add(name);
+                return;
+            }
+            foreach (var src in _sfxPool)
+                if (src != null && src.isPlaying && src.clip == clip) src.Stop();
+        }
+
+        /// <summary>暂停 BGM(保留进度;未在播时无操作)。玩法静默场景进入时调用,退出配 ResumeBgm。</summary>
+        public void PauseBgm()
+        {
+            if (_bgmSource != null && _bgmSource.isPlaying) _bgmSource.Pause();
+        }
+
+        /// <summary>恢复 BGM(与 PauseBgm 配对;从暂停位置原位续播,不重头)。音乐开关关闭时维持静音,
+        /// 由 SetMusicEnabled(true) 负责之后的开播;clip 未加载(理论上不会:BGM 初始化即播)也静默跳过。</summary>
+        public void ResumeBgm()
+        {
+            if (_bgmSource == null || _bgmSource.clip == null) return;
+            if (_settings != null && !_settings.MusicEnabled) return;
+            if (!_bgmSource.isPlaying) _bgmSource.UnPause();
         }
 
         void PlayClip(AudioClip clip)

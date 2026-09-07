@@ -84,12 +84,13 @@ public static class WaterSortSkinImporter
                 WaterSortViewSetup.EnsureEntry(path, AddressOf(path));
             }
         }
-        // 模块音效(Audio/*.ogg,21 文档 §6.5):地址 WaterSort/Audio/{名},AudioManager 以
-        // "mod:watersort/{名}" 路由到本目录 —— 占位 pour1 与后续正式音效放对目录即自动入组
-        // (路径必须规范化,EnsureEntry 不认带 .. 的相对路径)
+        // 模块音效(Audio/*.ogg / *.wav,21 文档 §6.5):地址 WaterSort/Audio/{名},AudioManager 以
+        // "mod:WaterSort/{名}" 路由到本目录 —— pick(抬起)/drop(放下)/pour(倒水)放对目录即自动入组
+        // (路径必须规范化,EnsureEntry 不认带 .. 的相对路径;.wav 与 .ogg 同扫同校验)
         if (Directory.Exists(AudioDir))
         {
-            foreach (var file in Directory.GetFiles(AudioDir, "*.ogg"))
+            foreach (var ext in new[] { "*.ogg", "*.wav" })
+            foreach (var file in Directory.GetFiles(AudioDir, ext))
             {
                 var path = file.Replace('\\', '/');
                 var name = System.IO.Path.GetFileNameWithoutExtension(path);
