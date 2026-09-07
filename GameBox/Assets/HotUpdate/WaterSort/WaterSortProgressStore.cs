@@ -58,5 +58,31 @@ namespace Box.HotUpdate.WaterSort
             Save(data);
             return true;
         }
+
+        // ---- 半局快照(二期:入口直达 + 续玩;单槽,仅保存最近一盘未完成的常规局) ---- //
+
+        /// <summary>读半局快照(无则 null)。关号匹配与盘面合法性由会话侧 StartLevel 校验。</summary>
+        public static WaterSortRunData LoadRun()
+        {
+            return Load()?.run;
+        }
+
+        /// <summary>写半局快照(单槽覆盖;视图在盘面变更后调用,已动手才写)。</summary>
+        public static void SaveRun(WaterSortRunData run)
+        {
+            if (run == null) return;
+            var data = Load();
+            data.run = run;
+            Save(data);
+        }
+
+        /// <summary>清半局快照(通关/重开/全新开局;无快照幂等)。</summary>
+        public static void ClearRun()
+        {
+            var data = Load();
+            if (data?.run == null) return;
+            data.run = null;
+            Save(data);
+        }
     }
 }

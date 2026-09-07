@@ -17,7 +17,8 @@ using WaterSort.Core;
 ///
 /// ① 新建 Modules/WaterSort/Prefabs/WaterSortView.prefab —— 热更视图不进 prefab 序列化(20 文档 §4):
 ///    根挂 AOT HotViewBinder(viewTypeFullName = WaterSortView),运行期动态 AddComponent(UIView 由桥挂回)。
-///    节点树严格按 WaterSortView 类头契约命名(标题/五列选关网格/对局三栏/结算列);
+///    节点树严格按 WaterSortView 类头契约命名(对局三栏/每日主页/激励确认面板;选关页与结算页
+///    2026-09-06 收口已下线);按钮为方块皮肤图承载(底栏四钮 190 方块、两处返回钮 150 方块),
 ///    试管区与液块由运行期 WaterSortTubeRack 代码绘制,prefab 只提供容器(几何 1080x1920 中心锚布局)。
 ///    文本不预赋字体:工程 TMP Settings 默认 MiSans 动态字体(FontSetup 后所有新建 TMP 免赋)。
 /// ② 关卡 JSON(Assets/Modules/WaterSort/Data/regular_levels.json):按关号 1..N 调 WaterSortGenDefaults.
@@ -25,8 +26,9 @@ using WaterSort.Core;
 ///    与运行期加载结构 WaterSortLevelPack 同源(JsonUtility 反序列化直读)。
 /// ③ 全部入新建组 Game_WaterSort(PRD WS-20 组名;prefab 地址 UI/WaterSortView = WaterSortModule.
 ///    MainViewAddress;JSON 地址 WaterSort/Levels/regular_levels.json = WaterSortLevelStore.LevelsAddress)。
-/// ④ 幂等补建 M1.4 节点(底栏四钮布局/结算奖励行,几何校准重复执行零写入)+ 模块清单接入
-///    (id=watersort → WaterSortModule,Phase45ModuleSetup.AddEntry 幂等,13 文档步骤 3)。
+/// ④ 幂等迁移与几何校准(2026-09-06 收口:删选关/结算子树,底栏四钮与两处返回钮迁方块皮肤图几何,
+///    重复执行零写入)+ 模块清单接入(id=watersort → WaterSortModule,Phase45ModuleSetup.AddEntry
+///    幂等,13 文档步骤 3)。
 /// </summary>
 public static class WaterSortViewSetup
 {
@@ -56,7 +58,6 @@ public static class WaterSortViewSetup
     // 占位配色(与运行时 WaterSortTubeRack 色板无关;文本/背景用,表现后置 AIGC 替换)
     static readonly Color Backdrop = new Color(0.05f, 0.08f, 0.11f, 1f); // 全屏深蓝灰(玩法底色)
     static readonly Color Accent = new Color(0.20f, 0.55f, 0.90f);       // 主按钮蓝(同 MoreGames)
-    static readonly Color PanelTint = new Color(1f, 1f, 1f, 0.06f);      // 容器微亮底(选关网格/栏目)
 
     [MenuItem("Box/WaterSort/Build View Prefab + Levels(12 demo)")]
     public static void Build() => BuildInternal(DemoLevelCount);
@@ -155,9 +156,23 @@ public static class WaterSortViewSetup
             Debug.Log("[WaterSortSetup] 已新建 prefab: " + PrefabPath);
         }
         EnsureBinder(); // 新建后首次运行也会走自愈路径(此时必命中,保持行为单一路径)
-        EnsureM14Nodes(); // M1.4:增量节点补建 + 几何校准(幂等,见下)
-        EnsureM23DailyNodes(); // M2.3:每日入口按钮 + 每日主页面板(幂等,见下)
-        EnsureM31Nodes(); // M3.1:结算翻倍钮 + 激励确认面板(内嵌 AdPanel,不压 Router,幂等)
+        TrimRemovedPanels(); // 2026-09-06:旧树删选关/结算子树(新树不建,零写盘)
+        EnsureDailyNodes(); // M2.3:每日主页(缺才建;SelectPanel 随删,DailyButton 入口钮下线)
+        EnsureIconButtons(); // 图标钮几何校准:底栏四钮 190 方块 + 两处返回钮 150 方块(幂等)
+        EnsureAdPanelNodes(); // M3.1:激励确认面板(缺才建;结算翻倍钮已随结算页下线)
+    }
+
+    /// <summary>
+    /// 2026-09-06 UI 收口迁移入口(旧 prefab 原地升级;新装/重跑 Build 走 BuildPrefab 自动包含):
+    /// 删选关/结算子树 → 每日/图标钮几何校准 → 皮肤图扫描入库。幂等,可重复执行。
+    /// </summary>
+    [MenuItem("Box/WaterSort/Migrate UI 2026-09(删选关/结算 + 图标钮几何)")]
+    public static void Migrate2026Ui()
+    {
+        BuildPrefab();                 // 迁移链(删子树 + 几何校准;含缺树新建分支)
+        WaterSortSkinImporter.Sweep(); // 新皮肤图入库(地址 = WaterSort/UI/&lt;名&gt;,归口 SkinImporter)
+        AssetDatabase.SaveAssets();
+        Debug.Log("[WaterSortSetup] 2026-09 UI 收口迁移完成(选关/结算已删,按钮迁方块图标几何)");
     }
 
     /// <summary>根挂/校准 HotViewBinder(幂等):LoadPrefabContents 原地改,保 GUID。</summary>
@@ -190,64 +205,41 @@ public static class WaterSortViewSetup
         Stretch(rt);
         root.GetComponent<Image>().color = Backdrop;
 
-        // ---- 选关面板(全屏节区,下含标题/五列网格/回大厅) ----
-        var select = NewPanel(root.transform, "SelectPanel");
-        NewText(select, "Title", "", new Vector2(0, 830), new Vector2(700, 90), 60, true);
-
-        var scroll = NewNode(select, "LevelScroll", new Vector2(0, -60), new Vector2(1000, 1460), PanelTint);
-        scroll.gameObject.AddComponent<ScrollRect>().vertical = true; // 滚动体:见下字段接线
-        // Viewport 拉伸填满滚动区;RectMask2D 纯几何裁剪列表越界(经典 Mask + 全透明遮罩图在真机
-        // 被 CullTransparentMesh 剔除 → stencil 空写 → 内容不可见但可盲点,2026-09-05 Bug 清单 6 换型;
-        // WaterSortView.OnCreate 对存量 bundle 有同款运行期兜底,两处收敛到 RectMask2D)。
-        // 透明底 + raycastTarget=true:空白区拖拽也命中(事件沿层级冒泡到 ScrollRect)
-        var viewport = NewNode(scroll, "Viewport", Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0));
-        Stretch(viewport);
-        var vImg = viewport.gameObject.AddComponent<Image>();
-        vImg.color = Color.clear;
-        viewport.gameObject.AddComponent<RectMask2D>();
-        var content = NewNode(viewport, "Content", Vector2.zero, new Vector2(0, 0), new Color(0, 0, 0, 0));
-        content.anchorMin = new Vector2(0, 1);  // 顶锚:运行时按行撑高,ScrollRect 纵滚
-        content.anchorMax = new Vector2(1, 1);
-        content.pivot = new Vector2(0.5f, 1f);
-        var sr = scroll.GetComponent<ScrollRect>();
-        sr.viewport = viewport;
-        sr.content = content;
-        sr.movementType = ScrollRect.MovementType.Elastic;
-
-        // 选关项模板:BoxButton + Label(TMP),只渲染可玩关(无锁定态);运行期克隆进 Content 排 5 列
-        NewButton(select, "ItemTemplate", "1", new Vector2(0, 0), new Vector2(150, 150), false, PanelTint);
-        NewButton(select, "HubButton", "", new Vector2(0, -800), new Vector2(400, 96), true);
-
         // ---- 对局面板(顶栏/步数/试管区/底栏;试管本体由运行期代码绘制) ----
         var game = NewPanel(root.transform, "GamePanel");
         var topBar = NewNode(game, "TopBar", new Vector2(0, 845), new Vector2(1080, 130), new Color(0, 0, 0, 0));
-        NewButton(topBar, "BackButton", "", new Vector2(-400, 0), new Vector2(220, 88), true);
+        NewButton(topBar, "BackButton", "", new Vector2(-400, 0), BackIconSize, true);
         NewText(topBar, "GameTitle", "", new Vector2(0, 0), new Vector2(640, 90), 44, true);
         NewText(topBar, "CoinLabel", "", new Vector2(395, 0), new Vector2(300, 80), 36, false);
         NewText(game, "StepText", "", new Vector2(0, 715), new Vector2(560, 84), 42, false);
         NewNode(game, "TubeArea", new Vector2(0, -60), new Vector2(1040, 1380), new Color(0, 0, 0, 0));
         var bottomBar = NewNode(game, "BottomBar", new Vector2(0, -845), new Vector2(1080, 130), new Color(0, 0, 0, 0));
-        NewButton(bottomBar, "UndoButton", "", new Vector2(-150, 0), new Vector2(280, 96), true);
-        NewButton(bottomBar, "RestartButton", "", new Vector2(150, 0), new Vector2(280, 96), true);
+        foreach (var b in BarButtons) NewButton(bottomBar, b.Name, "", b.Pos, b.Size, true);
 
-        // ---- 结算面板(标题/结果/三个动作) ----
-        var settle = NewPanel(root.transform, "SettlePanel");
-        NewText(settle, "Title", "", new Vector2(0, 330), new Vector2(700, 110), 64, true);
-        NewText(settle, "ResultText", "", new Vector2(0, 120), new Vector2(820, 96), 56, false);
-        NewButton(settle, "NextButton", "", new Vector2(0, -120), new Vector2(420, 104), true);
-        NewButton(settle, "RetryButton", "", new Vector2(0, -300), new Vector2(420, 104), true);
-        NewButton(settle, "HubButton", "", new Vector2(0, -480), new Vector2(420, 104), true);
+        // ---- 每日主页面板(M2.3;标题/返回/今日状态/连续天数/开始钮,ShowPanel 与对局互斥) ----
+        var daily = NewPanel(root.transform, "DailyPanel");
+        NewButton(daily, "BackButton", "", new Vector2(-400, 830), BackIconSize, true);
+        NewText(daily, "Title", "", new Vector2(0, 830), new Vector2(640, 90), 48, true);
+        NewText(daily, "StateText", "", new Vector2(0, 200), new Vector2(900, 110), 64, true);
+        NewText(daily, "StreakText", "", new Vector2(0, 20), new Vector2(700, 80), 44, false);
+        NewButton(daily, "PlayButton", "", new Vector2(0, -260), new Vector2(520, 128), true);
 
-        // 初始面板:选关可见(其余关闭,ShowPanel 由视图切换)
-        select.gameObject.SetActive(true);
-        game.gameObject.SetActive(false);
-        settle.gameObject.SetActive(false);
+        // ---- 内嵌激励确认面板(M3.1;根下最后 = 恒盖其它面板,见 EnsureAdPanelNodes) ----
+        BuildAdPanelTree(root.transform);
+
+        // 初始面板:对局可见(其余关闭,ShowPanel 由视图切换)
+        game.gameObject.SetActive(true);
+        daily.gameObject.SetActive(false);
         return root;
     }
 
-    // ---- ①b M1.4 增量节点与清单接入(幂等:缺则建、几何漂移才校准;重复执行零写入) ----
+    // ---- ①b 节点迁移与几何校准(幂等:缺则建、几何漂移才校准;重复执行零写入) ----
 
-    /// <summary>底栏按钮几何契约(M1.3 两钮 → M1.4 四钮;位置/宽度与 WaterSortView 类头契约同步)。</summary>
+    // 2026-09-06 收口几何(与 WaterSortView 类头契约同步):底栏四操作钮 = 方块皮肤图承载(去文字化),
+    // 顶栏与每日主页返回钮同为方块 —— 旧 pill 几何(206x96 / 220x88)由 EnsureIconButtons 一次性迁移
+    static readonly Vector2 IconSize = new Vector2(190, 190);    // 底栏操作钮(边缘间隙 80,屏边留白 40)
+    static readonly Vector2 BackIconSize = new Vector2(150, 150); // 返回钮
+
     struct BarButtonSpec
     {
         public string Name;
@@ -257,18 +249,50 @@ public static class WaterSortViewSetup
 
     static readonly BarButtonSpec[] BarButtons =
     {
-        new BarButtonSpec { Name = "UndoButton",      Pos = new Vector2(-405, 0), Size = new Vector2(206, 96) },
-        new BarButtonSpec { Name = "HintButton",      Pos = new Vector2(-135, 0), Size = new Vector2(206, 96) },
-        new BarButtonSpec { Name = "ExtraTubeButton", Pos = new Vector2(135, 0),  Size = new Vector2(206, 96) },
-        new BarButtonSpec { Name = "RestartButton",   Pos = new Vector2(405, 0),  Size = new Vector2(206, 96) },
+        new BarButtonSpec { Name = "UndoButton",      Pos = new Vector2(-405, 0), Size = IconSize },
+        new BarButtonSpec { Name = "HintButton",      Pos = new Vector2(-135, 0), Size = IconSize },
+        new BarButtonSpec { Name = "ExtraTubeButton", Pos = new Vector2(135, 0),  Size = IconSize },
+        new BarButtonSpec { Name = "RestartButton",   Pos = new Vector2(405, 0),  Size = IconSize },
     };
 
     /// <summary>
-    /// M1.4 幂等补建:底栏「提示/空瓶」两钮 + 结算奖励行 RewardText;既有钮按几何契约校准
-    /// (两钮 → 四钮布局一次性迁移,Label 随钮宽收缩;重复执行比对一致即零写盘)。
+    /// 2026-09-06 收口迁移:删除已下线的选关页(SelectPanel)与结算页(SettlePanel)整棵子树
+    /// (选关滚动列表/结算三钮/翻倍行随子树一并删除)。旧树(2026-09-05 及更早)才有这两棵,
+    /// 新建树不建、旧树删后重跑零写盘;视图侧对应改造见 WaterSortView 类头(过关 = 胜利图自动跳关)。
+    /// </summary>
+    static void TrimRemovedPanels()
+    {
+        var root = PrefabUtility.LoadPrefabContents(PrefabPath);
+        bool dirty = false;
+        try
+        {
+            foreach (var name in new[] { "SelectPanel", "SettlePanel" })
+            {
+                var gone = root.transform.Find(name);
+                if (gone != null)
+                {
+                    Object.DestroyImmediate(gone.gameObject);
+                    dirty = true;
+                }
+            }
+            if (dirty)
+            {
+                PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+                Debug.Log("[WaterSortSetup] 已删除下线路口面板子树:SelectPanel/SettlePanel(2026-09-06 收口)");
+            }
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>
+    /// 图标钮几何校准(2026-09-06 收口):底栏四钮 190 方块 + 顶栏/每日主页返回钮 150 方块,
+    /// 缺失补建、漂移校准(Label 随钮缩放留兜底文字);重复执行比对一致即零写盘。
     /// 热更视图不序列化进 prefab,本区域只补纯 AOT 节点容器(与 BuildRootTree 同构),行为全在 WaterSortView。
     /// </summary>
-    static void EnsureM14Nodes()
+    static void EnsureIconButtons()
     {
         var root = PrefabUtility.LoadPrefabContents(PrefabPath);
         bool dirty = false;
@@ -282,34 +306,42 @@ public static class WaterSortViewSetup
                     var t = bottom.Find(b.Name);
                     if (t == null)
                     {
-                        NewButton(bottom, b.Name, "", b.Pos, b.Size, true); // 与 M1.3 按钮同构(Accent + BoxButton + Label)
+                        // 极旧树缺钮(M1.3 两钮时代):按当前契约整钮补建(Accent + BoxButton + Label)
+                        NewButton(bottom, b.Name, "", b.Pos, b.Size, true);
                         dirty = true;
                         continue;
                     }
-                    // 已存在(M1.3 两钮 / 布局漂移):校准几何与 Label 留边
-                    var rt = (RectTransform)t;
-                    if (NotSame(rt.anchoredPosition, b.Pos)) { rt.anchoredPosition = b.Pos; dirty = true; }
-                    if (NotSame(rt.sizeDelta, b.Size)) { rt.sizeDelta = b.Size; dirty = true; }
-                    var label = t.Find("Label");
-                    var labelSize = b.Size - new Vector2(24, 16); // NewButton 的文案留边口径
-                    if (label != null && NotSame(((RectTransform)label).sizeDelta, labelSize))
-                    {
-                        ((RectTransform)label).sizeDelta = labelSize;
-                        dirty = true;
-                    }
+                    dirty |= Calibrate((RectTransform)t, b.Pos, b.Size);
                 }
             }
-            var settle = root.transform.Find("SettlePanel");
-            if (settle != null && settle.Find("RewardText") == null)
+            // 对局顶栏返回钮(左位方块 150)
+            var topBackParent = root.transform.Find("GamePanel/TopBar");
+            if (topBackParent != null)
             {
-                // 奖励行夹在 ResultText 与 NextButton 间的留白带;运行时按首通 SetActive(见 WaterSortView.OnLevelSolved)
-                NewText(settle, "RewardText", "", new Vector2(0, 2), new Vector2(760, 56), 44, false);
-                dirty = true;
+                var back = topBackParent.Find("BackButton");
+                if (back == null)
+                {
+                    NewButton(topBackParent, "BackButton", "", new Vector2(-400, 0), BackIconSize, true);
+                    dirty = true;
+                }
+                else dirty |= Calibrate((RectTransform)back, new Vector2(-400, 0), BackIconSize);
+            }
+            // 每日主页返回钮(同级根坐标;M2.3 老树为 220x88 pill,随本版迁移为 150 方块)
+            var dailyParent = root.transform.Find("DailyPanel");
+            if (dailyParent != null)
+            {
+                var back = dailyParent.Find("BackButton");
+                if (back == null)
+                {
+                    NewButton(dailyParent, "BackButton", "", new Vector2(-400, 830), BackIconSize, true);
+                    dirty = true;
+                }
+                else dirty |= Calibrate((RectTransform)back, new Vector2(-400, 830), BackIconSize);
             }
             if (dirty)
             {
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
-                Debug.Log("[WaterSortSetup] M1.4 节点补建完成(底栏四钮 + 结算奖励行)");
+                Debug.Log("[WaterSortSetup] 图标钮几何校准完成(底栏 190 方块 × 4 + 返回钮 150 方块 × 2)");
             }
         }
         finally
@@ -318,33 +350,42 @@ public static class WaterSortViewSetup
         }
     }
 
+    /// <summary>按钮几何校准:pos/size 与契约不符才写,Label 随钮缩放(返回是否有变更)。</summary>
+    static bool Calibrate(RectTransform rt, Vector2 pos, Vector2 size)
+    {
+        bool dirty = false;
+        if (NotSame(rt.anchoredPosition, pos)) { rt.anchoredPosition = pos; dirty = true; }
+        if (NotSame(rt.sizeDelta, size)) { rt.sizeDelta = size; dirty = true; }
+        var label = rt.Find("Label");
+        var labelSize = size - new Vector2(24, 16); // NewButton 的文案留边口径
+        if (label != null && NotSame(((RectTransform)label).sizeDelta, labelSize))
+        {
+            ((RectTransform)label).sizeDelta = labelSize;
+            dirty = true;
+        }
+        return dirty;
+    }
+
     /// <summary>
-    /// M2.3 幂等补建每日挑战节点(WS-09;契约见 WaterSortView 类头):
-    /// ① SelectPanel/DailyButton —— 选关页顶部入口钮(标题栏与选关网格之间的留白带);
-    /// ② DailyPanel 整棵子树 —— 标题/返回/今日状态/连续天数/开始钮(与 Select/Game/Settle 并列,
-    ///    ShowPanel 四面板互斥切换)。全部子节点为纯 AOT 容器,行为在 WaterSortView(Bind/FindInCard 路径);
-    /// 首次为 prefab 已有节点时的增量路径,新建路径由 EnsureM23DailyNodes 同一收敛(BuildRootTree 不建每日区)。
+    /// M2.3 幂等补建每日主页面板(WS-09;契约见 WaterSortView 类头):
+    /// DailyPanel 整棵子树 —— 标题/返回/今日状态/连续天数/开始钮(与 GamePanel 并列,ShowPanel 双面板互斥)。
+    /// 2026-09-06:SelectPanel 已下线,原挂其下的选关页 DailyButton 入口钮随子树删除,每日入口
+    /// 只剩模块 args="daily"(隐藏入口,见 WaterSortView 类头)。全部子节点为纯 AOT 容器,
+    /// 行为在 WaterSortView(Bind/FindInCard 路径);新建树由 BuildRootTree 直接生成,本方法只服务旧树迁移。
     /// </summary>
-    static void EnsureM23DailyNodes()
+    static void EnsureDailyNodes()
     {
         var root = PrefabUtility.LoadPrefabContents(PrefabPath);
         bool dirty = false;
         try
         {
-            var select = root.transform.Find("SelectPanel");
-            if (select != null && select.Find("DailyButton") == null)
-            {
-                // 入口钮放标题(830)与滚动区(顶 670)之间的留白带;Accent 主色钮(同 M1.4 底栏钮形态)
-                NewButton(select, "DailyButton", "", new Vector2(0, 730), new Vector2(440, 92), true);
-                dirty = true;
-            }
             var daily = root.transform.Find("DailyPanel");
             if (daily == null)
             {
-                var panel = NewPanel(root.transform, "DailyPanel"); // 全屏节区(同 Select/Game/Settle)
+                var panel = NewPanel(root.transform, "DailyPanel"); // 全屏节区(同 GamePanel)
                 daily = panel;
-                // 顶栏:返回(左,同 GamePanel/TopBar/BackButton 几何)+ 标题(中,运行期 ApplyLanguage 落文案)
-                NewButton(daily, "BackButton", "", new Vector2(-400, 830), new Vector2(220, 88), true);
+                // 顶栏:返回(左,方块 150,与对局顶栏返回钮同构)+ 标题(中,运行期 ApplyLanguage 落文案)
+                NewButton(daily, "BackButton", "", new Vector2(-400, 830), BackIconSize, true);
                 NewText(daily, "Title", "", new Vector2(0, 830), new Vector2(640, 90), 48, true);
                 // 中部状态区:今日完成状态(大字)/ 连续天数(小字)/ 开始挑战钮(向下对齐)
                 NewText(daily, "StateText", "", new Vector2(0, 200), new Vector2(900, 110), 64, true);
@@ -356,7 +397,7 @@ public static class WaterSortViewSetup
             if (dirty)
             {
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
-                Debug.Log("[WaterSortSetup] M2.3 每日挑战节点补建完成(DailyButton + DailyPanel)");
+                Debug.Log("[WaterSortSetup] DailyPanel 补建完成(M2.3 每日主页)");
             }
         }
         finally
@@ -366,65 +407,51 @@ public static class WaterSortViewSetup
     }
 
     /// <summary>
-    /// M3.1 幂等补建激励点位节点(WS-12/13;契约见 WaterSortView 类头):
-    /// ① SettlePanel/DoubleButton —— 结算翻倍钮(仅首通结算显示);RewardText 左移缩宽,
-    ///    与右侧翻倍钮并成一行(旧几何 (0,2) 760x56 随本版一次性迁移);
-    /// ② AdPanel 整棵子树 —— 玩法内嵌激励确认面板(全屏遮罩 + 卡片:消息 + 看广告/取消两钮)。
-    ///    刻意不进 Router 栈:UIRouter 覆盖下层会触发其 OnHide,而水排序 OnHide=退模块(防被盖误退,
-    ///    见 WaterSortView 类头退出纪律);内嵌面板零路由生命周期 —— 遮罩拦点击,关闭只翻自身。
+    /// 激励确认面板补建(M3.1,WS-12/13;契约见 WaterSortView 类头):
+    /// 玩法内嵌 AdPanel(全屏遮罩 + 卡片:消息 + 看广告/取消两钮)位于根下最后 —— 面板弹出即盖住
+    /// 其它面板。刻意不进 Router 栈:UIRouter 覆盖下层会触发其 OnHide,而水排序 OnHide=退模块
+    /// (防被盖误退,见 WaterSortView 类头退出纪律);内嵌面板零路由生命周期,遮罩拦点击,关闭只翻自身。
+    /// 2026-09-06:结算页下线,SettlePanel/DoubleButton 翻倍行随之删除,本方法只剩 AdPanel;
+    /// 新建树由 BuildRootTree → BuildAdPanelTree 直接生成,本方法只服务旧树补建。
     /// </summary>
-    static void EnsureM31Nodes()
+    static void EnsureAdPanelNodes()
     {
         var root = PrefabUtility.LoadPrefabContents(PrefabPath);
         bool dirty = false;
         try
         {
-            // ① 结算翻倍行:RewardText(左列,文字右边界 80)与 DoubleButton(右列,左边界 170)同行不叠;
-            //    整行仅首通结算显示/隐藏由 WaterSortView.OnLevelSolved 控制(重玩与每日结算隐藏)
-            var settle = root.transform.Find("SettlePanel");
-            if (settle != null)
-            {
-                var reward = settle.Find("RewardText");
-                if (reward != null)
-                {
-                    var rt = (RectTransform)reward;
-                    var targetPos = new Vector2(-170, 2);
-                    var targetSize = new Vector2(500, 56);
-                    if (NotSame(rt.anchoredPosition, targetPos)) { rt.anchoredPosition = targetPos; dirty = true; }
-                    if (NotSame(rt.sizeDelta, targetSize)) { rt.sizeDelta = targetSize; dirty = true; }
-                }
-                if (settle.Find("DoubleButton") == null)
-                {
-                    NewButton(settle, "DoubleButton", "", new Vector2(330, 2), new Vector2(320, 88), true);
-                    dirty = true;
-                }
-            }
-            // ② 内嵌激励确认面板(根下最后兄弟 → 恒盖其它面板;行为在 WaterSortView.ShowAdPanel)
             if (root.transform.Find("AdPanel") == null)
             {
-                var overlay = NewNode(root.transform, "AdPanel", Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0));
-                Stretch(overlay);
-                var img = overlay.gameObject.AddComponent<Image>();
-                img.color = new Color(0, 0, 0, 0.55f);
-                img.raycastTarget = true; // 遮罩拦截点击:面板弹出期间下层按钮不可达
-                var card = NewNode(overlay, "Card", Vector2.zero, new Vector2(860, 440),
-                    new Color(0.10f, 0.14f, 0.18f, 0.98f));
-                NewText(card, "MessageText", "", new Vector2(0, 70), new Vector2(740, 210), 42, false);
-                NewButton(card, "ConfirmButton", "", new Vector2(-215, -155), new Vector2(360, 104), true);
-                NewButton(card, "CancelButton", "", new Vector2(215, -155), new Vector2(360, 104), true);
-                overlay.gameObject.SetActive(false); // 初始隐藏(ShowAdPanel 弹出)
+                BuildAdPanelTree(root.transform);
                 dirty = true;
             }
             if (dirty)
             {
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
-                Debug.Log("[WaterSortSetup] M3.1 激励点位节点补建完成(DoubleButton + AdPanel)");
+                Debug.Log("[WaterSortSetup] AdPanel 补建完成(M3.1 激励确认面板)");
             }
         }
         finally
         {
             PrefabUtility.UnloadPrefabContents(root);
         }
+    }
+
+    /// <summary>AdPanel 子树构建(新建树/旧树补建共用;返回 overlay 根,默认隐藏,ShowAdPanel 弹出)。</summary>
+    static RectTransform BuildAdPanelTree(Transform parent)
+    {
+        var overlay = NewNode(parent, "AdPanel", Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0));
+        Stretch(overlay);
+        var img = overlay.gameObject.AddComponent<Image>();
+        img.color = new Color(0, 0, 0, 0.55f);
+        img.raycastTarget = true; // 遮罩拦截点击:面板弹出期间下层按钮不可达
+        var card = NewNode(overlay, "Card", Vector2.zero, new Vector2(860, 440),
+            new Color(0.10f, 0.14f, 0.18f, 0.98f));
+        NewText(card, "MessageText", "", new Vector2(0, 70), new Vector2(740, 210), 42, false);
+        NewButton(card, "ConfirmButton", "", new Vector2(-215, -155), new Vector2(360, 104), true);
+        NewButton(card, "CancelButton", "", new Vector2(215, -155), new Vector2(360, 104), true);
+        overlay.gameObject.SetActive(false); // 初始隐藏(ShowAdPanel 弹出)
+        return overlay;
     }
 
     static bool NotSame(Vector2 a, Vector2 b)

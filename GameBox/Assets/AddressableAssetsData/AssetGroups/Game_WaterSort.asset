@@ -25,6 +25,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 38b2c805f4bd02742ba08f7017acc5a9
+    m_Address: WaterSort/UI/ws_win_title
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4b35254ec6c0c0141beb06ac5cccd107
     m_Address: WaterSort/UI/ws_btn_daily
     m_ReadOnly: 0
@@ -50,13 +55,38 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 61f709793344b8e469eefadcf932b5b1
+    m_Address: WaterSort/UI/ws_btn_undo_flat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 83825d97c5a0fbd4ab84c1fc6607ed6a
+    m_Address: WaterSort/UI/ws_btn_extra_flat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 85f75c7cff372bf429bb677173d98f7f
     m_Address: WaterSort/UI/ws_liquid_soft
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 8ddc17e5bd905994b9f93aa2eaafbc7d
+    m_Address: WaterSort/UI/ws_btn_hint_flat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 902fa6fa22853c0429c052c736cdb19a
     m_Address: WaterSort/UI/ws_tube_mask
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9bf6af6e889bbcc44a847012f04987d6
+    m_Address: WaterSort/UI/ws_btn_restart_flat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ab124ba2d1ff1cd4db467ed06ff189d8
+    m_Address: WaterSort/UI/ws_btn_back_flat
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -72,6 +102,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: da9f2a4be97f9354ca502fc53bab72cd
     m_Address: WaterSort/UI/ws_level_btn
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e8ed2c60c4566e247882c2baa27116b3
+    m_Address: WaterSort/UI/ws_bg_zise
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

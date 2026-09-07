@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 using WaterSort.Core;
 
 namespace Box.HotUpdate.WaterSort
@@ -63,8 +64,10 @@ namespace Box.HotUpdate.WaterSort
         /// <summary>
         /// 开局(选关/重开共用):关卡数据解码失败(损坏/版本不符)返回 false 不动状态,界面提示。
         /// 过关标记/历史/金币消耗计数随新局复位 —— 重玩本关 = 全新盘面(已付提示/空瓶金币不退)。
+        /// 半局恢复(二期):resume 为关号匹配的快照时续玩(盘面与道具计数还原,撤销历史不恢复);
+        /// 快照损坏/与关卡不一致 → 静默回全新开局。ResumedFromSave 供视图决定保留或清理快照槽。
         /// </summary>
-        public bool StartLevel(WaterSortLevelData data)
+        public bool StartLevel(WaterSortLevelData data, WaterSortRunData resume = null)
         {
             if (data == null || !WaterSortLevelCodec.TryDecode(data, out var board)) return false;
             LevelData = data;
@@ -77,8 +80,88 @@ namespace Box.HotUpdate.WaterSort
             RewardDoublesUsed = 0;
             _history.Clear();
             _solvedNotified = false;
+            ResumedFromSave = false;
+            // 半局恢复校验:关号/色数与解码盘一致、总管数 ≥ 原始盘(加管只增不减)、快照可重建、
+            // 且恢复出的盘未解(已解盘不该作为续局出现 —— 通关路径本应清槽,防御异常快照)
+            if (resume != null && resume.levelId == data.id
+                && resume.colors == board.Colors && resume.tubeCount >= board.TubeCount
+                && TryBuildRunBoard(resume, out var restored, out var move, out var hints, out var extra)
+                && !restored.IsSolved())
+            {
+                Board = restored;
+                MoveCount = move;
+                HintsUsed = hints;
+                ExtraTubesUsed = extra;
+                ResumedFromSave = true;
+            }
             IsInLevel = true;
             return true;
+        }
+
+        /// <summary>本次 StartLevel 是否从半局快照恢复(视图据此决定保留或清理快照槽)。</summary>
+        public bool ResumedFromSave { get; private set; }
+
+        /// <summary>
+        /// 从半局快照重建盘面:逐项校验(管数条目齐、每管高度 0~容量、色值 1..colors、拼片总数吻合),
+        /// 任一非法返回 false 走全新开局 —— 快照来自存档,必须按不可信输入对待。
+        /// </summary>
+        bool TryBuildRunBoard(WaterSortRunData run, out WaterSortBoard board,
+            out int moveCount, out int hintsUsed, out int extraTubesUsed)
+        {
+            board = null;
+            moveCount = hintsUsed = extraTubesUsed = 0;
+            if (run == null || run.tubeHeights == null || run.cells == null) return false;
+            int colors = run.colors, n = run.tubeCount;
+            if (colors < 1 || n < colors + 2 || run.tubeHeights.Count != n) return false; // 水排序最少 = 色数 + 2 空管
+            int total = 0;
+            for (int t = 0; t < n; t++)
+            {
+                int k = run.tubeHeights[t];
+                if (k < 0 || k > WaterSortBoard.Capacity) return false;
+                total += k;
+            }
+            if (run.cells.Count != total) return false; // 拼片数与高度总和不吻合 = 快照损坏
+            var tubes = new int[n][];
+            int idx = 0;
+            for (int t = 0; t < n; t++)
+            {
+                int k = run.tubeHeights[t];
+                tubes[t] = new int[k];
+                for (int i = 0; i < k; i++, idx++)
+                {
+                    int c = run.cells[idx];
+                    if (c < 1 || c > colors) return false; // 非法色值 → 拒绝恢复
+                    tubes[t][i] = c;
+                }
+            }
+            board = new WaterSortBoard(colors, n - colors, tubes);
+            moveCount = Mathf.Max(0, run.moveCount);
+            hintsUsed = Mathf.Max(0, run.hintsUsed);
+            extraTubesUsed = Mathf.Max(0, run.extraTubesUsed);
+            return true;
+        }
+
+        /// <summary>半局快照(常规对局,视图在盘面变更后落盘):盘面按管序拼接(自底向上)+ 计数。
+        /// 返回 null = 当前无可快照状态(未开局)。</summary>
+        public WaterSortRunData BuildRunSnapshot()
+        {
+            if (!IsInLevel || Board == null) return null;
+            var run = new WaterSortRunData
+            {
+                levelId = LevelId,
+                colors = Board.Colors,
+                tubeCount = Board.TubeCount,
+                moveCount = MoveCount,
+                hintsUsed = HintsUsed,
+                extraTubesUsed = ExtraTubesUsed,
+            };
+            for (int t = 0; t < Board.TubeCount; t++)
+            {
+                int k = Board.TopCount(t);
+                run.tubeHeights.Add(k);
+                for (int i = 0; i < k; i++) run.cells.Add(Board.Get(t, i));
+            }
+            return run;
         }
 
         /// <summary>倒水:仅放行规则允许的移动(Apply 本身不校验合法性)。成功 → 记账 + 上报;失败返回 false 由界面抖动。</summary>
@@ -114,10 +197,10 @@ namespace Box.HotUpdate.WaterSort
             return true;
         }
 
-        /// <summary>重开本关:从关卡源重建(等价再开局一次)。</summary>
+        /// <summary>重开本关:从关卡源重建(等价再开局一次)。显式传 null 快照 = 强制全新盘,不吃半局恢复。</summary>
         public void Restart()
         {
-            if (LevelData != null) StartLevel(LevelData);
+            if (LevelData != null) StartLevel(LevelData, null);
         }
 
         /// <summary>
