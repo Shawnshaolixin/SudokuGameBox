@@ -578,6 +578,7 @@ namespace Box.HotUpdate.WaterSort
                 ApplyButtonSkinAsync("GamePanel/BottomBar/RestartButton", SkinRestart),
                 ApplyButtonSkinAsync("GamePanel/BottomBar/ExtraTubeButton", SkinExtra));
             await LoadSkinAsync(SkinWinTitle); // 胜利标题预热:首关速通时弹层不白帧(见 PlayWinThenAdvanceAsync)
+            WaterSortWinConfetti.Prepare(); // 彩带贴图预热:过关瞬间不再等异步加载(首关速通同防白帧)
 
         }
 
@@ -684,6 +685,10 @@ namespace Box.HotUpdate.WaterSort
             }
             overlay.SetActive(true);
             overlay.transform.SetAsLastSibling(); // 恒盖所有面板(含 AdPanel;弹层期任何下层点击不可达)
+            // 胜利彩带与弹层同刻播放(需求:过关加特效):爆点取画面中心偏下(y=-330 ≈ 下 1/3 处),
+            // 花束由下而上贯穿标题漫全屏 —— 玩家视野重心在下半屏,爆点随之下移(2026-09-07 验收反馈)
+            // (渲染在标题之上 —— Play 内部自建 WinConfetti 子节点,是遮罩/标题后的末位兄弟)
+            WaterSortWinConfetti.Play(overlay.transform, new Vector2(0f, -330f));
             // 弹入:遮罩淡入与标题回弹并行(EaseOutBack 中段过冲 = 「弹」感)
             BoxTween.FadeTo(overlay, 0f, 1f, 0.25f).Forget();
             if (titleImg != null && sprite != null)

@@ -15,6 +15,11 @@ MonoBehaviour:
   m_GroupName: Game_WaterSort
   m_GUID: 4ec2cf2f88ff5144bbfd27372b7998ab
   m_SerializeEntries:
+  - m_GUID: 1c2ff4934c8b8be44a4a07da9157f27d
+    m_Address: WaterSort/Fx/confetti_ribbon
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 31bbd07b9cd43cf4e9ddf4622dacf2b5
     m_Address: WaterSort/Audio/pour1
     m_ReadOnly: 0
@@ -95,8 +100,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c207739dd2a4a6648982c57efdd14d0b
+    m_Address: WaterSort/Fx/confetti_dot
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: d67c07a2827a2a347a752b8ee15cb830
     m_Address: WaterSort/UI/ws_btn_back
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: da69d678500b7e748a9aedb848d31f79
+    m_Address: WaterSort/Fx/confetti_chip
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

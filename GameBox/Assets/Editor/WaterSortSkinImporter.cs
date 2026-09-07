@@ -12,12 +12,18 @@ using UnityEngine;
 /// 2) 幂等注册进 Game_WaterSort 组:地址 = WaterSort/UI/&lt;文件名&gt;(21 文档 §6.1 约定),
 ///    入库走 WaterSortViewSetup.EnsureEntry —— 与 prefab/关卡 JSON 同一自愈入口,组/地址不符自动修复。
 ///    同目录 .shader(液体软裁剪 ws_liquid_soft)按同一地址约定入组,热更侧经 IAssetService 加载。
+///    另:目录根下若建 Fx/ 子目录(胜利彩带 confetti_* 等 UGUI 粒子白图),png 只入组不套上面
+///    的皮肤预设 —— 预设强制 Sprite/Multiple 会让 RawImage 拿不到 Texture2D 主资产染色。
 /// 每次域重载扫一遍目录,仅当导入设置或条目缺/错时才写盘,零日常开销;美术文件增改名自动生效。
 /// </summary>
 public static class WaterSortSkinImporter
 {
     // 皮肤目录(21 文档 §6 落位:玩法专属 UI 图归模块目录,壳层共享仍走 Assets/Art/UI)
     const string UiDir = "Assets/Modules/WaterSort/UI";
+
+    // 特效贴图目录(UGUI 粒子,如胜利彩带):按 WaterSort/Fx/{名} 入组,
+    // 但【不套 UI 皮肤图预设】——RawImage 用 Texture2D 主资产染色,套 Sprite/Multiple 会歧义
+    const string FxDir = "Assets/Modules/WaterSort/Fx";
 
     // 模块音效目录(21 文档 §6.5:AudioManager 以 "mod:watersort/{名}" 路由到本目录)
     const string AudioDir = "Assets/Modules/WaterSort/Audio";
@@ -62,6 +68,21 @@ public static class WaterSortSkinImporter
                 continue;
             }
             WaterSortViewSetup.EnsureEntry(path, AddressOf(path));
+        }
+        // 特效贴图(胜利彩带 confetti_*,UGUI 粒子白图):仅入组,导入预设保持源 meta 的默认 Texture2D
+        if (Directory.Exists(FxDir))
+        {
+            foreach (var file in Directory.GetFiles(FxDir, "*.png"))
+            {
+                var path = file.Replace('\\', '/');
+                var name = System.IO.Path.GetFileNameWithoutExtension(path);
+                if (!IsConformingName(name))
+                {
+                    Debug.LogWarning($"[WaterSortSkin] 跳过不合规文件名(请改名后重存): {name}");
+                    continue;
+                }
+                WaterSortViewSetup.EnsureEntry(path, AddressOf(path));
+            }
         }
         // 模块音效(Audio/*.ogg,21 文档 §6.5):地址 WaterSort/Audio/{名},AudioManager 以
         // "mod:watersort/{名}" 路由到本目录 —— 占位 pour1 与后续正式音效放对目录即自动入组
