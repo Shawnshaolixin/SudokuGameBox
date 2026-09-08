@@ -18,10 +18,12 @@ namespace Box.Services
     /// </summary>
     public sealed class AdMobAdsService : IAdsService
     {
-        // 广告位 ID 2026-08-29 起临时切回官方测试位(16 号文档备忘 #3):
-        // 封闭测试包分发给他人时,他人设备不在 TestDeviceIds 内会收到真实广告,点击有无效流量风险;
-        // 官方测试位在任何设备上都返回测试广告(零收入,无违规风险),开发阶段无需注册测试设备。
-        // 封闭测试结束、上生产轨道前恢复真实 ID(正式值,勿再切回测试位):
+        // 广告位 ID 暂用官方测试位(2026-09-08 决策,AdMob 关联审核受阻):
+        // AdMob「应用就绪度审核」要求商店公开可访问才能关联——closed testing(12+14)商店页
+        // 对公众不可见,AdMob 后台按包名/URL 均搜不到(官方限制,非索引延迟)。
+        // 因此封闭期用测试位:激励流程完整可玩(零收入零违规),测试者体验不降级;
+        // UMP 开启不受影响(测试位同样走同意流,正好完成欧盟实测)。
+        // 生产开通当天:AdMob 后台关联商店链接 → 等审核获批 → 恢复下方真 ID 并随版发布:
         //   激励 ca-app-pub-6367116322180531/5022991846
         //   插屏 ca-app-pub-6367116322180531/4813896836
         private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
@@ -35,11 +37,13 @@ namespace Box.Services
         // 新设备首次请求广告后按 logcat 提示补充。填入后广告初始化前生效。
         private static readonly List<string> TestDeviceIds = new() { "AAC1C00E2A99B28A43349D7BD59ADE49" };
 
-        // UMP 同意流程开关(Phase 9 真机):GDPR 只约束欧洲(EEA)用户,中国用户不需要同意表单。
-        // 真机实测:UMP 访问 consent.google.com 在国内网络会挂起,原生调用阻塞导致广告初始化
-        // 迟迟不执行(15 秒超时兜底都来不及触发)。测试期默认关闭,直接初始化广告;
-        // 上架面向欧美市场时置回 true 并确保 UMP 表单在 AdMob 后台「隐私与消息」已配置。
-        private const bool UmpEnabled = false;
+        // UMP 同意流程开关:GDPR 只约束欧洲(EEA)用户,非 EEA 设备不会弹表单。
+        // 2026-09-08 恢复启用(上架线要求,05 文档发布清单:UMP 欧盟实测)。
+        // 前置条件:AdMob 后台「隐私与消息」已配置 GDPR 表单——未配置时表单加载失败仅告警
+        // 走兜底,但 EEA 用户无同意即展示广告不合规,务必先配好再发版。
+        // 国内自测注意:consent.google.com 访问挂起时由 UmpFlowWithTimeout 的 15 秒兜底接管,
+        // 广告初始化最多延迟 15 秒(海外测试者无此问题)。
+        private const bool UmpEnabled = true;
 
         private const string CommerceModuleId = "box.commerce"; // D-7 存档分区：去广告状态
 
@@ -92,7 +96,7 @@ namespace Box.Services
                 return;
             }
 
-            // —— 第零步:注册真机测试设备(TestDeviceIds 非空时生效;测试位 ID 阶段可跳过)——
+            // —— 第零步:注册真机测试设备(TestDeviceIds 非空时生效;真广告位阶段必做,防自点无效流量)——
             if (TestDeviceIds.Count > 0)
             {
                 var requestConfiguration = new RequestConfiguration
