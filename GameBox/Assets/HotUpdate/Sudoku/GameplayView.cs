@@ -37,6 +37,8 @@ namespace Box.HotUpdate.Sudoku
         CancellationTokenSource _timerCts;
         CancellationTokenSource _introCts; // 入场弹跳动画(重开新局/销毁时取消)
         CancellationTokenSource _fxCts;    // 单元扩散动画(新动画取代旧动画时取消)
+        CancellationTokenSource _guideCts; // 首局新手引导(视图销毁时取消防残留等待)
+        FirstRunGuide _guide;              // 引导实例(播放中非空;OnBackKey 拦截用)
         int[] _rippleCells;                // 扩散动画进行中的单元格(新动画开始时恢复残留金色)
         int _fxFrame = -1;                 // 同帧多单元凑齐(收官格 宫+行+列同帧触发)只播第一波的帧标记
 
@@ -91,6 +93,34 @@ namespace Box.HotUpdate.Sudoku
             ApplyLanguage(); // 打开即按当前语言刷新(prefab 初始英文文案)
             // 淡入(D-15):绑定 _timerCts,OnDestroy 取消防场景后协程访问已销毁对象
             await BoxTween.FadeTo(gameObject, 0f, 1f, 0.2f, _timerCts.Token);
+            await ShowFirstRunGuideAsync(); // 首局三步引导(见 FirstRunGuide;仅首次进对局)
+        }
+
+        /// <summary>
+        /// 首局新手引导(2026-09-09 产品拍板:三步极简):淡入+落子动效收尾后弹出,
+        /// 完成(Skip/Got it)写 PlayerPrefs 标记,此后永不再弹;中途被取消(视图销毁)不标记。
+        /// </summary>
+        async UniTask ShowFirstRunGuideAsync()
+        {
+            if (FirstRunGuide.HasShown || _svc == null) return; // 已引导/异常上下文:放行
+            await UniTask.Delay(600, DelayType.DeltaTime, PlayerLoopTiming.Update, _timerCts.Token); // 等落子动效(≤0.55s)收尾
+            _guideCts?.Cancel();
+            _guideCts = new CancellationTokenSource();
+            // 字体模板取标题 TMP:引导文案与对局内同字体(字符集含 ×/– 等符号,见字体子集清单)
+            var fontTemplate = transform.Find("TitleText")?.GetComponent<TextMeshProUGUI>();
+            var guide = new FirstRunGuide(transform, fontTemplate);
+            _guide = guide;
+            try
+            {
+                await guide.RunAsync(_guideCts.Token);
+                FirstRunGuide.MarkShown(); // 完整走完(含 Skip)才标记,中途退出不写
+            }
+            catch (OperationCanceledException) { /* 视图销毁:本次不标记,下次进对局再引导 */ }
+            finally
+            {
+                guide.Dispose();
+                _guide = null;
+            }
         }
 
         // 隐藏 MonoBehaviour.OnDestroy(Unity 生命周期):场景卸载即清理,防残留闭包;
@@ -102,6 +132,7 @@ namespace Box.HotUpdate.Sudoku
             _timerCts?.Cancel();
             _introCts?.Cancel();
             _fxCts?.Cancel();
+            _guideCts?.Cancel(); // 引导进行中退场:中断等待,Dispose 由 finally 执行
             if (_svc != null) _svc.ClearBackHandler();
         }
 
@@ -217,6 +248,7 @@ namespace Box.HotUpdate.Sudoku
 
         UniTask<bool> OnBackKey()
         {
+            if (_guide != null && _guide.IsRunning) return UniTask.FromResult(true); // 引导中:吞掉,防误撤销/退出
             if (_svc != null && _svc.Router.StackCount > 0) return UniTask.FromResult(false); // 弹窗打开:交还路由
             OnBack();
             return UniTask.FromResult(true);

@@ -118,6 +118,14 @@ namespace Box.Services
             { "hint.ad.confirm", "看广告" }, // 广告提示确认框按钮
             { "hint.ad.cancel", "取消" },
 
+            // 首局新手引导(2026-09-09 产品拍板:三步极简;v1.0 语言固定英文,zh 表备未来扩展)
+            { "tutorial.step.grid", "用 1–9 的数字填满每一行、每一列与每个 3×3 宫格。" },
+            { "tutorial.step.numpad", "轻点一个数字,把数字填进选中的格子。" },
+            { "tutorial.step.hint", "卡住了?点「提示」按钮获取帮助。" },
+            { "tutorial.gotit", "明白了!" },
+            { "tutorial.skip", "跳过" },
+            { "tutorial.tap", "点任意处继续" },
+
             // 结算弹窗
             { "settlement.title.daily", "每日挑战完成" },
             { "settlement.title.normal", "对局完成" },
@@ -187,6 +195,14 @@ namespace Box.Services
             { "game.exit.cancel", "Cancel" },
             { "hint.ad.confirm", "Watch" },
             { "hint.ad.cancel", "Cancel" },
+
+            // 首局新手引导(2026-09-09 产品拍板:三步极简;文案与产品需求原文一致)
+            { "tutorial.step.grid", "Fill every row, column and 3×3 box with numbers 1–9." },
+            { "tutorial.step.numpad", "Tap a number to fill the selected cell." },
+            { "tutorial.step.hint", "Need help? Use a Hint when you're stuck." },
+            { "tutorial.gotit", "Got it!" },
+            { "tutorial.skip", "Skip" },
+            { "tutorial.tap", "Tap anywhere to continue" },
 
             // 结算弹窗
             { "settlement.title.daily", "Daily Challenge Complete" },

@@ -19,6 +19,14 @@ namespace Box.Gameplay.Tests
     /// </summary>
     public class GameplaySmokeTests
     {
+        // 首局新手引导(FirstRunGuide)门控:冒烟测试聚焦业务流,预设"已引导"不被遮罩打断;
+        // TearDown 清除,便于本地手动回归首局引导(删键即重新弹出)
+        [SetUp]
+        public void SeedTutorialShown() => PlayerPrefs.SetInt(FirstRunGuide.PrefsKey, 1);
+
+        [TearDown]
+        public void RestoreTutorialKey() => PlayerPrefs.DeleteKey(FirstRunGuide.PrefsKey);
+
         [UnityTest]
         public IEnumerator MainMenu_Start_To_Gameplay_Flow() => UniTask.ToCoroutine(async () =>
         {
