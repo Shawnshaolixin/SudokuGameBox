@@ -70,9 +70,35 @@ grep "已应用上传签名" "d:/Projects/AI/SudokuGameBox/Build/Logs/release-aa
 
 **通过标准**：日志有 `已应用上传签名 upload.keystore(alias: sudoku)`；jarsigner 全部条目为 `CN=SudokuGameBox`，**不得出现 `CN=Android Debug`**。
 
-### 5. 交付
+### 5. 产出 Google Play 发布说明（英文，每次出包必做）
 
-验证通过后告知用户上传 `GameBox/Build/Android/Rovilo.aab`。首次上传 Play Console 会要求 Play App Signing 注册，用 `Build/keystore/upload.cer`。
+Play Console → 发布 → 版本 → **「此版本中的新功能 / What's new」**，每种语言上限 **500 字符**。
+每次出包都要产出一份，供用户直接粘贴。
+
+**取材**：从上一次出包（上一次 versionCode 提交）到 HEAD 的提交
+
+```bash
+git log --oneline <上次 versionCode 提交>..HEAD
+```
+
+**改写原则（这是发布说明，不是 commit log）**：
+
+- **面向玩家**：写「你现在能做什么」，不写「改了什么代码」。
+  ✅ `Added Rate Us and Support buttons in Settings` ／ ✗ `移除 SENTIS_ANALYTICS_ENABLED 宏`
+- **纯内部改动不写**：构建配置、宏定义、重构、CI、文档 —— 玩家看不见，写进去只是噪音。
+  例：`feat(设置)` 要写，`chore(构建)`/`docs(...)` 一律不写。
+- **≤500 字符**，超了 Console 会截断。
+- **不堆砌关键词**（ASO 红线，会被判关键词填充），只写真实改动。
+- 确实无用户可见改动时，用官方认可的标准兜底句：`Bug fixes and performance improvements.`
+
+**落地**：追加到 `docs/release-notes.md`（最新在上，英文在上、中文对照在下）。
+英文是上架用文案，中文仅供理解、不上架（与 `docs/store-listing-descriptions.md` 同规矩）。
+**同时把英文版直接贴在对话里**，用户要的是能复制粘贴的东西，不是一句"已写好"。
+
+### 6. 交付
+
+验证通过后告知用户上传 `GameBox/Build/Android/Rovilo.aab`，**并附上 §5 的英文发布说明**。
+首次上传 Play Console 会要求 Play App Signing 注册，用 `Build/keystore/upload.cer`。
 
 ## 常见坑（都是 2026-08-26 实战踩过的）
 
