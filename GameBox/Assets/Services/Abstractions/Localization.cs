@@ -84,6 +84,8 @@ namespace Box.Services
             { "settings.done", "完成" },
             { "settings.removeAds", "去广告" },
             { "settings.removeAdsPurchased", "去广告:已购买" },
+            { "settings.rate", "给个好评" },
+            { "settings.support", "联系支持" },
             { "settings.privacy", "隐私政策" },
             { "iap.notReady", "商店暂不可用,请稍后重试" },
 
@@ -162,6 +164,8 @@ namespace Box.Services
             { "settings.done", "Done" },
             { "settings.removeAds", "Remove Ads" },
             { "settings.removeAdsPurchased", "Remove Ads: Purchased" },
+            { "settings.rate", "Rate Us" },
+            { "settings.support", "Support" },
             { "settings.privacy", "Privacy Policy" },
             { "iap.notReady", "Store not ready. Try again later." },
 

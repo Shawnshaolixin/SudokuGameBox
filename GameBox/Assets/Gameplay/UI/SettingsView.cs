@@ -13,8 +13,10 @@ namespace Box.Gameplay
     /// 值走 ISettingsService(PlayerPrefs 偏好,§8.1「PlayerPrefs 只留音量/语言等偏好」);切换即生效并落盘。
     /// 主题固定浅色(2026-08-29 Bug 清单:主题按钮已移除,卡片与文字恒为设计 token 浅色值;玩法场景换肤 v1.0 后置,注释见 §10.2);
     /// 语言按钮已移除(2026-08-29 Bug 清单:v1.0 固定英文,无切换入口;L10n 机制保留备未来)。
-    /// prefab: Assets/UI/Prefabs/Popups/SettingsPopup(Phase5SceneSetup 生成):Title + 2 个切换按钮 + 去广告/隐私 + CloseButton,
+    /// prefab: Assets/UI/Prefabs/Popups/SettingsPopup(Phase5SceneSetup 生成;反馈入口由 SettingsFeedbackSetup 追加):
+    /// Title + 音效/音乐 切换 + 去广告/去评分/联系支持/隐私 + CloseButton,
     /// 按钮文案子节点约定 "Label"(与 Phase4 弹窗一致)。
+    /// ⚠️ 新增按钮须同步登记进 PopupButtonSkin 的 SurfaceNames/PrimaryNames,否则换肤阶段会被跳过(留占位蓝)。
     /// </summary>
     public sealed class SettingsView : UIView
     {
@@ -23,6 +25,13 @@ namespace Box.Gameplay
 
         /// <summary>隐私政策 URL(合规 FR-17,文档见 docs/ 与 GitHub Pages 同源)。</summary>
         const string PrivacyUrl = "https://shawnshaolixin.github.io/SudokuGameBox/privacy-policy.html";
+
+        /// <summary>商店详情页(「去评分」按钮目标)。用 https 而非 market:// ——未装 Play 商店时
+        /// 前者自动降级到浏览器,后者会直接失败。</summary>
+        const string StoreUrl = "https://play.google.com/store/apps/details?id=com.lixingames.rovilo";
+
+        /// <summary>支持邮箱(与隐私政策第 5 节同源)。主题预填应用名+版本,便于按版本分拣反馈。</summary>
+        const string SupportEmail = "slx97065227@gmail.com";
 
         UIService _svc;
         IIapService _iap;
@@ -51,6 +60,8 @@ namespace Box.Gameplay
             _iap = ServiceLocator.Iap;
             if (_iap != null) _iap.PurchaseCompleted += OnPurchaseCompleted; // 购买成功 → 刷新按钮文案
             Bind("RemoveAdsButton", OnRemoveAds);
+            Bind("RateButton", OnRate);
+            Bind("SupportButton", OnSupport);
             Bind("PrivacyButton", OnPrivacy);
             return UniTask.CompletedTask;
         }
@@ -78,6 +89,24 @@ namespace Box.Gameplay
         void OnPrivacy()
         {
             Application.OpenURL(PrivacyUrl);
+        }
+
+        /// <summary>
+        /// 去评分:打开 Play 商店详情页(05 文档 §5 检查清单「应用内评分引导」)。
+        /// ⚠️ 刻意**不**接 In-App Review API:官方明确禁止用按钮触发它——用户配额用尽时
+        /// 弹窗不出现,按钮就成了"点了没反应"的坏入口;按钮形态的官方推荐做法就是跳商店页。
+        /// (API 那侧若要做,是在通关等正反馈时刻静默调用,且它无回调、有 ≥1 个月配额,不能当转化漏斗用。)
+        /// </summary>
+        void OnRate()
+        {
+            Application.OpenURL(StoreUrl);
+        }
+
+        /// <summary>联系支持:拉起邮件客户端,主题预填应用名与版本号(同族文本见 05 文档 §5 检查清单)。</summary>
+        void OnSupport()
+        {
+            var subject = Uri.EscapeDataString("Rovilo " + Application.version + " Feedback");
+            Application.OpenURL("mailto:" + SupportEmail + "?subject=" + subject);
         }
 
         void OnPurchaseCompleted() => Refresh();
@@ -138,6 +167,8 @@ namespace Box.Gameplay
             SetLabel("CloseButton", L10n.Get("settings.done"));
             bool purchased = _iap != null && _iap.IsRemoveAdsPurchased;
             SetLabel("RemoveAdsButton", L10n.Get(purchased ? "settings.removeAdsPurchased" : "settings.removeAds"));
+            SetLabel("RateButton", L10n.Get("settings.rate"));
+            SetLabel("SupportButton", L10n.Get("settings.support"));
             SetLabel("PrivacyButton", L10n.Get("settings.privacy"));
 
             // 主题固定浅色(2026-08-29 移除主题切换按钮):卡片与文字恒为设计 token 浅色值
