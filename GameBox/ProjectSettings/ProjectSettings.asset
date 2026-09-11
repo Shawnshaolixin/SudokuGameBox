@@ -701,7 +701,7 @@ PlayerSettings:
   webWasm2023: 0
   webEnableSubmoduleStrippingCompatibility: 0
   scriptingDefineSymbols:
-    Android: APP_UI_EDITOR_ONLY;SUDOKU_IAP;SUDOKU_ADMOB;SUDOKU_FIREBASE;SENTIS_ANALYTICS_ENABLED
+    Android: APP_UI_EDITOR_ONLY;SUDOKU_IAP;SUDOKU_ADMOB;SUDOKU_FIREBASE
     Standalone: SENTIS_ANALYTICS_ENABLED;APP_UI_EDITOR_ONLY
   additionalCompilerArguments: {}
   platformArchitecture: {}
