@@ -23,7 +23,7 @@ description: 构建可上架的 Android AAB(上传签名 + 签名验证)。当�
 | JDK | 内置 OpenJDK，本机已设 `JdkUseEmbedded=1`（注册表 `HKCU\Software\Unity Technologies\Unity Editor 5.x`，GUI 等价于 Preferences → External Tools 选 "JDK installed with Unity"） |
 | Gradle | 内置（2026-08-29 改 `GradleUseEmbedded=1`；自定义 `D:\Tools\gradle-9.1.0` 曾致编辑器构建 Gradle daemon 挂死 20min+，勿再改回，编辑器与 CLI 均用内置） |
 | 网络代理 | **必须**：`maven.google.com` 国内直连被墙，Gradle 会静默无限重试（假挂死）。已配置 `~/.gradle/gradle.properties` 走本机代理 `127.0.0.1:7897`；构建前确认 Clash 类代理在跑 |
-| 产物 | `GameBox/Build/Android/Rovilo.aab`（约 57 MB） |
+| 产物 | `GameBox/Build/Android/Rovilo-release-v<versionCode>-<时间戳>.aab`（约 64 MB）。**文件名里的版本号取自 `BuildScript.cs` 的 `PlayerSettings.Android.bundleVersionCode`，可直接据此确认版本**；不要去找 `Rovilo.aab`，那个名字不存在 |
 | 耗时 | 10~20 分钟（IL2CPP 全量），建议后台运行 |
 
 ## 构建步骤
