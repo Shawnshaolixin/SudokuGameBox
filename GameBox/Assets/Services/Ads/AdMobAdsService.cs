@@ -18,16 +18,16 @@ namespace Box.Services
     /// </summary>
     public sealed class AdMobAdsService : IAdsService
     {
-        // 广告位 ID 暂用官方测试位(2026-09-08 决策,AdMob 关联审核受阻):
-        // AdMob「应用就绪度审核」要求商店公开可访问才能关联——closed testing(12+14)商店页
-        // 对公众不可见,AdMob 后台按包名/URL 均搜不到(官方限制,非索引延迟)。
-        // 因此封闭期用测试位:激励流程完整可玩(零收入零违规),测试者体验不降级;
-        // UMP 开启不受影响(测试位同样走同意流,正好完成欧盟实测)。
-        // 生产开通当天:AdMob 后台关联商店链接 → 等审核获批 → 恢复下方真 ID 并随版发布:
-        //   激励 ca-app-pub-6367116322180531/5022991846
-        //   插屏 ca-app-pub-6367116322180531/4813896836
-        private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
-        private const string InterstitialAdUnitId = "ca-app-pub-3940256099942544/1033173712";
+        // 广告位 ID:2026-09-13 正式版起启用真实广告位(封闭测试期用官方测试位,2026-09-08 决策)。
+        // 为什么现在就切、而不是等 AdMob 批准:
+        //   AdMob「应用就绪度审核」要求商店页公开可访问才能关联,而商店页只在生产轨道上线后
+        //   才公开——等批准再发版会形成死锁。真 ID 在审核通过前只是「无填充」,审核通过后
+        //   自动开始出广告,不用再发一版;反之测试位在正式包里永远是零收入,且必须重新发版才能切。
+        // 发布当天用户操作:生产轨道上线 → AdMob 后台关联商店链接 → 等就绪度审核获批。
+        // 无填充期间体验兜底:激励按钮走 GameplayView 的 hint.ad.unavailable toast,不白屏不卡死。
+        // 回滚:若线上长期无填充需临时恢复激励可玩性,换回官方测试位并重新发版。
+        private const string RewardedAdUnitId = "ca-app-pub-6367116322180531/5022991846";
+        private const string InterstitialAdUnitId = "ca-app-pub-6367116322180531/4813896836";
 
         // 广告埋点的 format 取值(两个生命周期绑定共用,避免字面量写散)
         private const string FormatRewarded = "rewarded";
