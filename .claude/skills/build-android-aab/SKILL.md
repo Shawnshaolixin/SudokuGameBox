@@ -18,7 +18,7 @@ description: 构建可上架的 Android AAB(上传签名 + 签名验证)。当�
 |---|---|
 | Unity | `C:\Program Files\Unity\Hub\Editor\6000.3.20f1\Editor\Unity.exe` |
 | 工程 | `d:\Projects\AI\SudokuGameBox\GameBox` |
-| 上传 keystore | 仓库根 `Build/keystore/upload.keystore`（alias `sudoku`；密码见 `Build/keystore/README.md`，当前为占位值 `SudokuGameBox_Upload_2026`） |
+| 上传 keystore | 仓库根 `Build/keystore/upload.keystore`（alias `sudoku`；密码见 `Build/keystore/README.md`） |
 | NDK | r27c，需环境变量 `ANDROID_NDK_ROOT=D:/Projects/AI/AndroidNDK/android-ndk-r27c` |
 | JDK | 内置 OpenJDK，本机已设 `JdkUseEmbedded=1`（注册表 `HKCU\Software\Unity Technologies\Unity Editor 5.x`，GUI 等价于 Preferences → External Tools 选 "JDK installed with Unity"） |
 | Gradle | 内置（2026-08-29 改 `GradleUseEmbedded=1`；自定义 `D:\Tools\gradle-9.1.0` 曾致编辑器构建 Gradle daemon 挂死 20min+，勿再改回，编辑器与 CLI 均用内置） |
@@ -44,8 +44,8 @@ Google Play 要求 `versionCode` 严格递增，**每次构建必须比 Console 
 ### 3. 注入环境变量并启动 CLI 构建（关键！）
 
 ```bash
-export BOX_KEYSTORE_PASS="SudokuGameBox_Upload_2026"   # 必须与 Build/keystore/README.md 一致
-export BOX_KEY_PASS="SudokuGameBox_Upload_2026"
+export BOX_KEYSTORE_PASS="<见 Build/keystore/README.md>"   # 必须与 Build/keystore/README.md 一致
+export BOX_KEY_PASS="<见 Build/keystore/README.md>"
 export ANDROID_NDK_ROOT="D:/Projects/AI/AndroidNDK/android-ndk-r27c"
 "C:/Program Files/Unity/Hub/Editor/6000.3.20f1/Editor/Unity.exe" \
   -batchmode -quit -projectPath "d:/Projects/AI/SudokuGameBox/GameBox" \
