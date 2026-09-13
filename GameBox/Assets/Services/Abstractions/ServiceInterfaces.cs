@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Box.Services
 {
@@ -58,6 +59,13 @@ namespace Box.Services
 
         void LogEvent(string eventName);
         void LogEvent(string eventName, string parameterName, object parameterValue);
+
+        /// <summary>
+        /// 多参数埋点(2026-09-13 补:单参数重载表达不了"难度+耗时+星级"这类多维事件)。
+        /// 值为 null 的键会被跳过(GA4 不支持 null);参数名须符合 <see cref="AnalyticsEvents"/> 契约。
+        /// </summary>
+        void LogEvent(string eventName, IReadOnlyDictionary<string, object> parameters);
+
         void LogNonFatal(string message);
     }
 

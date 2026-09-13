@@ -10,7 +10,8 @@ namespace Box.Gameplay
     /// 首个场景加载前创建 UIService(路由/弹窗仲裁/层级/返回键)、ModuleLoader(模块清单,Phase 4.5)
     /// 与存档/偏好服务(Phase 5:D-7 AES 存档 + PlayerPrefs 偏好),注册 Services 静态定位器供玩法层访问。
     /// v1.0 纯 AOT 直接运行,无任何网络等待;v1.1 热更下载链路在 Phase 9 接入。
-    /// 广告/内购/分析真实现 Phase 7 接入,当前传 Stub 便于观察 UI 埋点(ui_show)。
+    /// 广告/内购/分析真实现 Phase 7 接入;三者均需编译符号,缺符号时各自回退 Stub,不影响开发与 CI。
+    /// 依赖顺序:分析服务最先创建,并作为构造参数注入 IAP 与广告服务(内购漏斗/广告收益上报用)。
     /// </summary>
     public static class AppBootstrap
     {
@@ -46,14 +47,14 @@ namespace Box.Gameplay
             // 「Box/商业化/应用 AdMob+IAP 编译符号」(Phase7AdMobSetup.cs)后才会写入。
             // 这样设计:未导入 AdMob 插件前代码可正常编译,不影响日常开发与 CI。
 #if SUDOKU_IAP
-            var iap = new UnityIapService(save); // 真实现:Google Play 商店连接 + 非消耗品 remove_ads
+            var iap = new UnityIapService(save, analytics); // 真实现:Google Play 商店连接 + 非消耗品 remove_ads
 #else
             var iap = new IapServiceStub();      // 桩:模拟购买,便于无 SDK 环境跑通流程
 #endif
             ServiceLocator.RegisterIap(iap);
 
 #if SUDOKU_ADMOB
-            var ads = new AdMobAdsService(save); // 真实现:UMP 同意 + 激励视频 + 插屏(频控)
+            var ads = new AdMobAdsService(save, analytics); // 真实现:UMP 同意 + 激励视频 + 插屏(频控)
 #else
             var ads = new AdsServiceStub();      // 桩:直接"看完"并发放奖励,插屏按前 3 局简化频控
 #endif

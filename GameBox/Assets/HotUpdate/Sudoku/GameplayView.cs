@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Random = UnityEngine.Random; // 消歧:System.Random(using System) 与 UnityEngine.Random
 using Box.ModuleFramework;
@@ -185,7 +186,13 @@ namespace Box.HotUpdate.Sudoku
             RefreshTitle(); // 标题走 L10n(每日挑战/数独-难度)
             RefreshBoard();
             PlayBoardIntro(); // 给定数字逐个弹跳入场(波浪式)
-            _svc?.Router.Analytics?.LogEvent("sudoku_level_start"); // §8.4 事件名 snake_case(04 文档 §6.1)
+            // 04 文档 §6.1:开局事件带难度与来源,用于按难度拆留存。
+            // 注:本作谜题由 SudokuGenerator 程序化生成,没有题库 ID,故不报 puzzle_id。
+            _svc?.Router.Analytics?.LogEvent("sudoku_level_start", new Dictionary<string, object>
+            {
+                { "difficulty", _session.Difficulty.ToString().ToLowerInvariant() },
+                { "source", GameContext.IsDaily ? "daily" : "free" },
+            });
 
             _timerCts?.Cancel();
             _timerCts = new CancellationTokenSource();
@@ -197,7 +204,16 @@ namespace Box.HotUpdate.Sudoku
             RefreshBoard();
             PlaySfx(AudioSfx.Win); // TODO(试听):胜利音临时占位(switch 系列尾部),待正式 fanfare 替换
             if (_board != null) FxPool.Celebrate(_board.transform.position); // 胜利庆祝:棋盘中心双爆发
-            _svc?.Router.Analytics?.LogEvent("sudoku_level_complete");
+            // 04 文档 §6.1:结算事件带难度/耗时/星级/失误/提示数——难度曲线与时长分布的原始数据
+            _svc?.Router.Analytics?.LogEvent("sudoku_level_complete", new Dictionary<string, object>
+            {
+                { "difficulty", _session.Difficulty.ToString().ToLowerInvariant() },
+                { "time_sec", (int)_session.ElapsedSeconds },
+                { "stars", _session.StarRating },
+                { "mistakes", _session.MistakeCount },
+                { "hints_used", _session.HintsUsed },
+                { "source", GameContext.IsDaily ? "daily" : "free" },
+            });
 
             var result = new SettlementResult
             {
@@ -357,7 +373,13 @@ namespace Box.HotUpdate.Sudoku
                 PlaySfx(AudioSfx.Hint); // 提示落子轻音
                 FxPool.PlayBurst(FxPool.SparkTex, CellWorldPos(hintIdx), 16, 1f,
                     new Color(1f, 0.85f, 0.4f)); // 提示反馈:金色火花出现在被提示格
-                _svc?.Router.Analytics?.LogEvent("sudoku_hint_used");
+                // hint_type 判定:提示按次数先后消耗且不区分存储,故 HintsUsed(已在 TryUseHint 内自增)
+                // 超出免费额度 HintCount 的那几次,必然消耗的是"看广告回奖"得来的提示
+                var hintType = _session.HintsUsed > _session.HintCount ? "ad" : "normal";
+                _svc?.Router.Analytics?.LogEvent("sudoku_hint_used", new Dictionary<string, object>
+                {
+                    { "hint_type", hintType },
+                });
             }
             RefreshBoard(); // 回奖后同步按钮 interactable(HintExhausted 置灰 → 可点)
         }

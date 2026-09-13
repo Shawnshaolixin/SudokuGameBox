@@ -20,5 +20,11 @@ namespace Box.Services
 
         /// <summary>事件名是否合规(非法字符/大写/超长/数字开头均 false)。</summary>
         public static bool IsValidName(string eventName) => eventName != null && ValidName.IsMatch(eventName);
+
+        /// <summary>
+        /// 参数名是否合规。GA4 对参数名与事件名用同一套字符规则,违规的参数同样会被
+        /// SDK 静默丢弃——2026-09-05 事件名带点被全丢的教训,参数名沿用同一道闸。
+        /// </summary>
+        public static bool IsValidParamName(string parameterName) => parameterName != null && ValidName.IsMatch(parameterName);
     }
 }

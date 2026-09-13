@@ -29,6 +29,10 @@ namespace Box.Services
         private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
         private const string InterstitialAdUnitId = "ca-app-pub-3940256099942544/1033173712";
 
+        // 广告埋点的 format 取值(两个生命周期绑定共用,避免字面量写散)
+        private const string FormatRewarded = "rewarded";
+        private const string FormatInterstitial = "interstitial";
+
         // 真机测试设备 ID 列表(换真实广告位后的必做项,Phase 9):
         // 真机首次请求广告后,logcat 会打印
         //   Use RequestConfiguration.Builder().setTestDeviceIds(...) to get test ads on this device
@@ -48,6 +52,7 @@ namespace Box.Services
         private const string CommerceModuleId = "box.commerce"; // D-7 存档分区：去广告状态
 
         private readonly ISaveService _save;
+        private readonly IAnalyticsService _analytics; // 广告收益/展示埋点(2026-09-13 补:此前只有 Debug.Log)
         private readonly AdFrequencyController _frequency = new AdFrequencyController();
 
         private RewardedAd _rewardedAd;      // 当前就绪的激励视频实例（展示完成后置空并预加载下一个）
@@ -74,10 +79,30 @@ namespace Box.Services
         public bool IsAdsRemoved { get; private set; }
 
         /// <param name="save">存档服务，用于读写 D-7「box.commerce」分区的去广告状态。</param>
-        public AdMobAdsService(ISaveService save)
+        /// <param name="analytics">埋点服务，上报广告收益与展示链路。</param>
+        public AdMobAdsService(ISaveService save, IAnalyticsService analytics)
         {
             _save = save;
+            _analytics = analytics;
             IsAdsRemoved = _save.GetModule<CommerceData>(CommerceModuleId)?.RemoveAdsPurchased ?? false;
+        }
+
+        /// <summary>
+        /// 广告埋点统一出口:两处生命周期绑定共用的上报点,集中在此保证 format 取值一致。
+        /// </summary>
+        /// <param name="eventName">事件名(如 ads_revenue / ads_impression)。</param>
+        /// <param name="format">广告类型,取 FormatRewarded / FormatInterstitial。</param>
+        /// <param name="extra">附加参数(如收益的 value_micros / currency)。</param>
+        private void ReportAdEvent(string eventName, string format, Dictionary<string, object> extra = null)
+        {
+            if (_analytics == null) return;
+
+            var parameters = new Dictionary<string, object> { { "format", format } };
+            if (extra != null)
+            {
+                foreach (var kv in extra) parameters[kv.Key] = kv.Value;
+            }
+            _analytics.LogEvent(eventName, parameters);
         }
 
         /// <summary>
@@ -302,11 +327,24 @@ namespace Box.Services
         {
             ad.OnAdPaid += value =>
             {
-                // 广告收入事件：将来接入 Analytics 时在此上报（IAnalyticsService.LogEvent）
+                // 广告收益事件:AdMob 的 AdValue 以微单位计价(value.Value = 实际金额 × 1e6)
                 Debug.Log($"[AdMob] 激励视频付费事件：{value.Value} {value.CurrencyCode}");
+                ReportAdEvent("ads_revenue", FormatRewarded, new Dictionary<string, object>
+                {
+                    { "value_micros", value.Value },
+                    { "currency", value.CurrencyCode },
+                });
             };
-            ad.OnAdImpressionRecorded += () => Debug.Log("[AdMob] 激励视频展示已记录");
-            ad.OnAdClicked += () => Debug.Log("[AdMob] 激励视频被点击");
+            ad.OnAdImpressionRecorded += () =>
+            {
+                Debug.Log("[AdMob] 激励视频展示已记录");
+                ReportAdEvent("ads_impression", FormatRewarded);
+            };
+            ad.OnAdClicked += () =>
+            {
+                Debug.Log("[AdMob] 激励视频被点击");
+                ReportAdEvent("ads_click", FormatRewarded);
+            };
             ad.OnAdFullScreenContentOpened += () => Debug.Log("[AdMob] 激励视频已打开");
             ad.OnAdFullScreenContentClosed += () =>
             {
@@ -318,6 +356,10 @@ namespace Box.Services
             ad.OnAdFullScreenContentFailed += error =>
             {
                 Debug.LogWarning($"[AdMob] 激励视频展示失败：{error.GetMessage()}");
+                ReportAdEvent("ads_show_failed", FormatRewarded, new Dictionary<string, object>
+                {
+                    { "reason", error.GetMessage() },
+                });
                 ad.Destroy();
                 LoadRewardedAd(); // 展示失败后可重试加载
             };
@@ -346,9 +388,25 @@ namespace Box.Services
         /// <summary>绑定插屏生命周期事件。</summary>
         private void BindLifecycleEvents(InterstitialAd ad)
         {
-            ad.OnAdPaid += value => Debug.Log($"[AdMob] 插屏付费事件：{value.Value} {value.CurrencyCode}");
-            ad.OnAdImpressionRecorded += () => Debug.Log("[AdMob] 插屏展示已记录");
-            ad.OnAdClicked += () => Debug.Log("[AdMob] 插屏被点击");
+            ad.OnAdPaid += value =>
+            {
+                Debug.Log($"[AdMob] 插屏付费事件：{value.Value} {value.CurrencyCode}");
+                ReportAdEvent("ads_revenue", FormatInterstitial, new Dictionary<string, object>
+                {
+                    { "value_micros", value.Value },
+                    { "currency", value.CurrencyCode },
+                });
+            };
+            ad.OnAdImpressionRecorded += () =>
+            {
+                Debug.Log("[AdMob] 插屏展示已记录");
+                ReportAdEvent("ads_impression", FormatInterstitial);
+            };
+            ad.OnAdClicked += () =>
+            {
+                Debug.Log("[AdMob] 插屏被点击");
+                ReportAdEvent("ads_click", FormatInterstitial);
+            };
             ad.OnAdFullScreenContentOpened += () => Debug.Log("[AdMob] 插屏已打开");
             ad.OnAdFullScreenContentClosed += () =>
             {
@@ -360,6 +418,10 @@ namespace Box.Services
             ad.OnAdFullScreenContentFailed += error =>
             {
                 Debug.LogWarning($"[AdMob] 插屏展示失败：{error.GetMessage()}");
+                ReportAdEvent("ads_show_failed", FormatInterstitial, new Dictionary<string, object>
+                {
+                    { "reason", error.GetMessage() },
+                });
                 ad.Destroy();
                 LoadInterstitialAd();
             };
