@@ -1,6 +1,6 @@
 ---
 name: build-android-aab
-description: 构建可上架的 Android AAB(上传签名 + 签名验证)。当用户要求"打 AAB/发布包/上架包/打 release 包/Google Play 上传包"时使用。完整指南见 docs/17_AAB发布构建指南.md。
+description: 构建可上架的 Android AAB(上传签名 + 签名验证 + versionCode/versionName 版本号推导)。当用户要求"打 AAB/发布包/上架包/打 release 包/Google Play 上传包"时使用。完整指南见 docs/17_AAB发布构建指南.md。
 ---
 
 # 构建发布用 Android AAB
@@ -36,6 +36,69 @@ Google Play 要求 `versionCode` 严格递增，**每次构建必须比 Console 
 2. 检查 `GameBox/ProjectSettings/ProjectSettings.asset` 的 `AndroidBundleVersionCode`；
 3. 若 `< Console 最新 + 1`，先改该字段（`AndroidBundleVersionCode: N`），**确认后再构建**；
 4. 已经启动的构建若版本号不对，必须停止重建（构建启动时会快照版本号，中途改不生效）。
+
+### 1.5 推导 versionName（2026-09-16 新增）
+
+`versionCode` 管更新（整数，每次必 +1）；`versionName` 给人看（字符串，**可以不变**，
+Android 对它零格式要求）。本仓库的提交规范（AGENTS.md 规则 2 强制 `type(模块): 描述`）
+使 versionName 可自动推导。注意 `BuildReleaseDialog` **只写 versionCode、不碰 versionName**，
+这个缺口由本节补上。
+
+**核心：重算，不是递增。** 每次出包按「距上次发布累积的改动」重新推导；同一个改动集
+打 10 次包必须算出同一个值（幂等）。**严禁**"打一次包就 +1"——迭代期连打三次包会让
+版本号虚高到与实际发布历史对不上。
+
+#### 基线算法（纯 git 推导，不维护状态文件）
+
+```bash
+# 基线 = 最近一次改动 AndroidBundleVersionCode 或 bundleVersion 的提交
+# ⚠️ 必须用 -G 不能用 -S：-S 按"字符串出现次数"匹配，而改值(17→18)不改变行数，
+#    实测 -S 会错误地返回 Initial commit。这是本节最容易踩的坑。
+BASE=$(git log -1 --format=%H -G'bundleVersion:|AndroidBundleVersionCode' \
+       -- GameBox/ProjectSettings/ProjectSettings.asset)
+
+git show $BASE:GameBox/ProjectSettings/ProjectSettings.asset | grep "^  bundleVersion:"  # 上次发布的 versionName
+git log --oneline $BASE..HEAD                                                            # 本次累积改动
+```
+
+**两个字段都进基线**是必须的：若只在 versionCode 提交时推进基线，发布 1.1.0 之后
+又加功能，会从 1.0.0 重算出 1.1.0（原地踏步，版本号永远追不上）。
+
+（`-G` 的正则用 `bundleVersion:` 带冒号，可避免误匹配同文件里的 `visionOSBundleVersion`
+与 `tvOSBundleVersion`——那两个是大写 B。）
+
+#### 推导规则
+
+| 累积改动里有什么 | versionName |
+|---|---|
+| 有**用户可见**的 `feat` | 中位 +1 → `1.1.0` |
+| 只有**用户可见**的 `fix` | 末位 +1 → `1.0.1` |
+| 只有内部改动（`chore`/`docs`/`refactor`/`test`，以及埋点/构建/广告位切换类 `feat`） | **不变** |
+
+三段式的意义就在这张表：末位 +1 = 只修 bug 用法不变；中位 +1 = 加了东西但老用户不用重学；
+首位 +1 = 大改。
+
+「用户可见」的判据与 §5 **完全一致**——同一批改动，§5 判定"不写入发布说明"的，
+这里就不涨版本号。两处口径必须一致，否则会出现「版本号涨了、发布说明却写着无改动」的怪状。
+
+#### 必须问用户的情形（禁止静默改）
+
+`type` 与「用户可见」会打架——埋点、广告位切换这类常打成 `feat`，但玩家看不见。
+凡遇以下情形，**在对话里报出「建议值 + 依据」，等用户点头再写**：
+
+- 累积改动里的 `feat` 是否用户可见存在歧义
+- 涉及破坏性变更（可能需要首位 +1）
+- 基线推导值 ≠ `docs/release-notes.md` 最新条目的 versionName（说明有人手工改过，基线不可信）
+- 首次发布（尚无基线）
+
+**推导是建议，不是决定。** 这与 `BuildReleaseDialog` 对 versionCode 的做法一致
+（预填 + 用户核对，而非替用户拍板）。
+
+#### 写回
+
+写 `GameBox/ProjectSettings/ProjectSettings.asset` 的 `bundleVersion`（约 149 行）。
+versionName 烘焙进 AAB，**改完必须重新出包**才生效。改完连同 §5 的发布说明一并提交，
+**该提交即成为下次推导的基线**。
 
 ### 2. 检查 Unity 编辑器未占用工程
 
@@ -75,11 +138,16 @@ grep "已应用上传签名" "d:/Projects/AI/SudokuGameBox/Build/Logs/release-aa
 Play Console → 发布 → 版本 → **「此版本中的新功能 / What's new」**，每种语言上限 **500 字符**。
 每次出包都要产出一份，供用户直接粘贴。
 
-**取材**：从上一次出包（上一次 versionCode 提交）到 HEAD 的提交
+**取材**：**用 §1.5 的同一个基线**（最近一次改动版本号字段的提交）到 HEAD
 
 ```bash
-git log --oneline <上次 versionCode 提交>..HEAD
+BASE=$(git log -1 --format=%H -G'bundleVersion:|AndroidBundleVersionCode' \
+       -- GameBox/ProjectSettings/ProjectSettings.asset)
+git log --oneline $BASE..HEAD
 ```
+
+与 §1.5 共用基线不是巧合：**版本号涨不涨、发布说明写不写，本来就该由同一批改动回答**。
+两处口径若不一致，就会出现「versionName 涨到 1.1.0、发布说明却写 Bug fixes」的矛盾版本。
 
 **改写原则（这是发布说明，不是 commit log）**：
 
