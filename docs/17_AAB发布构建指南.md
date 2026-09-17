@@ -26,7 +26,7 @@
 | Unity | `C:\Program Files\Unity\Hub\Editor\6000.3.20f1\Editor\Unity.exe` | 6000.3.20f1 |
 | 工程 | `d:\Projects\AI\SudokuGameBox\GameBox` | 仓库根含 Build/、docs/ 等 |
 | 上传 keystore | 仓库根 `Build/keystore/upload.keystore` | alias `sudoku`；目录 gitignore，双备份纪律见 15 号文档 §4.3 |
-| keystore 密码 | 见 `Build/keystore/README.md` | 当前为占位值 `SudokuGameBox_Upload_2026`，**上架前更换** |
+| keystore 密码 | 见 `Build/keystore/README.md` | 当前为占位值 `<见 Build/keystore/README.md>`，**上架前更换** |
 | upload.cer | `Build/keystore/upload.cer` | Play App Signing 注册时上传公钥 |
 | NDK | `D:/Projects/AI/AndroidNDK/android-ndk-r27c` | 环境变量 `ANDROID_NDK_ROOT` 注入（14 号文档 FAQ 的 headless workaround） |
 | JDK | 内置 OpenJDK（AndroidPlayer 下） | 需 `JdkUseEmbedded=1`：注册表 `HKCU\Software\Unity Technologies\Unity Editor 5.x\JdkUseEmbedded_h2297287597` = 1（GUI 等价：Preferences → External Tools → JDK → JDK installed with Unity） |
@@ -44,8 +44,8 @@
 ### 3.2 注入环境变量并启动
 
 ```bash
-export BOX_KEYSTORE_PASS="SudokuGameBox_Upload_2026"   # 与 Build/keystore/README.md 一致
-export BOX_KEY_PASS="SudokuGameBox_Upload_2026"
+export BOX_KEYSTORE_PASS="<见 Build/keystore/README.md>"   # 与 Build/keystore/README.md 一致
+export BOX_KEY_PASS="<见 Build/keystore/README.md>"
 export ANDROID_NDK_ROOT="D:/Projects/AI/AndroidNDK/android-ndk-r27c"
 "C:/Program Files/Unity/Hub/Editor/6000.3.20f1/Editor/Unity.exe" \
   -batchmode -quit -projectPath "d:/Projects/AI/SudokuGameBox/GameBox" \

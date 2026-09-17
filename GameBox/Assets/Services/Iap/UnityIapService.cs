@@ -1,5 +1,6 @@
 #if SUDOKU_IAP
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Purchasing;
 using UnityEngine.Purchasing.Extension;
@@ -17,7 +18,12 @@ namespace Box.Services
         private const string CommerceModuleId = "box.commerce"; // D-7 存档分区：去广告状态
 
         private readonly ISaveService _save;
+        private readonly IAnalyticsService _analytics; // 内购漏斗埋点(2026-09-13 补:此前全链路零埋点)
         private IStoreController _controller; // Unity IAP 商店控制器（初始化成功后可用）
+
+        // 区分「用户主动新购」与「Google Play 启动自动恢复」——两者都走 ProcessPurchase，
+        // 只看回调参数分不出来。由 BuyRemoveAds 置位、ProcessPurchase/失败回调复位。
+        private bool _purchaseRequested;
 
         public bool IsInitialized { get; private set; }
 
@@ -28,9 +34,11 @@ namespace Box.Services
         public event Action PurchaseCompleted;
 
         /// <param name="save">存档服务，用于读写 D-7「box.commerce」分区的去广告状态。</param>
-        public UnityIapService(ISaveService save)
+        /// <param name="analytics">埋点服务，上报内购漏斗（开始 / 完成 / 失败）。</param>
+        public UnityIapService(ISaveService save, IAnalyticsService analytics)
         {
             _save = save;
+            _analytics = analytics;
             // 启动时先从 D-7 分区恢复（离线兜底）；发布环境下以收据校验为准（OnInitialized 里检测 hasReceipt）
             IsRemoveAdsPurchased = _save.GetModule<CommerceData>(CommerceModuleId)?.RemoveAdsPurchased ?? false;
         }
@@ -86,6 +94,11 @@ namespace Box.Services
             }
 
             Debug.Log("[IAP] 发起购买 remove_ads");
+            _purchaseRequested = true; // 标记:随后的 ProcessPurchase 属用户主动新购,而非启动自动恢复
+            _analytics?.LogEvent("iap_purchase_start", new Dictionary<string, object>
+            {
+                { "product", RemoveAdsProductId },
+            });
             _controller.InitiatePurchase(RemoveAdsProductId);
         }
 
@@ -103,7 +116,7 @@ namespace Box.Services
             if (product != null && product.hasReceipt && !IsRemoveAdsPurchased)
             {
                 Debug.Log("[IAP] 检测到已购收据（Android 自动恢复），完成去广告");
-                CompletePurchase(product);
+                CompletePurchase(product, "restore");
             }
         }
 
@@ -142,7 +155,10 @@ namespace Box.Services
 
             if (product.definition.id == RemoveAdsProductId)
             {
-                CompletePurchase(product);
+                // 主动购买过 = 新购;否则是 Google Play 对非消耗品的启动自动恢复回调
+                var source = _purchaseRequested ? "purchase" : "restore";
+                _purchaseRequested = false;
+                CompletePurchase(product, source);
                 return PurchaseProcessingResult.Complete;
             }
 
@@ -153,24 +169,38 @@ namespace Box.Services
         /// <summary>购买失败（新式详细回调）。用户取消购买是常见情况，仅告警不视为错误。</summary>
         public void OnPurchaseFailed(Product product, PurchaseFailureDescription failureDescription)
         {
+            _purchaseRequested = false; // 失败/取消后复位,否则下一次启动恢复回调会被误判成新购
             Debug.LogWarning($"[IAP] 购买失败：{product.definition.id}，原因 {failureDescription.reason}（{failureDescription.message}）");
+            _analytics?.LogEvent("iap_purchase_failed", new Dictionary<string, object>
+            {
+                { "product", product.definition.id },
+                { "reason", failureDescription.reason.ToString().ToLowerInvariant() },
+            });
         }
 
         /// <summary>购买失败（旧版回调，转发到详细版）。</summary>
         public void OnPurchaseFailed(Product product, PurchaseFailureReason failureReason)
         {
+            _purchaseRequested = false;
             Debug.LogWarning($"[IAP] 购买失败（旧回调）：{product.definition.id}，原因 {failureReason}");
+            _analytics?.LogEvent("iap_purchase_failed", new Dictionary<string, object>
+            {
+                { "product", product.definition.id },
+                { "reason", failureReason.ToString().ToLowerInvariant() },
+            });
         }
 
         // ======================== 内部工具 ========================
 
         /// <summary>
         /// 购买/恢复成功统一出口：写入 D-7「box.commerce」分区并触发 PurchaseCompleted。\n    /// 由此，Bootstrap 订阅该事件调用 AdsService.SetRemoveAds(true)，完成去广告闭环。\n    /// </summary>
-        private void CompletePurchase(Product product)
+        /// <param name="source">"purchase" = 用户主动新购；"restore" = 启动/手动恢复。</param>
+        private void CompletePurchase(Product product, string source)
         {
             if (IsRemoveAdsPurchased)
             {
-                // 幂等：重复回调（如启动恢复 + 手动再购）不重复写盘/发事件
+                // 幂等：重复回调（如启动恢复 + 手动再购）不重复写盘/发事件。
+                // 也不上报埋点——这不是一次新转化,报了会虚增购买漏斗。
                 PurchaseCompleted?.Invoke();
                 return;
             }
@@ -182,6 +212,13 @@ namespace Box.Services
                 UpdatedAtUnixSec = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             });
             Debug.Log($"[IAP] 去广告购买完成，已写入存档分区 {CommerceModuleId}");
+
+            // 与上面的幂等分支互斥:只有状态真正由「未购 → 已购」时才是一次转化
+            _analytics?.LogEvent("iap_purchase_complete", new Dictionary<string, object>
+            {
+                { "product", product.definition.id },
+                { "source", source },
+            });
 
             PurchaseCompleted?.Invoke();
         }

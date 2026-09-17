@@ -19,14 +19,20 @@ namespace Box.Services
     /// </summary>
     public sealed class AdMobAdsService : IAdsService
     {
-        // 广告位 ID 2026-08-29 起临时切回官方测试位(16 号文档备忘 #3):
-        // 封闭测试包分发给他人时,他人设备不在 TestDeviceIds 内会收到真实广告,点击有无效流量风险;
-        // 官方测试位在任何设备上都返回测试广告(零收入,无违规风险),开发阶段无需注册测试设备。
-        // 封闭测试结束、上生产轨道前恢复真实 ID(正式值,勿再切回测试位):
-        //   激励 ca-app-pub-6367116322180531/5022991846
-        //   插屏 ca-app-pub-6367116322180531/4813896836
-        private const string RewardedAdUnitId = "ca-app-pub-3940256099942544/5224354917";
-        private const string InterstitialAdUnitId = "ca-app-pub-3940256099942544/1033173712";
+        // 广告位 ID:2026-09-13 正式版起启用真实广告位(封闭测试期用官方测试位,2026-09-08 决策)。
+        // 为什么现在就切、而不是等 AdMob 批准:
+        //   AdMob「应用就绪度审核」要求商店页公开可访问才能关联,而商店页只在生产轨道上线后
+        //   才公开——等批准再发版会形成死锁。真 ID 在审核通过前只是「无填充」,审核通过后
+        //   自动开始出广告,不用再发一版;反之测试位在正式包里永远是零收入,且必须重新发版才能切。
+        // 发布当天用户操作:生产轨道上线 → AdMob 后台关联商店链接 → 等就绪度审核获批。
+        // 无填充期间体验兜底:激励按钮走 GameplayView 的 hint.ad.unavailable toast,不白屏不卡死。
+        // 回滚:若线上长期无填充需临时恢复激励可玩性,换回官方测试位并重新发版。
+        private const string RewardedAdUnitId = "ca-app-pub-6367116322180531/5022991846";
+        private const string InterstitialAdUnitId = "ca-app-pub-6367116322180531/4813896836";
+
+        // 广告埋点的 format 取值(两个生命周期绑定共用,避免字面量写散)
+        private const string FormatRewarded = "rewarded";
+        private const string FormatInterstitial = "interstitial";
 
         // 真机测试设备 ID 列表(换真实广告位后的必做项,Phase 9):
         // 真机首次请求广告后,logcat 会打印
@@ -36,15 +42,18 @@ namespace Box.Services
         // 新设备首次请求广告后按 logcat 提示补充。填入后广告初始化前生效。
         private static readonly List<string> TestDeviceIds = new() { "AAC1C00E2A99B28A43349D7BD59ADE49" };
 
-        // UMP 同意流程开关(Phase 9 真机):GDPR 只约束欧洲(EEA)用户,中国用户不需要同意表单。
-        // 真机实测:UMP 访问 consent.google.com 在国内网络会挂起,原生调用阻塞导致广告初始化
-        // 迟迟不执行(15 秒超时兜底都来不及触发)。测试期默认关闭,直接初始化广告;
-        // 上架面向欧美市场时置回 true 并确保 UMP 表单在 AdMob 后台「隐私与消息」已配置。
-        private const bool UmpEnabled = false;
+        // UMP 同意流程开关:GDPR 只约束欧洲(EEA)用户,非 EEA 设备不会弹表单。
+        // 2026-09-08 恢复启用(上架线要求,05 文档发布清单:UMP 欧盟实测)。
+        // 前置条件:AdMob 后台「隐私与消息」已配置 GDPR 表单——未配置时表单加载失败仅告警
+        // 走兜底,但 EEA 用户无同意即展示广告不合规,务必先配好再发版。
+        // 国内自测注意:consent.google.com 访问挂起时由 UmpFlowWithTimeout 的 15 秒兜底接管,
+        // 广告初始化最多延迟 15 秒(海外测试者无此问题)。
+        private const bool UmpEnabled = true;
 
         private const string CommerceModuleId = "box.commerce"; // D-7 存档分区：去广告状态
 
         private readonly ISaveService _save;
+        private readonly IAnalyticsService _analytics; // 广告收益/展示埋点(2026-09-13 补:此前只有 Debug.Log)
         private readonly AdFrequencyController _frequency = new AdFrequencyController();
 
         private RewardedAd _rewardedAd;      // 当前就绪的激励视频实例（展示完成后置空并预加载下一个）
@@ -71,10 +80,30 @@ namespace Box.Services
         public bool IsAdsRemoved { get; private set; }
 
         /// <param name="save">存档服务，用于读写 D-7「box.commerce」分区的去广告状态。</param>
-        public AdMobAdsService(ISaveService save)
+        /// <param name="analytics">埋点服务，上报广告收益与展示链路。</param>
+        public AdMobAdsService(ISaveService save, IAnalyticsService analytics)
         {
             _save = save;
+            _analytics = analytics;
             IsAdsRemoved = _save.GetModule<CommerceData>(CommerceModuleId)?.RemoveAdsPurchased ?? false;
+        }
+
+        /// <summary>
+        /// 广告埋点统一出口:两处生命周期绑定共用的上报点,集中在此保证 format 取值一致。
+        /// </summary>
+        /// <param name="eventName">事件名(如 ads_revenue / ads_impression)。</param>
+        /// <param name="format">广告类型,取 FormatRewarded / FormatInterstitial。</param>
+        /// <param name="extra">附加参数(如收益的 value_micros / currency)。</param>
+        private void ReportAdEvent(string eventName, string format, Dictionary<string, object> extra = null)
+        {
+            if (_analytics == null) return;
+
+            var parameters = new Dictionary<string, object> { { "format", format } };
+            if (extra != null)
+            {
+                foreach (var kv in extra) parameters[kv.Key] = kv.Value;
+            }
+            _analytics.LogEvent(eventName, parameters);
         }
 
         /// <summary>
@@ -93,7 +122,7 @@ namespace Box.Services
                 return;
             }
 
-            // —— 第零步:注册真机测试设备(TestDeviceIds 非空时生效;测试位 ID 阶段可跳过)——
+            // —— 第零步:注册真机测试设备(TestDeviceIds 非空时生效;真广告位阶段必做,防自点无效流量)——
             if (TestDeviceIds.Count > 0)
             {
                 var requestConfiguration = new RequestConfiguration
@@ -306,11 +335,24 @@ namespace Box.Services
         {
             ad.OnAdPaid += value =>
             {
-                // 广告收入事件：将来接入 Analytics 时在此上报（IAnalyticsService.LogEvent）
+                // 广告收益事件:AdMob 的 AdValue 以微单位计价(value.Value = 实际金额 × 1e6)
                 Debug.Log($"[AdMob] 激励视频付费事件：{value.Value} {value.CurrencyCode}");
+                ReportAdEvent("ads_revenue", FormatRewarded, new Dictionary<string, object>
+                {
+                    { "value_micros", value.Value },
+                    { "currency", value.CurrencyCode },
+                });
             };
-            ad.OnAdImpressionRecorded += () => Debug.Log("[AdMob] 激励视频展示已记录");
-            ad.OnAdClicked += () => Debug.Log("[AdMob] 激励视频被点击");
+            ad.OnAdImpressionRecorded += () =>
+            {
+                Debug.Log("[AdMob] 激励视频展示已记录");
+                ReportAdEvent("ads_impression", FormatRewarded);
+            };
+            ad.OnAdClicked += () =>
+            {
+                Debug.Log("[AdMob] 激励视频被点击");
+                ReportAdEvent("ads_click", FormatRewarded);
+            };
             ad.OnAdFullScreenContentOpened += () => Debug.Log("[AdMob] 激励视频已打开");
             ad.OnAdFullScreenContentClosed += () =>
             {
@@ -322,6 +364,10 @@ namespace Box.Services
             ad.OnAdFullScreenContentFailed += error =>
             {
                 Debug.LogWarning($"[AdMob] 激励视频展示失败：{error.GetMessage()}");
+                ReportAdEvent("ads_show_failed", FormatRewarded, new Dictionary<string, object>
+                {
+                    { "reason", error.GetMessage() },
+                });
                 ad.Destroy();
                 LoadRewardedAd(); // 展示失败后可重试加载
             };
@@ -350,9 +396,25 @@ namespace Box.Services
         /// <summary>绑定插屏生命周期事件。</summary>
         private void BindLifecycleEvents(InterstitialAd ad)
         {
-            ad.OnAdPaid += value => Debug.Log($"[AdMob] 插屏付费事件：{value.Value} {value.CurrencyCode}");
-            ad.OnAdImpressionRecorded += () => Debug.Log("[AdMob] 插屏展示已记录");
-            ad.OnAdClicked += () => Debug.Log("[AdMob] 插屏被点击");
+            ad.OnAdPaid += value =>
+            {
+                Debug.Log($"[AdMob] 插屏付费事件：{value.Value} {value.CurrencyCode}");
+                ReportAdEvent("ads_revenue", FormatInterstitial, new Dictionary<string, object>
+                {
+                    { "value_micros", value.Value },
+                    { "currency", value.CurrencyCode },
+                });
+            };
+            ad.OnAdImpressionRecorded += () =>
+            {
+                Debug.Log("[AdMob] 插屏展示已记录");
+                ReportAdEvent("ads_impression", FormatInterstitial);
+            };
+            ad.OnAdClicked += () =>
+            {
+                Debug.Log("[AdMob] 插屏被点击");
+                ReportAdEvent("ads_click", FormatInterstitial);
+            };
             ad.OnAdFullScreenContentOpened += () => Debug.Log("[AdMob] 插屏已打开");
             ad.OnAdFullScreenContentClosed += () =>
             {
@@ -364,6 +426,10 @@ namespace Box.Services
             ad.OnAdFullScreenContentFailed += error =>
             {
                 Debug.LogWarning($"[AdMob] 插屏展示失败：{error.GetMessage()}");
+                ReportAdEvent("ads_show_failed", FormatInterstitial, new Dictionary<string, object>
+                {
+                    { "reason", error.GetMessage() },
+                });
                 ad.Destroy();
                 LoadInterstitialAd();
             };

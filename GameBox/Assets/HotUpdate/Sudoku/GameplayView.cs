@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Random = UnityEngine.Random; // 消歧:System.Random(using System) 与 UnityEngine.Random
 using Box.ModuleFramework;
@@ -37,6 +38,8 @@ namespace Box.HotUpdate.Sudoku
         CancellationTokenSource _timerCts;
         CancellationTokenSource _introCts; // 入场弹跳动画(重开新局/销毁时取消)
         CancellationTokenSource _fxCts;    // 单元扩散动画(新动画取代旧动画时取消)
+        CancellationTokenSource _guideCts; // 首局新手引导(视图销毁时取消防残留等待)
+        FirstRunGuide _guide;              // 引导实例(播放中非空;OnBackKey 拦截用)
         int[] _rippleCells;                // 扩散动画进行中的单元格(新动画开始时恢复残留金色)
         int _fxFrame = -1;                 // 同帧多单元凑齐(收官格 宫+行+列同帧触发)只播第一波的帧标记
 
@@ -91,6 +94,34 @@ namespace Box.HotUpdate.Sudoku
             ApplyLanguage(); // 打开即按当前语言刷新(prefab 初始英文文案)
             // 淡入(D-15):绑定 _timerCts,OnDestroy 取消防场景后协程访问已销毁对象
             await BoxTween.FadeTo(gameObject, 0f, 1f, 0.2f, _timerCts.Token);
+            await ShowFirstRunGuideAsync(); // 首局三步引导(见 FirstRunGuide;仅首次进对局)
+        }
+
+        /// <summary>
+        /// 首局新手引导(2026-09-09 产品拍板:三步极简):淡入+落子动效收尾后弹出,
+        /// 完成(Skip/Got it)写 PlayerPrefs 标记,此后永不再弹;中途被取消(视图销毁)不标记。
+        /// </summary>
+        async UniTask ShowFirstRunGuideAsync()
+        {
+            if (FirstRunGuide.HasShown || _svc == null) return; // 已引导/异常上下文:放行
+            await UniTask.Delay(600, DelayType.DeltaTime, PlayerLoopTiming.Update, _timerCts.Token); // 等落子动效(≤0.55s)收尾
+            _guideCts?.Cancel();
+            _guideCts = new CancellationTokenSource();
+            // 字体模板取标题 TMP:引导文案与对局内同字体(字符集含 ×/– 等符号,见字体子集清单)
+            var fontTemplate = transform.Find("TitleText")?.GetComponent<TextMeshProUGUI>();
+            var guide = new FirstRunGuide(transform, fontTemplate);
+            _guide = guide;
+            try
+            {
+                await guide.RunAsync(_guideCts.Token);
+                FirstRunGuide.MarkShown(); // 完整走完(含 Skip)才标记,中途退出不写
+            }
+            catch (OperationCanceledException) { /* 视图销毁:本次不标记,下次进对局再引导 */ }
+            finally
+            {
+                guide.Dispose();
+                _guide = null;
+            }
         }
 
         // 隐藏 MonoBehaviour.OnDestroy(Unity 生命周期):场景卸载即清理,防残留闭包;
@@ -102,6 +133,7 @@ namespace Box.HotUpdate.Sudoku
             _timerCts?.Cancel();
             _introCts?.Cancel();
             _fxCts?.Cancel();
+            _guideCts?.Cancel(); // 引导进行中退场:中断等待,Dispose 由 finally 执行
             if (_svc != null) _svc.ClearBackHandler();
         }
 
@@ -154,7 +186,13 @@ namespace Box.HotUpdate.Sudoku
             RefreshTitle(); // 标题走 L10n(每日挑战/数独-难度)
             RefreshBoard();
             PlayBoardIntro(); // 给定数字逐个弹跳入场(波浪式)
-            _svc?.Router.Analytics?.LogEvent("sudoku_level_start"); // §8.4 事件名 snake_case(04 文档 §6.1)
+            // 04 文档 §6.1:开局事件带难度与来源,用于按难度拆留存。
+            // 注:本作谜题由 SudokuGenerator 程序化生成,没有题库 ID,故不报 puzzle_id。
+            _svc?.Router.Analytics?.LogEvent("sudoku_level_start", new Dictionary<string, object>
+            {
+                { "difficulty", _session.Difficulty.ToString().ToLowerInvariant() },
+                { "source", GameContext.IsDaily ? "daily" : "free" },
+            });
 
             _timerCts?.Cancel();
             _timerCts = new CancellationTokenSource();
@@ -166,7 +204,16 @@ namespace Box.HotUpdate.Sudoku
             RefreshBoard();
             PlaySfx(AudioSfx.Win); // TODO(试听):胜利音临时占位(switch 系列尾部),待正式 fanfare 替换
             if (_board != null) FxPool.Celebrate(_board.transform.position); // 胜利庆祝:棋盘中心双爆发
-            _svc?.Router.Analytics?.LogEvent("sudoku_level_complete");
+            // 04 文档 §6.1:结算事件带难度/耗时/星级/失误/提示数——难度曲线与时长分布的原始数据
+            _svc?.Router.Analytics?.LogEvent("sudoku_level_complete", new Dictionary<string, object>
+            {
+                { "difficulty", _session.Difficulty.ToString().ToLowerInvariant() },
+                { "time_sec", (int)_session.ElapsedSeconds },
+                { "stars", _session.StarRating },
+                { "mistakes", _session.MistakeCount },
+                { "hints_used", _session.HintsUsed },
+                { "source", GameContext.IsDaily ? "daily" : "free" },
+            });
 
             var result = new SettlementResult
             {
@@ -222,6 +269,7 @@ namespace Box.HotUpdate.Sudoku
 
         UniTask<bool> OnBackKey()
         {
+            if (_guide != null && _guide.IsRunning) return UniTask.FromResult(true); // 引导中:吞掉,防误撤销/退出
             if (_svc != null && _svc.Router.StackCount > 0) return UniTask.FromResult(false); // 弹窗打开:交还路由
             OnBack();
             return UniTask.FromResult(true);
@@ -330,7 +378,13 @@ namespace Box.HotUpdate.Sudoku
                 PlaySfx(AudioSfx.Hint); // 提示落子轻音
                 FxPool.PlayBurst(FxPool.SparkTex, CellWorldPos(hintIdx), 16, 1f,
                     new Color(1f, 0.85f, 0.4f)); // 提示反馈:金色火花出现在被提示格
-                _svc?.Router.Analytics?.LogEvent("sudoku_hint_used");
+                // hint_type 判定:提示按次数先后消耗且不区分存储,故 HintsUsed(已在 TryUseHint 内自增)
+                // 超出免费额度 HintCount 的那几次,必然消耗的是"看广告回奖"得来的提示
+                var hintType = _session.HintsUsed > _session.HintCount ? "ad" : "normal";
+                _svc?.Router.Analytics?.LogEvent("sudoku_hint_used", new Dictionary<string, object>
+                {
+                    { "hint_type", hintType },
+                });
             }
             RefreshBoard(); // 回奖后同步按钮 interactable(HintExhausted 置灰 → 可点)
         }

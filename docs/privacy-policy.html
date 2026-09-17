@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>隐私政策 / Privacy Policy - Rovilo</title>
+<title>Privacy Policy / 隐私政策 - Rovilo</title>
 <style>
   body { font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 860px; margin: 0 auto; padding: 24px 20px; color: #222; line-height: 1.7; }
   h1, h2 { color: #111; }
@@ -19,16 +19,64 @@
 <body>
 
 <!--
-  隐私政策已定稿（2026-08-29）：
+  隐私政策已定稿（2026-08-29），2026-09-16 补正：
   应用名 Rovilo、联系邮箱 slx97065227@gmail.com、生效日期 2026-08-29。
+
+  2026-09-16 补正原因（勿删，避免以后又改回去）：
+  Play Console「数据安全」表单要求声明「大致位置」。依据 Google 官方 AdMob
+  数据披露表，AdMob 会收集 IP 地址并"可能用于估算设备的大致位置"——
+  这与是否申请定位权限无关。原第 1 节表格"no location"的表述会与表单口径
+  冲突（表单勾了大致位置、政策却说没有），故改为区分「不申请定位权限」与
+  「SDK 依据 IP 推算大致位置」两件事。
   托管：GitHub Pages（docs/ 目录,main 分支），本页 URL：
   https://shawnshaolixin.github.io/SudokuGameBox/privacy-policy.html
   游戏内「隐私政策」按钮（SettingsView 占位 URL）应指向同一地址。
 -->
 
-<h1 class="lang-zh">隐私政策（Privacy Policy）</h1>
-<p>最后更新 / Last Updated: <strong>2026-08-29</strong></p>
+<h1 class="lang-zh">Privacy Policy / 隐私政策</h1>
+<p>最后更新 / Last Updated: <strong>2026-09-16</strong></p>
 <p>生效日期 / Effective Date: <strong>2026-08-29</strong></p>
+
+<section>
+<h2>English Version</h2>
+<p>Thank you for using <strong>Rovilo</strong> ("the App"). We respect your privacy. This policy explains what information is collected, used and shared on Android devices, and how you can control it.</p>
+
+<h3>1. Data We Collect</h3>
+<table>
+<tr><th>Data type</th><th>Collected?</th><th>Purpose</th></tr>
+<tr><td>Advertising ID (AAID), app set ID and other device identifiers</td><td>Yes</td><td>Google AdMob uses these to serve ads, control ad frequency and prevent invalid traffic; Firebase uses an app-instance identifier for analytics</td></tr>
+<tr><td>Approximate location (inferred from IP address)</td><td>Yes</td><td><strong>The App requests no location permission and never reads your device's GPS.</strong> However, Google AdMob and Firebase Analytics receive your IP address, from which an approximate, city-level location may be inferred, for ad targeting and analytics</td></tr>
+<tr><td>App activity (anonymous in-game events: game start, level complete, hint used, ad shown/clicked, purchase funnel)</td><td>Yes</td><td>Understand retention and feature performance (Firebase Analytics); ad delivery and measurement (Google AdMob)</td></tr>
+<tr><td>Crash logs and diagnostics (crash stack traces, app launch time, hang rate, energy usage)</td><td>Yes</td><td>Diagnose crashes and improve stability (Firebase Crashlytics); SDK diagnostics (Google AdMob)</td></tr>
+<tr><td>Game save data (progress, coins, preferences)</td><td>Local only</td><td>Stored on your device only; <strong>never uploaded to any server</strong>. Uninstalling or clearing data removes it.</td></tr>
+<tr><td>Accounts, contacts, photos and other sensitive data</td><td>No</td><td>The App has no account system and requests no contact or photo permission. It requests no location permission either — see the approximate-location row above for how IP-inferred location is handled</td></tr>
+</table>
+
+<h3>2. Third-Party SDKs</h3>
+<ul>
+<li><strong>Google AdMob / Google User Messaging Platform (UMP)</strong>: serve rewarded/interstitial ads; UMP obtains consent where required (e.g. EEA). See <a href="https://policies.google.com/privacy" rel="nofollow">Google Privacy Policy</a>.</li>
+<li><strong>Google Play Billing (Unity IAP)</strong>: processes the "Remove Ads" non-consumable purchase and returns only purchase receipts.</li>
+<li><strong>Firebase Analytics / Crashlytics</strong>: anonymous events and crash reporting.</li>
+</ul>
+<p><strong>Sharing.</strong> The data types marked "Yes" in section 1 are transmitted to Google and processed there for advertising, analytics and fraud-prevention purposes. We do not sell your data to anyone, and we operate no server of our own that stores it.</p>
+
+<h3>3. Children's Privacy</h3>
+<p>The App is intended for users aged 13 and above. It is not directed to children under 13, and we do not knowingly collect personal information from children under 13. Our ad requests are not configured as child-directed. If you believe that a child under 13 has provided us with personal information, please contact us using the address in section 5 and we will delete it.</p>
+
+<h3>4. Your Rights and Choices</h3>
+<ul>
+<li><strong>Consent</strong>: in applicable regions you will see a UMP consent form on first launch and can accept or reject personalized ads.</li>
+<li><strong>Deletion</strong>: we operate no server and all game saves are local — uninstall the App or clear its data to remove them. For the data held by the advertising and analytics SDKs (device identifiers, approximate location, app activity, diagnostics), you may request deletion at any time by emailing <strong>slx97065227@gmail.com</strong>; we will pass the request to the relevant provider and reply within 30 days.</li>
+<li><strong>Security</strong>: everything the App sends is transmitted over encrypted connections (HTTPS/TLS). Nothing is stored on a server we control, because we operate none.</li>
+<li><strong>Opt out of personalized ads</strong>: reset your Advertising ID in Android Settings → Privacy → Ads.</li>
+<li><strong>Purchases</strong>: buying "Remove Ads" disables ads for all time; purchases can be restored on the in-app store screen.</li>
+</ul>
+
+<h3>5. Changes and Contact</h3>
+<p>We may update this policy; the latest version will always be published on this page. For privacy questions: <strong>slx97065227@gmail.com</strong>.</p>
+</section>
+
+<hr>
 
 <section>
 <h2>中文版</h2>
@@ -37,11 +85,12 @@
 <h3>1. 我们收集的数据</h3>
 <table>
 <tr><th>数据类型</th><th>是否收集</th><th>用途</th></tr>
-<tr><td>广告标识符（Advertising ID / AAID）</td><td>是</td><td>由广告 SDK（Google AdMob）用于展示广告、控制广告频次并防止无效流量</td></tr>
-<tr><td>崩溃日志与错误信息</td><td>是</td><td>用于诊断崩溃与改进稳定性（Firebase Crashlytics）</td></tr>
-<tr><td>匿名使用事件（如开始游戏、完成一局）</td><td>是</td><td>用于了解玩法留存与功能效果（Firebase Analytics）</td></tr>
+<tr><td>广告标识符（Advertising ID / AAID）、应用集 ID 及其他设备标识符</td><td>是</td><td>Google AdMob 用于展示广告、控制广告频次并防止无效流量；Firebase 使用应用实例标识符做统计分析</td></tr>
+<tr><td>大致位置（依据 IP 地址推算）</td><td>是</td><td><strong>本应用不申请定位权限，也从不读取设备 GPS。</strong>但 Google AdMob 与 Firebase Analytics 会收到你的 IP 地址，据此可能推算出城市级的大致位置，用于广告投放与统计分析</td></tr>
+<tr><td>应用活动（匿名游戏内事件：开始游戏、完成一局、使用提示、广告展示/点击、内购漏斗）</td><td>是</td><td>了解玩法留存与功能效果（Firebase Analytics）；广告展示与效果衡量（Google AdMob）</td></tr>
+<tr><td>崩溃日志与诊断信息（崩溃堆栈、启动耗时、卡顿率、耗电情况）</td><td>是</td><td>诊断崩溃与改进稳定性（Firebase Crashlytics）；广告 SDK 自身的诊断（Google AdMob）</td></tr>
 <tr><td>游戏存档（数独进度、货币、设置偏好）</td><td>仅本地</td><td>存档只保存在你的设备上，<strong>不上传任何服务器</strong>；卸载应用或清除数据会删除存档</td></tr>
-<tr><td>账号、邮箱、通讯录、位置、照片等个人敏感信息</td><td>否</td><td>本应用不包含账号系统，不请求任何联系人/位置/相册权限</td></tr>
+<tr><td>账号、邮箱、通讯录、照片等个人敏感信息</td><td>否</td><td>本应用不包含账号系统，不请求任何联系人或相册权限，也不申请定位权限——IP 推算位置的说明见上表「大致位置」一行</td></tr>
 </table>
 
 <h3>2. 第三方 SDK</h3>
@@ -51,14 +100,16 @@
 <li><strong>Google Play Billing（Unity IAP）</strong>：处理「去广告」内购商品结算，仅返回购买凭据，不收集个人身份信息。</li>
 <li><strong>Firebase Analytics / Crashlytics</strong>：匿名事件埋点与崩溃统计。</li>
 </ul>
+<p><strong>关于共享。</strong>第 1 节中标记为「是」的数据会传输给 Google，并在那里用于广告、分析与防欺诈目的。我们不会将你的数据出售给任何其他方，自身也不运营任何存储这些数据的服务器。</p>
 
 <h3>3. 儿童隐私</h3>
-<p>本应用面向所有年龄段的休闲玩家，不包含社交、聊天、用户生成内容等功能。广告内容由第三方平台分发，并遵循 Google 的广告与儿童相关政策；若适用地区要求，我们将按平台指引启用「面向儿童的应用」设置（如 UMP 的按年龄段处理）。</p>
+<p>本应用面向 13 岁及以上用户，不面向 13 岁以下儿童。我们不会有意收集 13 岁以下儿童的个人信息，也不会将广告请求配置为面向儿童。如你认为有 13 岁以下儿童向我们提供了个人信息，请通过第 5 节的联系方式告知我们，我们将予以删除。</p>
 
 <h3>4. 你的权利与选择</h3>
 <ul>
 <li><strong>同意管理</strong>：在欧洲经济区（EEA）等适用地区，首次启动时你会看到 UMP 同意弹窗，可选择接受或拒绝个性化广告；之后也可随时在系统设置中管理。</li>
-<li><strong>删除数据</strong>：本应用没有服务器端数据，所有存档仅存于设备本地。卸载应用或在系统设置中清除应用数据即可删除全部数据。</li>
+<li><strong>删除数据</strong>：我们不运营服务器，所有游戏存档仅存于设备本地，卸载应用或在系统设置中清除应用数据即可删除。对于广告与分析 SDK 所持有的数据（设备标识符、大致位置、应用活动、诊断信息），你可随时发邮件至 <strong>slx97065227@gmail.com</strong> 请求删除，我们会将请求转达相应服务商并在 30 天内答复。</li>
+<li><strong>传输安全</strong>：本应用发出的一切数据均经加密连接（HTTPS/TLS）传输。我们自身不运营任何服务器，因此没有由我们控制的服务器留存这些数据。</li>
 <li><strong>关闭个性化广告</strong>：可在 Android 系统「隐私 → 广告」中重置广告标识符。</li>
 <li><strong>内购</strong>：购买「去广告」商品后你将不再看到广告；恢复购买可在应用内商店页面操作。</li>
 </ul>
@@ -68,46 +119,8 @@
 <p><strong>slx97065227@gmail.com</strong></p>
 </section>
 
-<hr>
-
-<section>
-<h2>English Version</h2>
-<p>Thank you for using <strong>Rovilo</strong> ("the App"). We respect your privacy. This policy explains what information is collected, used and shared on Android devices, and how you can control it.</p>
-
-<h3>1. Data We Collect</h3>
-<table>
-<tr><th>Data type</th><th>Collected?</th><th>Purpose</th></tr>
-<tr><td>Advertising ID (AAID)</td><td>Yes</td><td>Used by Google AdMob to serve ads, control ad frequency and prevent invalid traffic</td></tr>
-<tr><td>Crash logs / error reports</td><td>Yes</td><td>Diagnose crashes and improve stability (Firebase Crashlytics)</td></tr>
-<tr><td>Anonymous usage events (game start, level complete, etc.)</td><td>Yes</td><td>Understand retention and feature performance (Firebase Analytics)</td></tr>
-<tr><td>Game save data (progress, coins, preferences)</td><td>Local only</td><td>Stored on your device only; <strong>never uploaded to any server</strong>. Uninstalling or clearing data removes it.</td></tr>
-<tr><td>Accounts, contacts, location, photos and other sensitive data</td><td>No</td><td>The App has no account system and requests no contact/location/photo permissions</td></tr>
-</table>
-
-<h3>2. Third-Party SDKs</h3>
-<ul>
-<li><strong>Google AdMob / Google User Messaging Platform (UMP)</strong>: serve rewarded/interstitial ads; UMP obtains consent where required (e.g. EEA). See <a href="https://policies.google.com/privacy" rel="nofollow">Google Privacy Policy</a>.</li>
-<li><strong>Google Play Billing (Unity IAP)</strong>: processes the "Remove Ads" non-consumable purchase and returns only purchase receipts.</li>
-<li><strong>Firebase Analytics / Crashlytics</strong>: anonymous events and crash reporting.</li>
-</ul>
-
-<h3>3. Children's Privacy</h3>
-<p>The App is a casual game for all ages with no social features, chat or user-generated content. Ads are served by third-party platforms in compliance with Google's ads and families policies; where legally required, "designed for families" settings will be applied.</p>
-
-<h3>4. Your Rights and Choices</h3>
-<ul>
-<li><strong>Consent</strong>: in applicable regions you will see a UMP consent form on first launch and can accept or reject personalized ads.</li>
-<li><strong>Deletion</strong>: there is no server-side data; all saves are local. Uninstall or clear app data to delete everything.</li>
-<li><strong>Opt out of personalized ads</strong>: reset your Advertising ID in Android Settings → Privacy → Ads.</li>
-<li><strong>Purchases</strong>: buying "Remove Ads" disables ads for all time; purchases can be restored on the in-app store screen.</li>
-</ul>
-
-<h3>5. Changes and Contact</h3>
-<p>We may update this policy; the latest version will always be published on this page. For privacy questions: <strong>slx97065227@gmail.com</strong>.</p>
-</section>
-
 <footer>
-<p>Rovilo · Privacy Policy · 2026-08-29</p>
+<p>Rovilo · Privacy Policy · 2026-09-16</p>
 </footer>
 
 </body>

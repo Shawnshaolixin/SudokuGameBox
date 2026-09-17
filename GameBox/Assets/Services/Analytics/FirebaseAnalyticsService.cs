@@ -1,5 +1,6 @@
 #if SUDOKU_FIREBASE
 using System;
+using System.Collections.Generic;
 using Firebase;
 using Firebase.Analytics;
 using Firebase.Crashlytics;
@@ -49,18 +50,22 @@ namespace Box.Services
             });
         }
 
-        public void LogEvent(string eventName) => Log(eventName, null, null);
+        public void LogEvent(string eventName) => Log(eventName, Array.Empty<Parameter>());
 
         public void LogEvent(string eventName, string parameterName, object parameterValue)
-            => Log(eventName, parameterName, parameterValue);
+            => Log(eventName, parameterValue == null
+                ? Array.Empty<Parameter>()
+                : new[] { ToParameter(parameterName, parameterValue) });
+
+        public void LogEvent(string eventName, IReadOnlyDictionary<string, object> parameters)
+            => Log(eventName, ToParameters(parameters));
 
         /// <summary>
-        /// 统一事件上报：GA4 参数仅支持 string/long/double，bool 转 0/1，其余转字符串。
-        /// 依赖未就绪时静默丢弃（与桩行为一致，不阻塞业务链路）。
+        /// 统一事件上报入口。依赖未就绪时静默丢弃（与桩行为一致，不阻塞业务链路）。
         /// 事件名先过一次契约校验(AnalyticsEvents,04 文档 §6.1)——非法名会被 FA SDK 静默
         /// 拒收(2026-09-05 带点/斜杠命名全丢的教训),违规打 Warning 便于开发期发现。
         /// </summary>
-        private void Log(string eventName, string parameterName, object parameterValue)
+        private void Log(string eventName, Parameter[] parameters)
         {
             if (!_available) return;
             if (!AnalyticsEvents.IsValidName(eventName))
@@ -70,26 +75,51 @@ namespace Box.Services
             }
             try
             {
-                if (parameterValue == null)
-                {
-                    FirebaseAnalytics.LogEvent(eventName);
-                    return;
-                }
-                switch (parameterValue)
-                {
-                    case string s: FirebaseAnalytics.LogEvent(eventName, parameterName, s); break;
-                    case bool b:   FirebaseAnalytics.LogEvent(eventName, parameterName, b ? 1L : 0L); break;
-                    case int i:    FirebaseAnalytics.LogEvent(eventName, parameterName, (long)i); break;
-                    case long l:   FirebaseAnalytics.LogEvent(eventName, parameterName, l); break;
-                    case float f:  FirebaseAnalytics.LogEvent(eventName, parameterName, (double)f); break;
-                    case double d: FirebaseAnalytics.LogEvent(eventName, parameterName, d); break;
-                    default:       FirebaseAnalytics.LogEvent(eventName, parameterName, parameterValue.ToString()); break;
-                }
+                FirebaseAnalytics.LogEvent(eventName, parameters);
             }
             catch (Exception e)
             {
                 // 埋点失败不上抛、不重试:分析链路异常不能影响游戏本体
                 Debug.LogWarning($"[Firebase] 埋点失败:{eventName} → {e.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 字典 → GA4 参数数组。值为 null 的键跳过(GA4 无 null 类型)。
+        /// 参数名非法时只告警不丢弃:SDK 会静默丢掉该参数,提前暴露比后台查不到原因省事。
+        /// </summary>
+        private static Parameter[] ToParameters(IReadOnlyDictionary<string, object> parameters)
+        {
+            if (parameters == null || parameters.Count == 0) return Array.Empty<Parameter>();
+
+            var list = new List<Parameter>(parameters.Count);
+            foreach (var kv in parameters)
+            {
+                if (kv.Value == null) continue;
+                if (!AnalyticsEvents.IsValidParamName(kv.Key))
+                {
+                    Debug.LogWarning($"[Firebase] 埋点参数名非法(仅 [a-z0-9_] 且字母开头 ≤40): {kv.Key}");
+                }
+                list.Add(ToParameter(kv.Key, kv.Value));
+            }
+            return list.ToArray();
+        }
+
+        /// <summary>
+        /// 值 → GA4 Parameter:GA4 仅支持 string/long/double,bool 转 0/1,其余 ToString
+        /// (与 04 文档 §6.1 的类型约定一致)。
+        /// </summary>
+        private static Parameter ToParameter(string name, object value)
+        {
+            switch (value)
+            {
+                case string s: return new Parameter(name, s);
+                case bool b:   return new Parameter(name, b ? 1L : 0L);
+                case int i:    return new Parameter(name, (long)i);
+                case long l:   return new Parameter(name, l);
+                case float f:  return new Parameter(name, (double)f);
+                case double d: return new Parameter(name, d);
+                default:       return new Parameter(name, value.ToString());
             }
         }
 

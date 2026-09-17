@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Box.Services;
 using UnityEngine;
 
@@ -133,6 +134,25 @@ namespace Box.Gameplay
                 return;
             }
             Debug.Log($"[AnalyticsStub] 事件:{eventName}  {parameterName}={parameterValue}");
+        }
+
+        public void LogEvent(string eventName, IReadOnlyDictionary<string, object> parameters)
+        {
+            if (!AnalyticsEvents.IsValidName(eventName))
+            {
+                Debug.LogWarning($"[AnalyticsStub] 埋点事件名非法(仅 [a-z0-9_] 且字母开头 ≤40,04 文档 §6.1): {eventName}");
+                return;
+            }
+            if (parameters == null || parameters.Count == 0)
+            {
+                Debug.Log($"[AnalyticsStub] 事件:{eventName}");
+                return;
+            }
+
+            // 拼成 "k=v k=v" 便于开发期在 Console 直接核对参数,与真实现的后台视图对齐
+            var parts = new List<string>(parameters.Count);
+            foreach (var kv in parameters) parts.Add($"{kv.Key}={kv.Value}");
+            Debug.Log($"[AnalyticsStub] 事件:{eventName}  {string.Join(" ", parts)}");
         }
 
         public void LogNonFatal(string message)
