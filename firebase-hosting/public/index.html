@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rovilo — Sudoku Puzzle Game</title>
+<meta name="description" content="Rovilo is a classic Sudoku puzzle game for Android. Developer website and contact information.">
+<!--
+  开发者网站落地页(Firebase Hosting 根目录)。
+  用途:
+    1) 作为 Google Play 商店页「网站」字段的目标地址;
+    2) 承载 AdMob app-ads.txt 的域名入口(文件位于本目录 /app-ads.txt)。
+  约束:纯静态、零外部依赖(不引 CDN 字体/图标/脚本),避免任何第三方加载失败影响可达性。
+  注意:隐私政策不在此域复制,统一指向 GitHub Pages 的单一事实源,防止两份拷贝漂移。
+-->
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --card: #ffffff;
+    --fg: #1c1c1e;
+    --muted: #5f6368;
+    --line: #e4e4e1;
+    --accent: #2f6f4f;
+    --accent-soft: #eef4f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131315;
+      --card: #1c1c1f;
+      --fg: #ececec;
+      --muted: #9a9ea3;
+      --line: #2c2c30;
+      --accent: #7fc9a0;
+      --accent-soft: #1e2a24;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 48px 20px 64px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC",
+          "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  .mark {
+    width: 64px; height: 64px;
+    border-radius: 16px;
+    background: var(--accent-soft);
+    border: 1px solid var(--line);
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    gap: 3px; padding: 12px;
+    margin-bottom: 24px;
+  }
+  .mark i { border-radius: 1.5px; background: var(--accent); opacity: .28; }
+  .mark i:nth-child(1), .mark i:nth-child(5), .mark i:nth-child(9) { opacity: 1; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -.02em; }
+  .tagline { color: var(--muted); margin: 0 0 32px; font-size: 17px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em;
+       color: var(--muted); margin: 0 0 14px; font-weight: 600; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { padding: 11px 0; border-top: 1px solid var(--line); }
+  li:first-child { border-top: 0; padding-top: 0; }
+  li:last-child { padding-bottom: 0; }
+  .label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+  a { color: var(--accent); text-decoration: none; word-break: break-word; }
+  a:hover { text-decoration: underline; }
+  p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+  .zh { color: var(--muted); font-size: 15px; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 32px; }
+  @media (max-width: 400px) { body { padding: 32px 16px 48px; } h1 { font-size: 26px; } }
+</style>
+</head>
+<body>
+<main>
+
+  <div class="mark" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+  </div>
+
+  <h1>Rovilo</h1>
+  <p class="tagline">A classic Sudoku puzzle game for Android — offline, calm, and free to play.</p>
+
+  <div class="card">
+    <h2>About</h2>
+    <p>Rovilo is a Sudoku game built around a clean, distraction-free grid. Puzzles are generated
+       on-device, so the game works fully offline. Multiple difficulty levels, a daily challenge,
+       a hint system, and no forced interruptions.</p>
+    <p class="zh">Rovilo 是一款经典数独游戏：谜题在本地生成，完全离线可玩；提供多档难度、每日挑战与提示系统。</p>
+  </div>
+
+  <div class="card">
+    <h2>Links</h2>
+    <ul>
+      <li>
+        <span class="label">Google Play</span>
+        <a href="https://play.google.com/store/apps/details?id=com.lixingames.rovilo">Rovilo on Google Play</a>
+      </li>
+      <li>
+        <span class="label">Privacy Policy</span>
+        <a href="https://shawnshaolixin.github.io/SudokuGameBox/privacy-policy.html">Privacy Policy / 隐私政策</a>
+      </li>
+      <li>
+        <span class="label">Contact / 联系</span>
+        <a href="mailto:slx97065227@gmail.com">slx97065227@gmail.com</a>
+      </li>
+    </ul>
+  </div>
+
+  <footer>
+    <p>© 2026 Rovilo. All rights reserved.</p>
+  </footer>
+
+</main>
+</body>
+</html>

@@ -141,7 +141,6 @@ GameBox/Assets/RemoteContent.meta
 # Addressables 构建输出与热更部署产物(ServerData 为默认 LocalBuildPath;部署目录为拷贝/上传用,均可重建)
 GameBox/ServerData/
 _deploy_remote/
-firebase-hosting/
 
 # HybridCLR 生成目录(Phase 9 9-1:Install 注入的 il2cpp 运行时 + GenerateAll 产物,可重跑生成,不入库)
 GameBox/HybridCLRData/
@@ -174,6 +173,20 @@ GameBox/Assets/Resources/PerformanceTestRunSettings.json*
 # Firebase 等 UPM 本地包 tgz(官方仅 tgz 分发,大体积不入库,clone 后需手动放置)
 GameBox/Packages/*.tgz
 
+# Firebase Hosting 站点(2026-09-17 改:原先整目录忽略,隐患是 app-ads.txt / index.html /
+# firebase.json 都不在版本库内 —— 一旦从干净检出执行 deploy_firebase.ps1,firebase deploy 会
+# prune 掉线上却不在本地的文件,app-ads.txt 被删则 AdMob 验证失效、广告停填,firebase.json 的
+# 缓存头策略也会一并丢失。故:站点配置与根目录静态文件入库,内容产物仍不入库(红线 9)。
+# 注意顺序:git 无法在"父目录被忽略"时重新包含子文件,必须先 !firebase-hosting/public/ 再逐个放行。
+firebase-hosting/*
+!firebase-hosting/firebase.json
+!firebase-hosting/.firebaserc
+!firebase-hosting/public/
+firebase-hosting/public/*
+# 开发者网站根目录静态文件(app-ads.txt 是 AdMob 验证入口,不可丢失)
+!firebase-hosting/public/app-ads.txt
+!firebase-hosting/public/index.html
+!firebase-hosting/public/robots.txt
+
 # Firebase Hosting 内容目录(deploy_firebase.ps1 每次从 ServerData 重建,红线 9 不入库)
-firebase-hosting/public/*/Android/
 firebase-hosting/.firebase/

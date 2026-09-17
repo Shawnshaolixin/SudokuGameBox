@@ -1,0 +1,7 @@
+# AdMob app-ads.txt 抓取器身份(Google-adstxt)必须能读到根目录 app-ads.txt,
+# 显式放行以避免任何默认拦截导致验证失败。
+User-agent: Google-adstxt
+Allow: /
+
+User-agent: *
+Allow: /
